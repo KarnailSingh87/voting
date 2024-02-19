@@ -894,3 +894,5 @@ MIT License - See LICENSE file
 <!-- Maintenance note: verified layout and documentation on 2024-02-18 -->
 
 <!-- Maintenance note: verified layout and documentation on 2024-02-19 -->
+
+<!-- Docs update: verified installation steps on 2024-02-19 -->
