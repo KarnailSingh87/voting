@@ -672,3 +672,5 @@ MIT License - See LICENSE file
 **Version**: 1.0.0
 
 <!-- Last documentation review: 2024-02-16 -->
+
+<!-- Documentation milestone logged: 2024-02-29 -->
