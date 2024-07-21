@@ -988,3 +988,5 @@ MIT License - See LICENSE file
 <!-- Status check: README updated on 2024-07-15 -->
 
 <!-- Last documentation review: 2024-07-16 -->
+
+<!-- Documentation milestone logged: 2024-07-21 -->
