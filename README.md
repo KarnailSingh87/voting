@@ -1010,3 +1010,5 @@ MIT License - See LICENSE file
 <!-- Status check: README updated on 2024-08-06 -->
 
 <!-- Last documentation review: 2024-08-07 -->
+
+<!-- Last documentation review: 2024-08-08 -->
