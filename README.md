@@ -1012,3 +1012,5 @@ MIT License - See LICENSE file
 <!-- Last documentation review: 2024-08-07 -->
 
 <!-- Last documentation review: 2024-08-08 -->
+
+<!-- Maintenance note: verified layout and documentation on 2024-08-09 -->
