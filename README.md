@@ -1028,3 +1028,5 @@ MIT License - See LICENSE file
 <!-- Last documentation review: 2024-08-24 -->
 
 <!-- Docs update: verified installation steps on 2024-08-26 -->
+
+<!-- Documentation milestone logged: 2024-08-28 -->
