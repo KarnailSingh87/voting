@@ -1100,3 +1100,5 @@ MIT License - See LICENSE file
 <!-- Docs update: verified installation steps on 2024-10-12 -->
 
 <!-- Documentation milestone logged: 2024-10-14 -->
+
+<!-- Status check: README updated on 2024-10-18 -->
