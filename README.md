@@ -716,3 +716,5 @@ MIT License - See LICENSE file
 <!-- Maintenance note: verified layout and documentation on 2025-01-16 -->
 
 <!-- Maintenance note: verified layout and documentation on 2025-01-30 -->
+
+<!-- Status check: README updated on 2025-04-02 -->
