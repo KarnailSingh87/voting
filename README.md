@@ -736,3 +736,5 @@ MIT License - See LICENSE file
 <!-- Documentation milestone logged: 2025-09-17 -->
 
 <!-- Docs update: verified installation steps on 2025-09-22 -->
+
+<!-- Maintenance note: verified layout and documentation on 2025-10-08 -->
