@@ -1,0 +1,454 @@
+
+> aadhaar-voting-backend@1.0.0 dev
+> nodemon server.js
+
+[33m[nodemon] 3.1.11[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Mock mode - OTP 364843 for phone 6230013209 (Aadhaar: 862671670132)
+Socket connected eTiC317q5WrT5E5vAAAC
+Socket disconnected eTiC317q5WrT5E5vAAAC
+Socket connected JWOITsf-Twd2N3NdAAAF
+Socket disconnected JWOITsf-Twd2N3NdAAAF
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+node:events:486
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::5005
+    at Server.setupListenHandle [as _listen2] (node:net:1940:16)
+    at listenInCluster (node:net:1997:12)
+    at Server.listen (node:net:2102:7)
+    at file:///Users/harsh/Desktop/Harsh/PROJECTS/voting/backend/server.js:41:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'EADDRINUSE',
+  errno: -48,
+  syscall: 'listen',
+  address: '::',
+  port: 5005
+}
+
+Node.js v25.2.1
+[31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Mock mode - OTP 937417 for phone 6230013209 (Aadhaar: 862671670132)
+[OTP] Mock mode - OTP 211102 for phone 6230013209 (Aadhaar: 862671670132)
+[OTP] Mock mode - OTP 844743 for phone 6230013209 (Aadhaar: 862671670132)
+[OTP] Mock mode - OTP 557668 for phone 6230013209 (Aadhaar: 862671670132)
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+node:internal/modules/package_json_reader:316
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'nodemailer' imported from /Users/harsh/Desktop/Harsh/PROJECTS/voting/backend/config/otpService.js
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:316:9)
+    at packageResolve (node:internal/modules/esm/resolve:768:81)
+    at moduleResolve (node:internal/modules/esm/resolve:858:18)
+    at defaultResolve (node:internal/modules/esm/resolve:990:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:712:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:729:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:758:52)
+    at #resolve (node:internal/modules/esm/loader:694:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:614:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v25.2.1
+[31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+node:internal/modules/package_json_reader:316
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'nodemailer' imported from /Users/harsh/Desktop/Harsh/PROJECTS/voting/backend/config/otpService.js
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:316:9)
+    at packageResolve (node:internal/modules/esm/resolve:768:81)
+    at moduleResolve (node:internal/modules/esm/resolve:858:18)
+    at defaultResolve (node:internal/modules/esm/resolve:990:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:712:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:729:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:758:52)
+    at #resolve (node:internal/modules/esm/loader:694:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:614:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v25.2.1
+[31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+node:internal/modules/package_json_reader:316
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'nodemailer' imported from /Users/harsh/Desktop/Harsh/PROJECTS/voting/backend/config/otpService.js
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:316:9)
+    at packageResolve (node:internal/modules/esm/resolve:768:81)
+    at moduleResolve (node:internal/modules/esm/resolve:858:18)
+    at defaultResolve (node:internal/modules/esm/resolve:990:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:712:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:729:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:758:52)
+    at #resolve (node:internal/modules/esm/loader:694:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:614:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v25.2.1
+[31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+node:internal/modules/package_json_reader:316
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'nodemailer' imported from /Users/harsh/Desktop/Harsh/PROJECTS/voting/backend/config/otpService.js
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:316:9)
+    at packageResolve (node:internal/modules/esm/resolve:768:81)
+    at moduleResolve (node:internal/modules/esm/resolve:858:18)
+    at defaultResolve (node:internal/modules/esm/resolve:990:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:712:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:729:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:758:52)
+    at #resolve (node:internal/modules/esm/loader:694:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:614:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v25.2.1
+[31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+node:internal/modules/package_json_reader:316
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'nodemailer' imported from /Users/harsh/Desktop/Harsh/PROJECTS/voting/backend/config/otpService.js
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:316:9)
+    at packageResolve (node:internal/modules/esm/resolve:768:81)
+    at moduleResolve (node:internal/modules/esm/resolve:858:18)
+    at defaultResolve (node:internal/modules/esm/resolve:990:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:712:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:729:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:758:52)
+    at #resolve (node:internal/modules/esm/loader:694:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:614:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v25.2.1
+[31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+node:internal/modules/package_json_reader:316
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'nodemailer' imported from /Users/harsh/Desktop/Harsh/PROJECTS/voting/backend/config/otpService.js
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:316:9)
+    at packageResolve (node:internal/modules/esm/resolve:768:81)
+    at moduleResolve (node:internal/modules/esm/resolve:858:18)
+    at defaultResolve (node:internal/modules/esm/resolve:990:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:712:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:729:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:758:52)
+    at #resolve (node:internal/modules/esm/loader:694:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:614:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v25.2.1
+[31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Port 5006 is in use.
+Attempting to listen on port 5007 (2 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+Voting backend running on :5007
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Port 5006 is in use.
+Attempting to listen on port 5007 (2 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+Voting backend running on :5007
+[OTP] Ethereal test account created for development: epufwyawdus3oglt@ethereal.email
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Ethereal test account created for development: rozvudrfd3b7muu6@ethereal.email
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+[OTP] Ethereal test account created for development: s5wjcucxavc65stv@ethereal.email
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Port 5006 is in use.
+Attempting to listen on port 5007 (2 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+Voting backend running on :5007
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+[OTP] Ethereal test account created for development: nc6otpivgi54yiuu@ethereal.email
+Voting backend running on :5005
+Voting backend running on :5006
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Ethereal test account created for development: caq4fenuarila4t6@ethereal.email
+Socket connected UZJlJX71DU1rU0aIAAAB
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Ethereal test account created for development: grxx52kmgcaipks7@ethereal.email
+Socket connected d_4DzpcKr6aItzt9AAAB
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Ethereal test account created for development: kxpt5x75ynoezgnn@ethereal.email
+Socket connected qFS7OzfpG5so4VHLAAAB
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Ethereal test account created for development: civaon5itsqgvsbn@ethereal.email
+Socket connected krWPKsjRDV7cgDwnAAAB
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+Socket connected _gtXg2-AozqSxth-AAAB
+[OTP] Ethereal test account created for development: ogfkyfwynqfj2iln@ethereal.email
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Ethereal test account created for development: oqgjzc3el7bdu4p2@ethereal.email
+Socket connected 5AsjYu6ZRFXU-kM9AAAB
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+[OTP] Ethereal test account created for development: jnzooi4j4lkykcz5@ethereal.email
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+node:internal/modules/package_json_reader:316
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'express-rate-limit' imported from /Users/harsh/Desktop/Harsh/PROJECTS/voting/backend/routes/publicRoutes.js
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:316:9)
+    at packageResolve (node:internal/modules/esm/resolve:768:81)
+    at moduleResolve (node:internal/modules/esm/resolve:858:18)
+    at defaultResolve (node:internal/modules/esm/resolve:990:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:712:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:729:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:758:52)
+    at #resolve (node:internal/modules/esm/loader:694:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:614:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v25.2.1
+[31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Ethereal test account created for development: qityzrtzmnuytm7f@ethereal.email
+Socket connected XkN4EsaUlgnN5VXIAAAB
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+[OTP] Ethereal test account created for development: zrdo3r3btqauwoiy@ethereal.email
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+[OTP] Ethereal test account created for development: hhvcv5t57rigaeha@ethereal.email
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+[OTP] Ethereal test account created for development: zcav5q25s6v327kg@ethereal.email
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+[OTP] Ethereal test account created for development: fen6dbpdywcws624@ethereal.email
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+[OTP] Ethereal test account created for development: juyhq3jkrz265gdv@ethereal.email
+Voting backend running on :5005
+Voting backend running on :5006
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Ethereal test account created for development: dfjgqo5tm7ydhuuh@ethereal.email
+Socket connected o2er5jlUflzSLTdGAAAB
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+[OTP] Ethereal test account created for development: enmxclwi5xaygkeb@ethereal.email
+MongoDB connected
+Voting backend running on :5005
+Socket connected vo4FEk8B7uYvGrK4AAAB
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Ethereal test account created for development: opwxx3cmmohvcxz5@ethereal.email
+Socket connected PGb8r5-geDxZQTR3AAAB
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+[OTP] Ethereal test account created for development: x7y4s3xe72vpqbnf@ethereal.email
+Voting backend running on :5005
+Voting backend running on :5006
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+[OTP] Ethereal test account created for development: mnrhqblpzchkrodt@ethereal.email
+Socket connected vLB7vVqKQuAWumryAAAB
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+Socket connected 4iApfchXT5gTst8YAAAB
+[OTP] Ethereal test account created for development: qyaxoafshntd4hpf@ethereal.email
+Socket disconnected 4iApfchXT5gTst8YAAAB
+n on port 5006 (3 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+[OTP] Ethereal test account created for development: uct6dxvzjie4wfnk@ethereal.email
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Voting backend running on :5005
+Socket connected 12wY7r9xXnp5tvBgAAAB
+[OTP] Ethereal test account created for development: rk2p5i42l6eoruik@ethereal.email
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+[OTP] Ethereal test account created for development: kdwifng3pibcdsay@ethereal.email
+Voting backend running on :5005
+Voting backend running on :5006
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node server.js`[39m
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+[OTP] Ethereal test account created for development: z275htobjsr3qvid@ethereal.email

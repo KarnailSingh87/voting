@@ -1,0 +1,11 @@
+MongoDB connected
+Port 5005 is in use.
+Attempting to listen on port 5006 (3 attempts left)...
+Port 5006 is in use.
+Attempting to listen on port 5007 (2 attempts left)...
+Voting backend running on :5005
+Voting backend running on :5006
+Voting backend running on :5007
+[OTP] Ethereal test account created for development: j6ok37chq5c5myia@ethereal.email
+[OTP] Sent 567079 to devtest+2@example.com via SMTP
+[OTP] Ethereal preview URL: https://ethereal.email/message/aXEkyWZ99A0DKPCbaXEk4pSkaEEGPuIGAAAAAfAAIGNTOB5cxqPPwNVt478
