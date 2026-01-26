@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
 
@@ -13,7 +13,7 @@ const Verify = () => {
   useEffect(() => {
     const verifyVote = async () => {
       try {
-        const response = await axios.get(`/api/public/vote/${id}`);
+        const response = await axios.get(`/api/vote/${id}`);
         
         if (response.data.success) {
           setVerificationData({

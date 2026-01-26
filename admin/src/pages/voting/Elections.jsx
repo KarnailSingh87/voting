@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import axios from '../../utils/axios';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import Sidebar from '../../components/Sidebar';
 
@@ -8,6 +10,7 @@ const Elections = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -16,6 +19,14 @@ const Elections = () => {
     candidates: [{ id: Date.now().toString(), name: '', party: '', description: '' }],
     isPublic: true
   });
+  // include importConcepts in the form data
+  useEffect(() => {
+    if (formData && !formData.importConcepts) {
+      setFormData(fd => ({ ...fd, importConcepts: { rollField: 'roll', nameField: 'name', emailField: 'email', mobileField: 'mobile', photoField: '' } }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   useEffect(() => {
     const fetchElections = async () => {
@@ -112,11 +123,12 @@ const Elections = () => {
           startDate: '',
           endDate: '',
           candidates: [{ id: Date.now().toString(), name: '', party: '', description: '' }],
-          isPublic: true
+          isPublic: true,
+          importConcepts: { rollField: 'roll', nameField: 'name', emailField: 'email', mobileField: 'mobile', photoField: '' }
         });
         setShowCreateForm(false);
         setError('');
-        alert('Election created successfully!');
+        toast.success('Election created successfully!');
       }
     } catch (err) {
       console.error('Error creating election:', err);
@@ -179,6 +191,10 @@ const Elections = () => {
     }
   };
 
+    const openElectionDetail = (id) => {
+      navigate(`/elections/${id}`);
+    };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'active':
@@ -190,7 +206,21 @@ const Elections = () => {
       case 'completed':
         return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Completed</span>;
       default:
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Unknown</span>;
+        // No badge when status is not provided
+        return null;
+    }
+  };
+
+  // Format date strings defensively. Return a friendly placeholder when missing/invalid
+  const formatDate = (d) => {
+    try {
+      if (!d) return '—';
+      const dt = new Date(d);
+      if (!Number.isNaN(dt.getTime())) return dt.toLocaleDateString();
+      // If parsing failed but original value exists, show the raw value so you can see the stored date string
+      return String(d);
+    } catch (e) {
+      return String(d || '—');
     }
   };
 
@@ -378,6 +408,32 @@ const Elections = () => {
                     </div>
 
                     <div className="sm:col-span-6">
+                      <h4 className="text-sm font-medium text-gray-700">Import Settings (defaults)</h4>
+                      <div className="mt-2 grid grid-cols-1 gap-y-3 sm:grid-cols-3">
+                        <div>
+                          <label className="block text-sm text-gray-700">Roll field</label>
+                          <input type="text" name="import_roll" value={formData.importConcepts?.rollField || 'roll'} onChange={(e)=> setFormData({ ...formData, importConcepts: { ...(formData.importConcepts||{}), rollField: e.target.value } })} className="mt-1 block w-full border rounded px-2 py-1" />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-700">Name field</label>
+                          <input type="text" name="import_name" value={formData.importConcepts?.nameField || 'name'} onChange={(e)=> setFormData({ ...formData, importConcepts: { ...(formData.importConcepts||{}), nameField: e.target.value } })} className="mt-1 block w-full border rounded px-2 py-1" />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-700">Email field</label>
+                          <input type="text" name="import_email" value={formData.importConcepts?.emailField || 'email'} onChange={(e)=> setFormData({ ...formData, importConcepts: { ...(formData.importConcepts||{}), emailField: e.target.value } })} className="mt-1 block w-full border rounded px-2 py-1" />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-700">Mobile field</label>
+                          <input type="text" name="import_mobile" value={formData.importConcepts?.mobileField || 'mobile'} onChange={(e)=> setFormData({ ...formData, importConcepts: { ...(formData.importConcepts||{}), mobileField: e.target.value } })} className="mt-1 block w-full border rounded px-2 py-1" />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-700">Photo field (optional)</label>
+                          <input type="text" name="import_photo" value={formData.importConcepts?.photoField || ''} onChange={(e)=> setFormData({ ...formData, importConcepts: { ...(formData.importConcepts||{}), photoField: e.target.value } })} className="mt-1 block w-full border rounded px-2 py-1" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-6">
                       <div className="flex items-center">
                         <input
                           id="isPublic"
@@ -437,12 +493,19 @@ const Elections = () => {
                                 <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                               </svg>
                               <span>
-                                {new Date(election.startDate).toLocaleDateString()} - {new Date(election.endDate).toLocaleDateString()}
+                                {formatDate(election.startTime || election.startDate)} - {formatDate(election.endTime || election.endDate)}
                               </span>
                             </div>
                           </div>
                           <div className="ml-4 flex-shrink-0 flex items-center space-x-3">
                             {getStatusBadge(election.status)}
+                            <button
+                              onClick={() => openElectionDetail(election._id)}
+                              className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-cyan-700 bg-cyan-100 hover:bg-cyan-200 focus:outline-none"
+                            >
+                              View
+                            </button>
+                            {/* Import button removed as per election management preference */}
                             {election.status === 'draft' && (
                               <button
                                 onClick={() => handleStartElection(election._id)}
@@ -495,6 +558,7 @@ const Elections = () => {
             </div>
           )}
         </main>
+
       </div>
     </div>
   );

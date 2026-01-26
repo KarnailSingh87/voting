@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
 
 const Register = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    aadhaar: '',
+    roll: '',
     name: '',
     mobile: '',
     email: '',
@@ -15,41 +15,30 @@ const Register = () => {
   });
 
   const [step, setStep] = useState(1);
-  const [aadhaarLoading, setAadhaarLoading] = useState(false);
-  const [aadhaarError, setAadhaarError] = useState('');
-  const [aadhaarValid, setAadhaarValid] = useState(null); // null = unknown, true = valid, false = invalid
+  const [rollLoading, setRollLoading] = useState(false);
+  const [rollError, setRollError] = useState('');
+  const [rollValid, setRollValid] = useState(null); // null = unknown, true = valid, false = invalid
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const aadhaarDebounceRef = useRef(null);
+  const rollDebounceRef = useRef(null);
   const nameRef = useRef(null);
   const emailRef = useRef(null);
 
-  // helper: validate Aadhaar (12 digits)
-  const isValidAadhaar = (v) => /^[0-9]{12}$/.test(v);
+  // helper: validate roll (alphanumeric 4-20 chars)
+  const isValidRoll = (v) => /^[A-Za-z0-9_-]{4,20}$/.test(v);
 
-  // Debounced lookup when aadhaar reaches 12 digits
+  // Debounced lookup when roll input changes
   useEffect(() => {
-    const aad = formData.aadhaar.replace(/\D/g, '');
-    if (aad.length >= 12) {
-      // normalize to first 12
-      const normalized = aad.slice(0, 12);
-      if (normalized !== formData.aadhaar) {
-        setFormData((s) => ({ ...s, aadhaar: normalized }));
-        return;
-      }
-      // debounce lookup
-      if (aadhaarDebounceRef.current) clearTimeout(aadhaarDebounceRef.current);
-      aadhaarDebounceRef.current = setTimeout(() => {
-        doAadhaarLookup(normalized, true);
-      }, 250);
-    }
-    return () => {
-      if (aadhaarDebounceRef.current) clearTimeout(aadhaarDebounceRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.aadhaar]);
+    const v = (formData.roll || '').toString().trim().toUpperCase();
+    if (!v) return;
+    if (rollDebounceRef.current) clearTimeout(rollDebounceRef.current);
+    rollDebounceRef.current = setTimeout(() => {
+      doRollLookup(v, false);
+    }, 300);
+  return () => { if (rollDebounceRef.current) clearTimeout(rollDebounceRef.current); };
+  }, [formData.roll]);
 
   // focus the name field when auto-advanced to step 2
   useEffect(() => {
@@ -61,54 +50,51 @@ const Register = () => {
     }
   }, [step]);
 
-  const doAadhaarLookup = async (aadhaar, autoAdvance = false) => {
-    setAadhaarError('');
-    setAadhaarLoading(true);
-    setAadhaarValid(null);
+  const doRollLookup = async (roll, autoAdvance = false) => {
+    setRollError('');
+    setRollLoading(true);
+    setRollValid(null);
     try {
-      const res = await axios.post('/aadhaar-lookup', { aadhaar });
-      // backend udiService returns { name } or { name, dob }
+      const res = await axios.post('/student-lookup', { roll });
       const name = res?.data?.name || '';
-      const dob = res?.data?.dateOfBirth || res?.data?.dob || '';
       if (name) {
-        setAadhaarValid(true);
-        setFormData((s) => ({ ...s, name: name || s.name, dateOfBirth: dob || s.dateOfBirth }));
+        setRollValid(true);
+        setFormData((s) => ({ ...s, name: name || s.name }));
         if (autoAdvance) setStep(2);
       } else {
-        setAadhaarValid(false);
-        setAadhaarError('No record found for this Aadhaar');
+        setRollValid(false);
+        setRollError('No record found for this roll');
       }
     } catch (e) {
-      setAadhaarValid(false);
-      setAadhaarError(e?.response?.data?.message || 'Lookup failed');
+      setRollValid(false);
+      setRollError(e?.response?.data?.message || 'Lookup failed');
     } finally {
-      setAadhaarLoading(false);
+      setRollLoading(false);
     }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'aadhaar') {
-      // allow only digits, limit to 12
-      const digits = value.replace(/\D/g, '').slice(0, 12);
-      setFormData((s) => ({ ...s, aadhaar: digits }));
-      setAadhaarError('');
-      setAadhaarValid(null);
+    if (name === 'roll') {
+      const normalized = value.toUpperCase().slice(0, 20);
+      setFormData((s) => ({ ...s, roll: normalized }));
+      setRollError('');
+      setRollValid(null);
     } else {
       setFormData((s) => ({ ...s, [name]: value }));
     }
   };
 
-  const handleAadhaarContinue = async () => {
-    const aad = formData.aadhaar.replace(/\D/g, '');
-    if (!isValidAadhaar(aad)) {
-      setAadhaarError('Please enter a valid 12-digit Aadhaar');
+  const handleRollContinue = async () => {
+    const r = (formData.roll || '').toString().trim().toUpperCase();
+    if (!isValidRoll(r)) {
+      setRollError('Please enter a valid roll (4-20 alphanumeric chars)');
       return;
     }
-    await doAadhaarLookup(aad, true);
+    await doRollLookup(r, true);
   };
 
-  const handleBackToAadhaar = () => {
+  const handleBackToRoll = () => {
     setStep(1);
   };
 
@@ -125,7 +111,7 @@ const Register = () => {
     try {
       // send request to backend to request OTP (it will create voter record if absent)
       const payload = {
-        aadhaar: formData.aadhaar,
+        roll: formData.roll,
         name: formData.name,
         email: formData.email,
         mobile: formData.mobile
@@ -166,42 +152,40 @@ const Register = () => {
 
         {!success && step === 1 && (
           <div>
-              <label htmlFor="aadhaar" className="block text-sm font-medium text-gray-700">Aadhaar Number</label>
+              <label htmlFor="roll" className="block text-sm font-medium text-gray-700">University Roll Number</label>
               <div className="relative">
                 <input
-                  id="aadhaar"
-                  name="aadhaar"
+                  id="roll"
+                  name="roll"
                   type="text"
-                  inputMode="numeric"
-                  maxLength={12}
-                  value={formData.aadhaar}
+                  value={formData.roll}
                   onChange={handleChange}
                   className="mt-1 mb-3 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="Enter 12-digit Aadhaar"
-                  aria-describedby="aadhaar-status"
+                  placeholder="Enter your roll number"
+                  aria-describedby="roll-status"
                 />
                 {/* right-side status: spinner, check or cross */}
                 <div className="absolute right-2 top-3">
-                  {aadhaarLoading ? (
+                  {rollLoading ? (
                     <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                     </svg>
-                  ) : formData.aadhaar.length === 12 && aadhaarValid === true ? (
+                  ) : formData.roll.length >= 4 && rollValid === true ? (
                     <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 00-1.414-1.414L8 11.172 4.707 7.879A1 1 0 003.293 9.293l4 4a1 1 0 001.414 0l8-8z" clipRule="evenodd" />
                     </svg>
-                  ) : formData.aadhaar.length === 12 && aadhaarValid === false ? (
+                  ) : formData.roll.length >= 4 && rollValid === false ? (
                     <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-9V6a1 1 0 112 0v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3z" clipRule="evenodd" />
                     </svg>
                   ) : null}
                 </div>
               </div>
-              <div id="aadhaar-status" aria-live="polite" className="mt-1 flex items-center justify-between">
+              <div id="roll-status" aria-live="polite" className="mt-1 flex items-center justify-between">
                 <div>
-                  {aadhaarLoading && <p className="text-sm text-gray-500">Looking up name...</p>}
-                  {aadhaarError && <p className="text-sm text-red-600">{aadhaarError}</p>}
+                  {rollLoading && <p className="text-sm text-gray-500">Looking up name...</p>}
+                  {rollError && <p className="text-sm text-red-600">{rollError}</p>}
                 </div>
                 <div className="text-sm text-gray-700">
                   <span className="font-medium">Your Name: </span>
@@ -211,10 +195,10 @@ const Register = () => {
 
               <button
                 type="button"
-                onClick={handleAadhaarContinue}
+                onClick={handleRollContinue}
                 className="mt-4 w-full inline-flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700"
               >
-                {aadhaarLoading ? 'Looking up...' : 'Continue'}
+                {rollLoading ? 'Looking up...' : 'Continue'}
               </button>
             </div>
         )}
@@ -224,8 +208,8 @@ const Register = () => {
             {error && <div className="mb-4 text-sm text-red-600">{error}</div>}
 
             <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700">Aadhaar</label>
-              <input readOnly value={formData.aadhaar} className="mt-1 block w-full px-3 py-2 border border-gray-200 bg-gray-100 rounded-md" />
+              <label className="block text-sm font-medium text-gray-700">Roll</label>
+              <input readOnly value={formData.roll} className="mt-1 block w-full px-3 py-2 border border-gray-200 bg-gray-100 rounded-md" />
             </div>
 
             <div className="mb-3">
@@ -259,7 +243,7 @@ const Register = () => {
             </div>
 
             <div className="flex items-center justify-between">
-              <button type="button" onClick={handleBackToAadhaar} className="inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md">Back</button>
+              <button type="button" onClick={handleBackToRoll} className="inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md">Back</button>
               <button type="submit" disabled={loading} className="inline-flex justify-center py-2 px-4 bg-cyan-600 text-white rounded-md">
                 {loading ? 'Registering...' : 'Register'}
               </button>

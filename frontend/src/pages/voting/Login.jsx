@@ -1,58 +1,58 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
+import { toast } from 'react-toastify';
 
 const Login = () => {
   const navigate = useNavigate();
-  // Aadhaar-based flow state
-  const [aadhaar, setAadhaar] = useState('');
+  // University roll-number based flow state
+  const [roll, setRoll] = useState('');
   const [name, setName] = useState('');
+  const [photo, setPhoto] = useState('');
+  const [extraInfo, setExtraInfo] = useState(null); // arbitrary fields from originalObj
+  const [studentData, setStudentData] = useState(null);
   const [mobile, setMobile] = useState('');
+  const [email, setEmail] = useState('');
+  const [rollDetected, setRollDetected] = useState('');
+  // removed unused `voted` state
+  const [registeredAtDetected, setRegisteredAtDetected] = useState(null);
+  const [originalArrDetected, setOriginalArrDetected] = useState(null);
+  const [originalHeadersDetected, setOriginalHeadersDetected] = useState(null);
   const [otp, setOtp] = useState('');
   const [stage, setStage] = useState('aadhaar'); // aadhaar | otp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [missingRecord, setMissingRecord] = useState(false);
   const [needsContact, setNeedsContact] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   const lookupTimer = useRef(null);
   const pendingStageTimer = useRef(null);
+  const [verifiedRoll, setVerifiedRoll] = useState(false);
+  const [isMe, setIsMe] = useState(null); // null = not chosen, true = it's me, false = not me
+  const [, setQueryRaised] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+  // removed unused emailError state
 
-  // Verhoeff algorithm for Aadhaar checksum validation
-  const verhoeff = (() => {
-    // multiplication table
-    const d = [
-      [0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]
-    ];
-    const p = [
-      [0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]
-    ];
-    const inv = [0,4,3,2,1,5,6,7,8,9];
-    return {
-      validate: (num) => {
-        const s = String(num).replace(/\D/g, '');
-        if (s.length !== 12) return false;
-        let c = 0;
-        const arr = s.split('').reverse().map(x => parseInt(x, 10));
-        for (let i = 0; i < arr.length; i++) {
-          c = d[c][p[(i % 8)][arr[i]]];
-        }
-        return c === 0;
-      }
-    };
-  })();
+  // simple roll number format validation (alphanumeric, 4-20 chars)
+  const isValidRoll = (v) => /^[A-Za-z0-9_-]{4,20}$/.test(v);
 
   const requestOtp = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setLoading(true);
     setError('');
     setMessage('');
     try {
-      const resp = await axios.post('/api/voter/request-otp', { aadhaar, name, mobile });
+  const resp = await axios.post('/api/voter/request-otp', { roll, name, mobile, email });
+  const sentTo = resp.data?.sentTo;
       setStage('otp');
-      setMessage('OTP sent (mock console). Enter it below.');
+      if (sentTo) setMessage(`OTP sent to ${sentTo}`);
+      else setMessage('OTP sent. Enter it below.');
+      toast.success('OTP requested');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to request OTP');
+      const msg = err.response?.data?.message || 'Failed to request OTP';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -64,9 +64,9 @@ const Login = () => {
     setError('');
     setMessage('');
     try {
-      const resp = await axios.post('/api/voter/request-otp', { aadhaar, name, mobile: providedMobile || mobile });
-      // show inline confirmation then switch to OTP entry
-      setMessage('OTP sent to your registered contact (mock). Preparing OTP entry...');
+      const resp = await axios.post('/api/voter/request-otp', { roll, name, mobile: providedMobile || mobile });
+      const sentTo = resp.data?.sentTo;
+      setMessage(sentTo ? `OTP sent to ${sentTo}. Preparing OTP entry...` : 'OTP sent. Preparing OTP entry...');
       // delay briefly so user sees the confirmation
       if (pendingStageTimer.current) clearTimeout(pendingStageTimer.current);
       pendingStageTimer.current = setTimeout(() => setStage('otp'), 800);
@@ -84,13 +84,32 @@ const Login = () => {
     }
   };
 
+  const reportIdentity = async () => {
+    if (!roll || !name) return;
+    setReportLoading(true);
+    try {
+      const payload = { roll, detectedName: name, reason: 'mismatch' };
+      if (email) payload.contactProvided = email;
+      await axios.post('/api/report-identity', payload);
+      setMessage('Query raised. Admin will review.');
+      setQueryRaised(true);
+      toast.success('Report saved');
+    } catch (e) {
+      const msg = e.response?.data?.message || 'Failed to report';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   const verifyOtp = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setMessage('');
     try {
-      const resp = await axios.post('/api/voter/verify-otp', { aadhaar, otp });
+      const resp = await axios.post('/api/voter/verify-otp', { roll, otp });
       localStorage.setItem('voterToken', resp.data.token);
       navigate('/dashboard');
     } catch (err) {
@@ -105,7 +124,7 @@ const Login = () => {
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {stage === 'otp' ? 'Enter OTP' : 'Aadhaar Verification'}
+            {stage === 'otp' ? 'Enter OTP' : 'Student Login'}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Secure & Transparent Online Voting System
@@ -200,57 +219,204 @@ const Login = () => {
 
             <div className="rounded-md space-y-4">
               <div>
-                <label htmlFor="aadhaar" className="block text-sm font-medium text-gray-700">Aadhaar Number</label>
+                <label htmlFor="roll" className="block text-sm font-medium text-gray-700">University Roll Number</label>
                 <input
-                  id="aadhaar"
-                  name="aadhaar"
+                  id="roll"
+                  name="roll"
                   type="text"
                   required
-                  value={aadhaar}
+                  value={roll}
                   onChange={(e)=>{
-                    const v = e.target.value.replace(/\D/g, '');
-                    setAadhaar(v);
+                    const v = e.target.value.trim();
+                    setRoll(v);
                     setError('');
                     setMessage('');
+                    setMissingRecord(false);
                     // reset any pending stage switch
                     if (pendingStageTimer.current) { clearTimeout(pendingStageTimer.current); pendingStageTimer.current = null; }
                     // clear previous name until lookup completes
-                    if (v.length < 12) {
+                    if (!v) {
                       setName('');
                       setNeedsContact(false);
                     }
-                    // debounce lookup when digits stable and valid
+                    // debounce lookup when characters stable and valid
                     if (lookupTimer.current) clearTimeout(lookupTimer.current);
-                    if (v.length === 12 && verhoeff.validate(v)) {
+                    if (v && isValidRoll(v)) {
+                      const query = v.trim().toUpperCase();
                       lookupTimer.current = setTimeout(async () => {
                         try {
                           setLookupLoading(true);
-                          const res = await axios.post('/api/aadhaar-lookup', { aadhaar: v });
-                          if (res.data?.success) {
-                            setName(res.data.name || '');
-                            setMessage(res.data.mock ? 'Aadhaar lookup (mock) successful' : 'Aadhaar verified');
-                            // Try to request OTP automatically — backend may require mobile/email; try without mobile first
-                            await tryRequestOtp();
-                          } else {
-                            setError(res.data?.message || 'Aadhaar lookup failed');
-                          }
+                          const res = await axios.post('/api/student-lookup', { roll: query });
+                            if (res.data?.success) {
+                            const s = res.data.student || {};
+                            setRollDetected(s.roll || '');
+                            setName(s.name || '');
+                            // populate contact info if provided by lookup
+                            if (s.email) setEmail(s.email);
+                            if (s.mobile) setMobile(s.mobile);
+                            if (s.photo) setPhoto(s.photo);
+                            if (s.originalObj) setExtraInfo(s.originalObj);
+                            // `voted` state removed earlier; don't call undefined setter
+                            if (s.registeredAt) setRegisteredAtDetected(s.registeredAt);
+                            if (Array.isArray(s.originalArr)) setOriginalArrDetected(s.originalArr);
+                            if (Array.isArray(s.originalHeaders)) setOriginalHeadersDetected(s.originalHeaders);
+                            setStudentData(s);
+                            // Prompt user to confirm identity before sending OTP
+                            setMessage('Please confirm your contact and request OTP.');
+                            // mark as verified (roll exists) but DO NOT auto-request OTP; wait for user confirmation
+                            setVerifiedRoll(true);
+                            setIsMe(null);
+                            setQueryRaised(false);
+                            toast.success('Student found');
+                            // show a link to full details page
+                            // (Login remains the primary flow; details page is for inspection/printing)
+                            } else {
+                              const respMsg = res.data?.message || 'Student lookup failed';
+                              // If backend explicitly indicates Not found, show a neutral message and allow reporting
+                              if (respMsg === 'Not found') {
+                                const friendly = 'No student record found for that roll. Check formatting (4–20 alphanumeric). If this is correct, contact your election admin.';
+                                setMessage(friendly);
+                                setMissingRecord(true);
+                                toast.info(friendly);
+                              } else {
+                                setError(respMsg);
+                                toast.error(respMsg);
+                              }
+                            }
                         } catch (err) {
-                          setError(err.response?.data?.message || 'Aadhaar lookup failed');
+                            let msg = err.response?.data?.message || 'Student lookup failed';
+                            // "Not found" is the raw 404 message from backend; show a friendly hint
+              if (err.response?.status === 404 || msg === 'Not found') {
+                // Provide a clearer, actionable message for users when lookup fails
+                msg = 'No student record found for that roll. Check formatting (4–20 alphanumeric). If this is correct, contact your election admin.';
+                setMessage(msg);
+                setMissingRecord(true);
+                toast.info(msg);
+              } else {
+                setError(msg);
+                toast.error(msg);
+              }
                         } finally {
                           setLookupLoading(false);
                         }
                       }, 300);
-                    } else if (v.length === 12) {
-                      // invalid checksum
-                      setError('Aadhaar appears invalid (checksum failed). Please check the number.');
+                    } else if (v) {
+                      // invalid format
+                      setError('Roll number appears invalid. Use 4–20 alphanumeric characters.');
                     }
                   }}
                   className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 focus:z-10 sm:text-sm"
-                  placeholder="12-digit Aadhaar"
+                  placeholder="Roll number"
                 />
-                {lookupLoading && <p className="mt-2 text-sm text-gray-500">Verifying Aadhaar...</p>}
-                {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
-                {name && <p className="mt-2 text-sm text-gray-700">Detected name: <span className="font-medium">{name}</span></p>}
+                {/* When lookup fails, allow the user to report a missing record */}
+                {missingRecord && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          setLookupLoading(true);
+                          const payload = { roll };
+                          if (email) payload.contactProvided = email;
+                          if (mobile) payload.contactProvided = mobile;
+                          const res = await axios.post('/api/report-missing', payload);
+                          setMessage(res.data?.message || 'Report submitted');
+                          toast.success(res.data?.message || 'Report submitted');
+                          setMissingRecord(false);
+                        } catch (e) {
+                          const msg = e.response?.data?.message || 'Failed to report missing student';
+                          setError(msg);
+                          toast.error(msg);
+                        } finally {
+                          setLookupLoading(false);
+                        }
+                      }}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                    >
+                      Report missing record
+                    </button>
+                  </div>
+                )}
+                {lookupLoading && <p className="mt-2 text-sm text-gray-500">Verifying roll number...</p>}
+                {name && (
+                  <div className="mt-2 text-sm text-gray-700">
+                    <p>Name: <span className="font-medium">{name}</span></p>
+                    <div className="mt-2 flex items-center space-x-3">
+                        <label className="inline-flex items-center text-sm">
+                        <input
+                          type="checkbox"
+                          checked={isMe === true}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setIsMe(checked);
+                            if (checked) {
+                              // prefill email from lookup and clear query
+                              setEmail(studentData?.email || '');
+                              setMessage('');
+                              setQueryRaised(false);
+                            } else {
+                              setMessage('Query raised. Admin will review.');
+                              setQueryRaised(true);
+                            }
+                          }}
+                          className="mr-2"
+                        />
+                        It&apos;s me
+                      </label>
+                      <button
+                        type="button"
+                        onClick={async () => { setIsMe(false); await reportIdentity(); }}
+                        disabled={reportLoading}
+                        className="text-sm text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        {reportLoading ? 'Reporting...' : 'Not me / Report'}
+                      </button>
+                    </div>
+                    {rollDetected && <p className="text-sm text-gray-600">Roll: <span className="font-medium">{rollDetected}</span></p>}
+                    {photo ? (
+                      <div className="mt-2 flex items-start space-x-4">
+                        <img src={photo} alt="student" className="h-28 w-28 object-cover rounded-md border" />
+                        <div>
+                          {email && <p className="text-sm text-gray-700">Email: <span className="font-medium">{email}</span></p>}
+                          {mobile && <p className="text-sm text-gray-700">Mobile: <span className="font-medium">{mobile}</span></p>}
+                          {registeredAtDetected && <p className="text-sm text-gray-700">Registered: <span className="font-medium">{new Date(registeredAtDetected).toLocaleString()}</span></p>}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-2">
+                        {email && <p className="text-sm text-gray-700">Email: <span className="font-medium">{email}</span></p>}
+                        {mobile && <p className="text-sm text-gray-700">Mobile: <span className="font-medium">{mobile}</span></p>}
+                        {registeredAtDetected && <p className="text-sm text-gray-700">Registered: <span className="font-medium">{new Date(registeredAtDetected).toLocaleString()}</span></p>}
+                      </div>
+                    )}
+
+                    {/* show original headers/array if available */}
+                    {originalHeadersDetected && originalHeadersDetected.length > 0 && (
+                      <div className="mt-3">
+                        <h4 className="text-sm font-semibold">Original Headers</h4>
+                        <div className="text-sm text-gray-600">
+                          {originalHeadersDetected.map((h,i) => (
+                            <p key={i}>{h}: {originalArrDetected && originalArrDetected[i] ? String(originalArrDetected[i]) : ''}</p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* arbitrary originalObj fields */}
+                    {extraInfo && (
+                      <div className="mt-3">
+                        <h4 className="text-sm font-semibold">Additional details</h4>
+                        <div className="mt-1 text-sm text-gray-700 space-y-1">
+                          {Object.entries(extraInfo).map(([k,v]) => (
+                            <p key={k}><strong>{k}:</strong> {String(v)}</p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* removed 'View full details' and raw JSON per user request */}
+                  </div>
+                )}
               </div>
 
               {needsContact && (
@@ -278,21 +444,58 @@ const Login = () => {
                   </div>
                 </div>
               )}
-      
-              {!needsContact && (
+              
+              {verifiedRoll ? (
+                isMe === true ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Email for OTP</label>
+                    <div className="mt-2 flex items-center space-x-2">
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        readOnly
+                        value={email}
+                        className="appearance-none relative block w-full px-3 py-2 border border-gray-200 bg-gray-100 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => requestOtp()}
+                        disabled={loading || !email}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700"
+                      >
+                        {loading ? 'Sending...' : 'Send OTP'}
+                      </button>
+                    </div>
+                  </div>
+                ) : isMe === false ? (
+                  <div className="rounded-md bg-yellow-50 p-4">
+                    <div className="flex">
+                        <div className="ml-3">
+                        <h3 className="text-sm font-medium text-yellow-800">Query raised</h3>
+                        <div className="mt-2 text-sm text-yellow-700">We&apos;ve logged a query for this roll; an admin will review it.</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <button
+                      type="button"
+                      disabled={true}
+                      className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-gray-300 cursor-not-allowed"
+                    >
+                      Enter roll number to verify
+                    </button>
+                  </div>
+                )
+              ) : (
                 <div>
                   <button
-                    type="submit"
-                    disabled={loading || lookupLoading}
-                    className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50"
+                    type="button"
+                    disabled={true}
+                    className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-gray-300 cursor-not-allowed"
                   >
-                    {loading ? (
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    ) : null}
-                    {loading ? 'Requesting OTP...' : 'Request OTP'}
+                    Enter roll number to verify
                   </button>
                 </div>
               )}

@@ -1,131 +1,150 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
 import io from 'socket.io-client';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
 let socket;
 
 const PublicDashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
-  const [ledger, setLedger] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
-
-  // Helper: format long hashes for display
-  const formatHash = (h) => {
-    if (!h) return '';
-    if (h.length <= 24) return h;
-    return `${h.slice(0, 10)}...${h.slice(-10)}`;
-  };
-
-  const handleCopy = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success('Hash copied to clipboard');
-    } catch (e) {
-      toast.error('Unable to copy');
-    }
-  };
+  const [elections, setElections] = useState([]);
+  const [electionFilter, setElectionFilter] = useState('all');
+  // retry UI states removed — retries now run silently in background
 
   useEffect(() => {
-    // Initialize WebSocket connection
-    socket = io('http://localhost:4000'); // Adjust to your backend URL
-    
+    // Initialize WebSocket connection (stats updates only)
+    socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
+
     socket.on('connect', () => {
       console.log('Connected to WebSocket server');
     });
-    
+
     socket.on('voteUpdate', (data) => {
-      // Add new vote to the top of the ledger
-      setLedger(prevLedger => {
-        const newEntry = {
-          _id: data.voteHash,
-          voteHash: data.voteHash,
-          timestamp: data.timestamp,
-          confirmationId: 'N/A' // We don't have this in the update
-        };
-        return [newEntry, ...prevLedger];
-      });
-      
-      // Update statistics
+      // Update statistics only
       setStats(prevStats => ({
         ...prevStats,
-        totalVotes: prevStats.totalVotes + 1,
-        recentVotes: prevStats.recentVotes + 1
+        totalVotes: (prevStats?.totalVotes || 0) + 1,
+        recentVotes: (prevStats?.recentVotes || 0) + 1
       }));
     });
-    
+
     socket.on('electionUpdate', (data) => {
-      // Update election status in the UI
-      console.log('Election update received:', data);
+      // Refresh elections list optimistically
+      (async () => {
+        try {
+          const res = await axios.get('/api/election');
+          if (res?.data?.success) setElections(res.data.elections || []);
+        } catch (e) { /* ignore */ }
+      })();
     });
-    
+
     socket.on('systemStatus', (data) => {
-      // Update system status
       console.log('System status update received:', data);
     });
-    
+
     socket.on('disconnect', () => {
       console.log('Disconnected from WebSocket server');
     });
-    
+
     return () => {
       socket.disconnect();
     };
   }, []);
 
   // Fetching function can be reused for retry and interval
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchLatest = async () => {
+  const fetchWithRetries = useCallback(async (url, tries = 3, baseDelay = 400) => {
+    let lastErr;
+    for (let i = 0; i < tries; i++) {
       try {
-        setError('');
-        // Fetch statistics
-        const statsResponse = await axios.get('/api/public/stats');
-
-        // Fetch public ledger
-        const ledgerResponse = await axios.get('/api/public/ledger');
-
-        if (!isMounted) return;
-
-        if (statsResponse?.data?.success) {
-          setStats(statsResponse.data.statistics);
-        }
-
-        if (ledgerResponse?.data?.success) {
-          setLedger(ledgerResponse.data.ledger);
-        }
-
-        setLastUpdated(new Date());
-      } catch (err) {
-        console.error('PublicDashboard fetch error', err?.message || err);
-        if (!isMounted) return;
-        setError('Failed to fetch data from the public API. Please check your connection or try again.');
-      } finally {
-        if (!isMounted) return;
-        setLoading(false);
+        const res = await axios.get(url);
+        return res;
+      } catch (e) {
+        lastErr = e;
+        // exponential backoff
+        if (i < tries - 1) await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
       }
-    };
+    }
+    throw lastErr;
+  }, []);
 
+  const fetchLatest = useCallback(async ({tries = 3} = {}) => {
+    let isMounted = true;
+    try {
+      setError('');
+
+      const [statsResponse, electionsResponse] = await Promise.all([
+  fetchWithRetries('/api/stats', tries),
+  fetchWithRetries('/api/election', tries)
+      ]);
+
+      if (!isMounted) return;
+
+      if (statsResponse?.data?.success) setStats(statsResponse.data.statistics);
+      if (electionsResponse?.data?.success) setElections(electionsResponse.data.elections || []);
+
+      setLastUpdated(new Date());
+    } catch (err) {
+      // Log and notify via toast; retry/backoff will attempt again in background
+      console.error('PublicDashboard fetch error', err?.message || err);
+      if (!isMounted) return;
+      // show a non-blocking toast notification instead of a persistent banner
+      try { toast.warn('Unable to reach public API — retrying in background'); } catch (e) { console.warn('Toast failed', e); }
+      setError('');
+    } finally {
+      if (isMounted) setLoading(false);
+    }
+    return () => { isMounted = false; };
+  }, [fetchWithRetries]);
+
+  useEffect(() => {
+    let mounted = true;
     // initial
-    fetchLatest();
+    (async () => {
+      if (!mounted) return;
+      setLoading(true);
+      await fetchLatest();
+    })();
 
-    const interval = setInterval(fetchLatest, 30000); // Update every 30 seconds
+    const interval = setInterval(() => fetchLatest(), 30000); // Update every 30 seconds
 
     return () => {
-      isMounted = false;
+      mounted = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [fetchLatest]);
 
   const handleViewVote = (confirmationId) => {
     navigate(`/verify/${confirmationId}`);
+  };
+
+  const formatDateTime = (d) => {
+    try {
+      if (!d) return '—';
+      const parsed = Date.parse(String(d));
+      if (!Number.isNaN(parsed)) return new Date(parsed).toLocaleString();
+      return String(d);
+    } catch (e) { return String(d || '—'); }
+  };
+
+  // Short, consistent format: DD/MM/YYYY, HH:mm:ss
+  const formatLastUpdated = (d) => {
+    try {
+      if (!d) return '—';
+      const date = new Date(d);
+      const pad = (n) => String(n).padStart(2, '0');
+      const day = pad(date.getDate());
+      const month = pad(date.getMonth() + 1);
+      const year = date.getFullYear();
+      const hours = pad(date.getHours());
+      const minutes = pad(date.getMinutes());
+      const seconds = pad(date.getSeconds());
+      return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
+    } catch (e) { return formatDateTime(d); }
   };
 
   const handleLogin = () => {
@@ -145,7 +164,6 @@ const PublicDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ToastContainer position="top-right" autoClose={3000} />
       {/* Navigation */}
       <nav className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -159,13 +177,14 @@ const PublicDashboard = () => {
                   onClick={() => setActiveTab('overview')}
                   className={`${activeTab === 'overview' ? 'border-cyan-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                 >
-                  Overview
+                  Elections
                 </button>
+                {/* Public Ledger removed per request */}
                 <button
-                  onClick={() => setActiveTab('ledger')}
-                  className={`${activeTab === 'ledger' ? 'border-cyan-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                  onClick={() => setActiveTab('elections')}
+                  className={`${activeTab === 'elections' ? 'border-cyan-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                 >
-                  Public Ledger
+                  Overview
                 </button>
               </div>
             </div>
@@ -196,57 +215,12 @@ const PublicDashboard = () => {
               </div>
               <div className="text-right text-sm text-gray-500">
                 <div>Last updated:</div>
-                <div className="font-mono">{lastUpdated ? new Date(lastUpdated).toLocaleString() : '—'}</div>
+                <div className="font-mono last-updated-digital">{lastUpdated ? formatLastUpdated(lastUpdated) : '—'}</div>
               </div>
             </div>
           </div>
 
-          {error && (
-            <div className="rounded-md bg-red-50 p-4 mb-6" role="alert" aria-live="assertive">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Error
-                  </h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>{error}</p>
-                    <div className="mt-3">
-                      <button
-                        onClick={() => {
-                          setLoading(true);
-                          setError('');
-                          // trigger a fresh fetch by toggling lastUpdated quickly
-                          // simpler: call the same endpoints directly
-                          (async () => {
-                            try {
-                              const sr = await axios.get('/api/public/stats');
-                              const lr = await axios.get('/api/public/ledger');
-                              if (sr?.data?.success) setStats(sr.data.statistics);
-                              if (lr?.data?.success) setLedger(lr.data.ledger);
-                              setLastUpdated(new Date());
-                              setError('');
-                            } catch (e) {
-                              setError('Retry failed — still unable to reach the public API.');
-                            } finally {
-                              setLoading(false);
-                            }
-                          })();
-                        }}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-500"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          
 
           {activeTab === 'overview' && (
             <div>
@@ -340,100 +314,112 @@ const PublicDashboard = () => {
                 </div>
               </div>
 
+              <div className="bg-white shadow rounded-lg p-4">
+                <h3 className="text-lg font-medium mb-3">Elections</h3>
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-600">Filter:</label>
+                    <select value={electionFilter} onChange={e => setElectionFilter(e.target.value)} className="border rounded px-2 py-1 text-sm">
+                      <option value="all">All</option>
+                      <option value="active">Active</option>
+                      <option value="upcoming">Upcoming</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                  <div className="text-sm text-gray-500">{elections.length} elections</div>
+                </div>
+
+                {elections.filter(ev => {
+                  if (electionFilter === 'all') return true;
+                  if (electionFilter === 'active') return (ev.status === 'active' || ev.status === 'ongoing');
+                  if (electionFilter === 'upcoming') return (ev.status === 'draft' || ev.status === 'scheduled');
+                  if (electionFilter === 'completed') return (ev.status === 'completed' || ev.status === 'ended');
+                  return true;
+                }).length === 0 ? (
+                  <div className="text-sm text-gray-500">No elections match the filter</div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4">
+                    {elections.filter(ev => {
+                      if (electionFilter === 'all') return true;
+                      if (electionFilter === 'active') return (ev.status === 'active' || ev.status === 'ongoing');
+                      if (electionFilter === 'upcoming') return (ev.status === 'draft' || ev.status === 'scheduled');
+                      if (electionFilter === 'completed') return (ev.status === 'completed' || ev.status === 'ended');
+                      return true;
+                    }).map(ev => (
+                      <div key={ev._id} className="border rounded p-3 flex justify-between items-center">
+                        <div>
+                          <div className="flex items-center space-x-3">
+                            <div className="font-semibold text-gray-900">{ev.title}</div>
+                            <div>
+                              {ev.status === 'active' || ev.status === 'ongoing' ? (
+                                <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">Active</span>
+                              ) : ev.status === 'draft' || ev.status === 'scheduled' ? (
+                                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs">Upcoming</span>
+                              ) : ev.status === 'completed' || ev.status === 'ended' ? (
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">Completed</span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="text-sm text-gray-600">{ev.description}</div>
+                          <div className="text-xs text-gray-500 mt-1">{formatLastUpdated(ev.startDate)} — {formatLastUpdated(ev.endDate)}</div>
+                          <div className="mt-2 text-sm">
+                            {ev.candidates && ev.candidates.length > 0 ? (
+                              <div className="flex space-x-2">
+                                {ev.candidates.map(c => (
+                                  <span key={c.id} className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-700">{c.name}</span>
+                                ))}
+                              </div>
+                            ) : (<span className="text-xs text-gray-400">No candidates</span>)}
+                          </div>
+                        </div>
+                        <div className="text-right flex flex-col items-end space-y-2">
+                          <div className="text-sm">{ev.candidates?.reduce((s,c)=>s+(c.voteCount||0),0)} votes</div>
+                          <button onClick={() => navigate(`/public/election/${ev._id}`)} className="text-xs px-2 py-1 bg-cyan-50 text-cyan-700 rounded hover:bg-cyan-100">View results</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Public Ledger removed */}
+          {activeTab === 'elections' && (
+            <div>
               <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                 <div className="px-4 py-5 sm:px-6">
                   <h3 className="text-lg leading-6 font-medium text-gray-900">About This System</h3>
-                  <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                    Secure & Transparent Online Voting System
-                  </p>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-500">Secure & Transparent Online Voting System</p>
                 </div>
                 <div className="border-t border-gray-200">
                   <dl>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                       <dt className="text-sm font-medium text-gray-500">Security</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        All votes are encrypted and cryptographically separated from voter identity. 
-                        The system uses end-to-end encryption and maintains an immutable audit trail.
+                        All votes are encrypted and cryptographically separated from voter identity. The system uses end-to-end encryption and maintains an immutable audit trail.
                       </dd>
                     </div>
                     <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                       <dt className="text-sm font-medium text-gray-500">Transparency</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        The public ledger below shows anonymized vote hashes that can be independently verified. No personal information is exposed in the public ledger. Independent auditors may verify the vote hashes against published election results without ever seeing voter identities.
+                        The public ledger shows anonymized vote hashes that can be independently verified. No personal information is exposed in the public ledger.
                       </dd>
                     </div>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                       <dt className="text-sm font-medium text-gray-500">Verification</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        Voters receive a unique confirmation ID after casting their vote, 
-                        which can be used to verify that their vote was recorded correctly 
-                        without revealing how they voted.
+                        Voters receive a unique confirmation ID after casting their vote, which can be used to verify their vote was recorded correctly without revealing how they voted.
                       </dd>
                     </div>
                     <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                       <dt className="text-sm font-medium text-gray-500">Privacy</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        Your vote is completely anonymous. The system uses cryptographic techniques 
-                        to ensure that no one, including system administrators, can link your 
-                        identity to your vote.
+                        Your vote is anonymous. The system uses cryptographic techniques to ensure that no one can link your identity to your vote.
                       </dd>
                     </div>
                   </dl>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'ledger' && (
-            <div className="bg-white shadow overflow-hidden sm:rounded-md">
-              <div className="px-4 py-5 sm:px-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">Public Ledger</h3>
-                <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                  Immutable record of all votes (anonymized)
-                </p>
-              </div>
-              <div className="border-t border-gray-200">
-                <ul className="divide-y divide-gray-200">
-                  {ledger.length === 0 ? (
-                    <li className="px-6 py-4 text-center">
-                      <p className="text-gray-500">No votes recorded yet</p>
-                    </li>
-                  ) : (
-                    ledger.map((entry) => (
-                      <li key={entry._id} className="px-6 py-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center text-sm text-gray-500">
-                              <svg className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                              </svg>
-                              <span>{new Date(entry.timestamp).toLocaleString()}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-mono text-gray-900 truncate mr-4" title={entry.voteHash}>
-                                {formatHash(entry.voteHash)}
-                              </p>
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={() => handleCopy(entry.voteHash)}
-                                  className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-700 hover:bg-gray-200"
-                                >
-                                  Copy
-                                </button>
-                                <button
-                                  onClick={() => handleViewVote(entry.confirmationId)}
-                                  className="text-xs px-2 py-1 bg-cyan-50 text-cyan-700 rounded hover:bg-cyan-100"
-                                >
-                                  Verify
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </li>
-                    ))
-                  )}
-                </ul>
               </div>
             </div>
           )}

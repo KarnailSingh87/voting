@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import axios from '../../utils/axios';
 import Navbar from '../../components/Navbar';
@@ -32,12 +32,12 @@ const AdminDashboard = () => {
 
     fetchDashboardData();
     const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
-    socket.on('vote_cast', (payload) => {
+    socket.on('vote_cast', (_payload) => {
       // Could trigger a refetch or update a local tally widget in future
       // For now just log
-      console.log('Vote cast realtime', payload);
+      console.log('Vote cast realtime', _payload);
     });
-    socket.on('election_status', (payload) => {
+    socket.on('election_status', () => {
       // Refetch to update stats
       fetchDashboardData();
     });

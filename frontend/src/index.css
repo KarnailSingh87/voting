@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Poppins:wght@100..900&family=Playfair+Display:wght@400..900&display=swap');
+/* Note: removed additional Google font imports per request to keep the project's default fonts */
 
 @tailwind base;
 @tailwind components;
@@ -6,6 +7,19 @@
 
 a.active hr{
     display: block;
+}
+
+/* Last-updated styles */
+.last-updated-digital {
+    /* keep default project fonts; do not override font-family */
+    letter-spacing: 0.06em;
+    font-weight: 700;
+}
+
+.last-updated-vintage {
+    /* vintage styling without changing the font-family */
+    font-style: italic;
+    font-size: 0.95rem;
 }
 
 *{

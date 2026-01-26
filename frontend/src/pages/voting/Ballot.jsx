@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
 
@@ -36,7 +36,7 @@ const Ballot = () => {
     
     try {
       const token = localStorage.getItem('voterToken');
-      const response = await axios.post('/api/voter/vote', 
+      const response = await axios.post('/api/vote/cast', 
         { electionId: id, candidateId: selectedCandidate },
         { headers: { Authorization: `Bearer ${token}` } }
       );

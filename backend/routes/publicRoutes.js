@@ -3,6 +3,10 @@ import rateLimit from 'express-rate-limit';
 import udiService from '../config/udiService.js';
 import Election from '../models/Election.js';
 import Candidate from '../models/Candidate.js';
+import Student from '../models/Student.js';
+import IdentityReport from '../models/IdentityReport.js';
+import Vote from '../models/Vote.js';
+import Voter from '../models/Voter.js';
 
 const router = express.Router();
 
@@ -11,6 +15,14 @@ const router = express.Router();
 const lookupLimiter = rateLimit({
   windowMs: Number(process.env.UDI_RATE_WINDOW_MS || 60_000), // 1 minute
   max: Number(process.env.UDI_RATE_MAX || 20),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// limiter for public student list (avoid scraping)
+const studentListLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -26,6 +38,67 @@ router.post('/aadhaar-lookup', lookupLimiter, async (req, res) => {
     return res.status(502).json({ success: false, message: result.message || 'Lookup failed' });
   } catch (e) {
     console.error('AADHAAR LOOKUP ERROR', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Student lookup endpoint - POST /api/student-lookup { roll }
+router.post('/student-lookup', lookupLimiter, async (req, res) => {
+  try {
+    const { roll } = req.body;
+    if (!roll || typeof roll !== 'string') return res.status(400).json({ success: false, message: 'roll required' });
+    // match roll case-insensitively and trim whitespace
+    const r = roll.trim();
+    // escape regex special chars in roll
+    const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const student = await Student.findOne({ roll: { $regex: `^${escapeRegExp(r)}$`, $options: 'i' } }).lean();
+    if (!student) return res.status(404).json({ success: false, message: 'Not found' });
+    // Return richer student data so frontends can display photo and any original upload fields
+    const payload = {
+      roll: student.roll,
+      name: student.name,
+      email: student.email,
+      mobile: student.mobile,
+      photo: student.photo,
+      voted: student.voted,
+      registeredAt: student.registeredAt,
+      originalObj: student.originalObj,
+      originalArr: student.originalArr,
+      originalHeaders: student.originalHeaders,
+    };
+    // keep older responses compatible by exposing name/top-level fields too
+    return res.json({ success: true, student: payload, name: student.name, email: student.email, mobile: student.mobile });
+  } catch (e) {
+    console.error('STUDENT LOOKUP ERROR', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Report identity mismatch ("Not me / Report")
+// POST /api/report-identity { roll, detectedName, reason?, contactProvided? }
+router.post('/report-identity', lookupLimiter, async (req, res) => {
+  try {
+    const { roll, detectedName, reason = 'mismatch', contactProvided } = req.body;
+    if (!roll || !detectedName) return res.status(400).json({ success: false, message: 'roll and detectedName required' });
+    const r = String(roll).trim();
+    const report = await IdentityReport.create({ roll: r, detectedName: String(detectedName), reason: String(reason), contactProvided: contactProvided ? String(contactProvided) : undefined, reporterIp: req.ip });
+    return res.json({ success: true, message: 'Report saved', id: report._id });
+  } catch (e) {
+    console.error('REPORT IDENTITY ERROR', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Report missing student record - POST /api/report-missing { roll, contactProvided? }
+router.post('/report-missing', lookupLimiter, async (req, res) => {
+  try {
+    const { roll, contactProvided } = req.body;
+    if (!roll) return res.status(400).json({ success: false, message: 'roll required' });
+    const r = String(roll).trim();
+    const report = await IdentityReport.create({ roll: r, reason: 'missing', contactProvided: contactProvided ? String(contactProvided) : undefined, reporterIp: req.ip });
+    return res.json({ success: true, message: 'Missing student report saved', id: report._id });
+  } catch (e) {
+    console.error('REPORT MISSING ERROR', e);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -47,6 +120,91 @@ router.get('/election', async (req, res) => {
     res.json({ success: true, elections: data });
   } catch(e) {
     console.error(e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Public endpoint to fetch master student list (for frontend sync)
+// GET /api/students?q=&page=&limit=
+router.get('/students', studentListLimiter, async (req, res) => {
+  try {
+    const { q = '', page = 1, limit = 1000 } = req.query;
+    const filter = {};
+    if (q) {
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$or = [
+        { roll: { $regex: escaped, $options: 'i' } },
+        { name: { $regex: escaped, $options: 'i' } },
+      ];
+    }
+    const skip = (Math.max(1, Number(page)) - 1) * Number(limit);
+    const items = await Student.find(filter).sort({ roll: 1 }).skip(skip).limit(Number(limit)).select('roll name email mobile voted registeredAt');
+    const total = await Student.countDocuments(filter);
+    res.json({ success: true, total, items });
+  } catch (e) {
+    console.error('STUDENT LIST ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Public stats for dashboard
+router.get('/stats', async (req, res) => {
+  try {
+    const totalVotes = await Vote.countDocuments();
+    // recent votes in last 24 hours
+    const recentVotes = await Vote.countDocuments({ timestamp: { $gte: new Date(Date.now() - 24*60*60*1000) } });
+    const activeElections = await Election.countDocuments({ status: 'ongoing' });
+    const totalVoters = await Student.countDocuments();
+    
+    res.json({
+      success: true,
+      statistics: {
+        totalVotes,
+        recentVotes,
+        activeElections,
+        totalVoters
+      }
+    });
+  } catch (e) {
+    console.error('STATS ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Public ledger (latest votes)
+router.get('/ledger', async (req, res) => {
+  try {
+    const limit = 50;
+    const votes = await Vote.find()
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .select('voteHash timestamp')
+      .lean();
+      
+    // Transform to match frontend expectation
+    const ledger = votes.map(v => ({
+      _id: v.voteHash, // frontend uses voteHash as key often
+      voteHash: v.voteHash,
+      timestamp: v.timestamp,
+      confirmationId: 'N/A'
+    }));
+    
+    res.json({ success: true, ledger });
+  } catch (e) {
+    console.error('LEDGER ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Verify vote by hash
+router.get('/vote/:hash', async (req, res) => {
+  try {
+    const { hash } = req.params;
+    const vote = await Vote.findOne({ voteHash: hash }).select('voteHash timestamp').lean();
+    if (!vote) return res.status(404).json({ success: false, message: 'Vote not found' });
+    res.json({ success: true, voteHash: vote.voteHash, timestamp: vote.timestamp });
+  } catch (e) {
+    console.error('VERIFY VOTE ERROR', e);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

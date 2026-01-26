@@ -1,4 +1,4 @@
-import React from 'react';
+/* JSX runtime — no default React import required */
 import { NavLink } from 'react-router-dom';
 import './Sidebar.css';
 
@@ -40,11 +40,27 @@ const Sidebar = () => {
           </NavLink>
         </li>
         <li>
+          <NavLink to='/voters' className={({ isActive }) => isActive ? 'active' : ''}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 2a4 4 0 100 8 4 4 0 000-8zm-8 16a8 8 0 0116 0H2z" />
+            </svg>
+            All Voters
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to='/import' className={({ isActive }) => isActive ? 'active' : ''}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M3 3v4h4V3H3zm0 10v4h4v-4H3zM13 3v4h4V3h-4zm0 10v4h4v-4h-4z" />
+            </svg>
+            Import Voters
+          </NavLink>
+        </li>
+        <li>
           <NavLink to='/audit' className={({ isActive }) => isActive ? 'active' : ''}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+              <path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
             </svg>
-            Audit Logs
+            Audit
           </NavLink>
         </li>
       </ul>

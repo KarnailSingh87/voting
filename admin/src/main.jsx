@@ -1,11 +1,11 @@
-import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { StrictMode } from 'react'
 import App from './App.jsx'
 import './index.css'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+  <StrictMode>
     {/* Create a router and opt into React Router v7 future flags */}
     <RouterProvider router={createBrowserRouter([
       { path: '*', element: <App /> }
@@ -15,5 +15,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         v7_relativeSplatPath: true
       }
     })} />
-  </React.StrictMode>
+  </StrictMode>
 )

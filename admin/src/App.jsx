@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -8,8 +8,11 @@ import { backendUrl } from './config/config';
 import Login from './pages/voting/Login';
 import Dashboard from './pages/voting/Dashboard';
 import Elections from './pages/voting/Elections';
+import ElectionDetail from './pages/voting/ElectionDetail';
 import Monitoring from './pages/voting/Monitoring';
 import Audit from './pages/voting/Audit';
+import ImportStudents from './pages/voting/ImportStudents';
+import AdminVoters from './pages/voting/AdminVoters';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 
@@ -69,9 +72,24 @@ const App = () => {
               <Elections token={token} />
             </ProtectedRoute>
           }/>
+          <Route path='/elections/:id' element={
+            <ProtectedRoute>
+              <ElectionDetail token={token} />
+            </ProtectedRoute>
+          }/>
           <Route path='/monitoring' element={
             <ProtectedRoute>
               <Monitoring token={token} />
+            </ProtectedRoute>
+          }/>
+          <Route path='/import' element={
+            <ProtectedRoute>
+              <ImportStudents token={token} />
+            </ProtectedRoute>
+          }/>
+          <Route path='/voters' element={
+            <ProtectedRoute>
+              <AdminVoters token={token} />
             </ProtectedRoute>
           }/>
           <Route path='/audit' element={

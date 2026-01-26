@@ -12,25 +12,33 @@ const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_T
 // Required env vars: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
 let mailTransporter = null;
 let isEthereal = false;
-if (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS) {
-  try {
-    mailTransporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-      secure: process.env.SMTP_SECURE === 'true' || false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-  } catch (e) {
-    console.error('[OTP] Failed to create mail transporter:', e.message);
-    mailTransporter = null;
+
+// Initialize OTP service (call during app startup so transporter is ready before requests)
+export async function initOTPService() {
+  // If explicit SMTP creds are provided, use them
+  if (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      mailTransporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT),
+        secure: process.env.SMTP_SECURE === 'true' || false,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+      isEthereal = false;
+      return;
+    } catch (e) {
+      console.error('[OTP] Failed to create mail transporter from env:', e && e.message ? e.message : e);
+      mailTransporter = null;
+    }
   }
-} else if (process.env.NODE_ENV !== 'production') {
-  // In dev, automatically create an Ethereal test account so devs can view emails without SMTP creds
-  nodemailer.createTestAccount()
-    .then((testAccount) => {
+
+  // In non-production, create an Ethereal test account so devs can view emails without SMTP creds
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const testAccount = await nodemailer.createTestAccount();
       mailTransporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',
         port: 587,
@@ -41,12 +49,14 @@ if (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && p
         },
       });
       isEthereal = true;
-      console.log('[OTP] Ethereal test account created for development:', testAccount.user);
-    })
-    .catch((err) => {
-      console.error('[OTP] Failed to create Ethereal test account:', err.message || err);
+      if (process.env.NODE_ENV !== 'test') console.log('[OTP] Ethereal test account created for development:', testAccount.user);
+      return;
+    } catch (err) {
+      console.error('[OTP] Failed to create Ethereal test account:', err && err.message ? err.message : err);
       mailTransporter = null;
-    });
+    }
+  }
+  // Otherwise transporter remains null (no email delivery)
 }
 
 // In-memory store (replace with Redis in production)
@@ -112,7 +122,7 @@ export async function requestOTP(aadhaarNumber, contact) {
     }
   }
 
-  return { success: true, message: 'OTP sent', expiresAt };
+  return { success: true, message: 'OTP sent', expiresAt, contact, contactType: isEmail ? 'email' : 'sms' };
 }
 
 export function verifyOTP(aadhaarNumber, otp) {

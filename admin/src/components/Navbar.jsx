@@ -1,4 +1,4 @@
-import React from 'react';
+/* JSX runtime — no default React import required */
 import './Navbar.css';
 
 const Navbar = ({ setToken }) => {

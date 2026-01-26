@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from '../../utils/axios';
 import io from 'socket.io-client';
 import Navbar from '../../components/Navbar';
@@ -10,33 +10,34 @@ const Monitoring = () => {
   const [healthData, setHealthData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [connectedClients, setConnectedClients] = useState(0);
+  const [events, setEvents] = useState([]);
 
   useEffect(() => {
     // Initialize WebSocket connection
-    socket = io('http://localhost:4000'); // Adjust to your backend URL
+    socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
     
     socket.on('connect', () => {
       console.log('Connected to WebSocket server');
+      setEvents(prev => [{ time: new Date(), message: 'Connected to server', type: 'system' }, ...prev]);
     });
     
-    socket.on('voteUpdate', (data) => {
+    socket.on('vote_cast', (data) => {
       // Update vote statistics in real-time
+      const msg = `Vote cast for candidate ${data.candidateId} (Total: ${data.voteCount})`;
       console.log('Vote update received:', data);
+      setEvents(prev => [{ time: new Date(), message: msg, type: 'vote' }, ...prev].slice(0, 50));
     });
     
-    socket.on('electionUpdate', (data) => {
+    socket.on('election_status', (data) => {
       // Update election status in real-time
+      const msg = `Election ${data.id} status changed to ${data.status}`;
       console.log('Election update received:', data);
-    });
-    
-    socket.on('systemStatus', (data) => {
-      // Update system status
-      console.log('System status update received:', data);
+      setEvents(prev => [{ time: new Date(), message: msg, type: 'election' }, ...prev].slice(0, 50));
     });
     
     socket.on('disconnect', () => {
       console.log('Disconnected from WebSocket server');
+      setEvents(prev => [{ time: new Date(), message: 'Disconnected from server', type: 'system' }, ...prev]);
     });
     
     return () => {
@@ -336,6 +337,42 @@ const Monitoring = () => {
                       </dd>
                     </div>
                   </dl>
+                </div>
+              </div>
+
+              {/* Real-time Events */}
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div className="px-4 py-5 sm:px-6">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Real-time Events</h3>
+                </div>
+                <div className="border-t border-gray-200">
+                  <ul className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+                    {events.length === 0 ? (
+                      <li className="px-4 py-4 text-sm text-gray-500">No events yet...</li>
+                    ) : (
+                      events.map((e, i) => (
+                        <li key={i} className="px-4 py-4 sm:px-6">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium text-cyan-600 truncate">
+                              {e.type === 'vote' ? 'Vote Cast' : e.type === 'election' ? 'Election Update' : 'System Update'}
+                            </p>
+                            <div className="ml-2 flex-shrink-0 flex">
+                              <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                {e.time.toLocaleTimeString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-2 sm:flex sm:justify-between">
+                            <div className="sm:flex">
+                              <p className="flex items-center text-sm text-gray-500">
+                                {e.message}
+                              </p>
+                            </div>
+                          </div>
+                        </li>
+                      ))
+                    )}
+                  </ul>
                 </div>
               </div>
             </div>

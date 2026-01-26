@@ -1,0 +1,98 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install backend deps
+        run: |
+          cd backend
+          npm ci
+      - name: Run backend tests
+        run: |
+          cd backend
+          npm test
+      - name: Backend lint
+        run: |
+          cd backend
+          # if you have a lint script for backend, run it; otherwise skip
+          if [ -f package.json ] && grep -q "lint" package.json; then npm run lint || true; fi
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install frontend deps
+        run: |
+          cd frontend
+          npm ci
+      - name: Frontend lint
+        run: |
+          cd frontend
+          npm run lint
+      - name: Frontend tests
+        run: |
+          cd frontend
+          npm test
+      - name: Frontend build
+        run: |
+          cd frontend
+          npm run build
+
+  admin-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install admin deps
+        run: |
+          cd admin
+          npm ci
+      - name: Admin lint
+        run: |
+          cd admin
+          npm run lint
+      - name: Admin build
+        run: |
+          cd admin
+          npm run build
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    needs: [backend-test, admin-build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install backend and admin deps
+        run: |
+          cd backend && npm ci
+          cd ../admin && npm ci
+      - name: Run E2E (start servers and run Cypress)
+        env:
+          MONGO_URI: mongodb://localhost:27017/test_db
+          NODE_ENV: test
+        run: |
+          cd admin
+          npx start-server-and-test \
+            'cd ../backend && npm run dev' \
+            http://localhost:5005 \
+            'npx vite --port 5173 --host' \
+            http://localhost:5173 \
+            'npx cypress run --config baseUrl=http://localhost:5173'

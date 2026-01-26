@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 const AdminLogin = ({ setToken }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
@@ -57,6 +57,24 @@ const AdminLogin = ({ setToken }) => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Dev-only: create a default super admin on the backend and pre-fill the form
+  const handleSeedAdmin = async () => {
+    if (!import.meta.env.DEV) return;
+    try {
+      const res = await axios.post(backendUrl + '/api/admin/seed-super');
+      if (res.data && res.data.username) {
+        setUsername(res.data.username || 'admin');
+        setPassword(res.data.password || 'password');
+        toast.success(`Seeded admin: ${res.data.username} / ${res.data.password}`);
+      } else {
+        toast.info(res.data?.message || 'Seed result returned');
+      }
+    } catch (err) {
+      console.error('Seed admin error', err);
+      toast.error(err.response?.data?.message || 'Failed to seed admin');
     }
   };
 
@@ -143,6 +161,12 @@ const AdminLogin = ({ setToken }) => {
               ) : 'Sign in to Admin Panel'}
             </button>
           </div>
+
+          {import.meta.env.DEV && (
+            <div className="mt-2 text-center">
+              <button type="button" onClick={handleSeedAdmin} className="text-sm text-indigo-600 underline">Create default admin (dev)</button>
+            </div>
+          )}
 
           <div className="text-center text-xs text-gray-500 mt-4">
             <p>Admin credentials required for access</p>

@@ -9,6 +9,7 @@ import voterRoutes from './routes/voterRoutes.js';
 import voteRoutes from './routes/voteRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
+import { initOTPService } from './config/otpService.js';
 
 dotenv.config();
 
@@ -25,6 +26,21 @@ app.use('/api', publicRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+// Global error handler to return JSON for Multer and common errors
+app.use((err, req, res, next) => {
+  if (!err) return next();
+  // Multer file size error
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ success: false, message: 'File too large. Max size is 50MB.' });
+  }
+  // Multer invalid file type (we threw Error('Invalid file type'))
+  if (err.message && err.message.includes('Invalid file type')) {
+    return res.status(400).json({ success: false, message: 'Invalid file type. Allowed: xlsx, xls, csv.' });
+  }
+  console.error('Unhandled error', err && (err.stack || err.message || err));
+  res.status(500).json({ success: false, message: 'Server error' });
+});
+
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: process.env.CORS_ORIGIN?.split(',') || '*'} });
 app.set('io', io);
@@ -38,6 +54,13 @@ const PORT = Number(process.env.PORT) || 5005;
 
 async function startServer() {
   await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_voting');
+
+  // initialize OTP/email transporter so requestOTP can actually send emails (Ethereal or SMTP)
+  try {
+    await initOTPService();
+  } catch (err) {
+    console.warn('OTP service init failed (emails will be mocked):', err && err.message ? err.message : err);
+  }
 
   const maxAttempts = 5; // try this port + up to maxAttempts-1 additional ports
   const tryListen = (port, attemptsLeft) => {
@@ -68,11 +91,17 @@ async function startServer() {
   tryListen(PORT, maxAttempts - 1);
 }
 
-(async () => {
-  try {
-    await startServer();
-  } catch (err) {
-    console.error('Failed to start server:', err);
-    process.exit(1);
-  }
-})();
+// export app for testing and programmatic use
+export { app, startServer };
+
+// start when run directly
+if (process.argv[1] && process.argv[1].endsWith('server.js')) {
+  (async () => {
+    try {
+      await startServer();
+    } catch (err) {
+      console.error('Failed to start server:', err);
+      process.exit(1);
+    }
+  })();
+}

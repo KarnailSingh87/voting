@@ -2,33 +2,89 @@ import express from 'express';
 import crypto from 'crypto';
 import { requestOTP, verifyOTP, hashAadhaar } from '../config/otpService.js';
 import Voter from '../models/Voter.js';
+import Student from '../models/Student.js';
+import voterAuth from '../middleware/voterAuth.js';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
+// Get voting history
+router.get('/history', voterAuth, async (req, res) => {
+  try {
+    const voter = await Voter.findById(req.voter.id).populate('history.electionId', 'title');
+    if (!voter) return res.status(404).json({ message: 'Voter not found' });
+    
+    const history = (voter.history || []).map(h => ({
+      confirmationId: h.voteHash, 
+      voteHash: h.voteHash,
+      timestamp: h.timestamp,
+      election: h.electionId ? { title: h.electionId.title } : { title: 'Unknown Election' }
+    }));
+    
+    res.json({ success: true, voteHistory: history });
+  } catch (e) {
+    console.error('HISTORY ERROR', e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Request OTP for Aadhaar
 router.post('/request-otp', async (req, res) => {
   try {
-    const { aadhaar, name, mobile, email } = req.body;
-    if (!aadhaar || !name || (!mobile && !email)) {
-      return res.status(400).json({ message: 'aadhaar, name and (mobile or email) required' });
+    // Support both aadhaar and roll as identifier
+    const { aadhaar, roll, name, mobile, email } = req.body;
+    const identifier = aadhaar || roll;
+    if (!identifier || !name || (!mobile && !email)) {
+      return res.status(400).json({ message: 'identifier (aadhaar or roll), name and (mobile or email) required' });
     }
-    const aadhaarHash = hashAadhaar(aadhaar);
-    let voter = await Voter.findOne({ aadhaarHash });
+    // If this is a roll-based login, enforce that the roll exists in Master List
+    if (roll) {
+      const r = roll.trim();
+      const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const student = await Student.findOne({ roll: { $regex: `^${escapeRegExp(r)}$`, $options: 'i' } });
+      if (!student) return res.status(403).json({ message: 'Access Denied: You are not registered in the voter list' });
+    }
+    const idHash = hashAadhaar(identifier);
+    let voter = await Voter.findOne({ aadhaarHash: idHash });
     if (!voter) {
-      voter = await Voter.create({ aadhaarHash, name, mobile, email, lastOTPRequestedAt: new Date() });
+      voter = await Voter.create({ aadhaarHash: idHash, identifierRaw: identifier, name, mobile, email, lastOTPRequestedAt: new Date() });
     } else {
       voter.lastOTPRequestedAt = new Date();
       // update contact info if provided
       if (mobile) voter.mobile = mobile;
       if (email) voter.email = email;
+      voter.identifierRaw = identifier;
       await voter.save();
     }
     const contact = email || mobile;
-    const result = await requestOTP(aadhaar, contact);
+    const result = await requestOTP(identifier, contact);
     if (!result.success) return res.status(429).json({ message: 'OTP request throttled or failed' });
-    const dest = email ? 'email' : 'phone';
-    return res.json({ message: `OTP sent to your ${dest}`, aadhaarHash });
+    // result may contain contact and contactType (email|sms)
+    const { contact: sentContact, contactType } = result || {};
+    // mask the contact before returning to client
+    const maskEmail = (em) => {
+      try {
+        const [local, domain] = em.split('@');
+        const dparts = domain.split('.');
+        const maskedLocal = local.length <= 2 ? local[0] + '*' : local[0] + '*'.repeat(Math.min(3, local.length-1)) + local.slice(-1);
+        const maskedDomain = dparts.map((p,i)=> i===0 ? p[0] + '*'.repeat(Math.max(1,p.length-1)) : p).join('.');
+        return `${maskedLocal}@${maskedDomain}`;
+      } catch (e) { return '****'; }
+    };
+    const maskPhone = (p) => {
+      try {
+        const digits = p.replace(/\D/g,'');
+        if (digits.length <= 4) return '*'.repeat(digits.length);
+        const visibleLast = digits.slice(-3);
+        return '*'.repeat(Math.max(0, digits.length - 3)) + visibleLast;
+      } catch (e) { return '****'; }
+    };
+    let maskedContact = undefined;
+    if (sentContact) {
+      if (contactType === 'email' || sentContact.includes('@')) maskedContact = maskEmail(String(sentContact));
+      else maskedContact = maskPhone(String(sentContact));
+    }
+    return res.json({ message: 'OTP sent', identifierHash: idHash, sentTo: maskedContact, contactType });
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
@@ -38,16 +94,17 @@ router.post('/request-otp', async (req, res) => {
 // Verify OTP and issue JWT
 router.post('/verify-otp', async (req, res) => {
   try {
-    const { aadhaar, otp } = req.body;
-    if (!aadhaar || !otp) return res.status(400).json({ message: 'aadhaar & otp required' });
-    const valid = verifyOTP(aadhaar, otp);
-    if (!valid) return res.status(401).json({ message: 'Invalid or expired OTP' });
-    const aadhaarHash = hashAadhaar(aadhaar);
-    const voter = await Voter.findOne({ aadhaarHash });
+    const { aadhaar, roll, otp } = req.body;
+    const identifier = aadhaar || roll;
+    if (!identifier || !otp) return res.status(400).json({ message: 'identifier & otp required' });
+    const valid = verifyOTP(identifier, otp);
+    if (!valid || !valid.success) return res.status(401).json({ message: (valid && valid.message) || 'Invalid or expired OTP' });
+    const idHash = hashAadhaar(identifier);
+    const voter = await Voter.findOne({ aadhaarHash: idHash });
     if (!voter) return res.status(404).json({ message: 'Voter record missing' });
     voter.verifiedAt = new Date();
     await voter.save();
-    const token = jwt.sign({ vid: voter._id, aadhaarHash }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '2h' });
+    const token = jwt.sign({ vid: voter._id, identifierHash: idHash }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '2h' });
     res.json({ token, voter: { id: voter._id, name: voter.name, hasVoted: voter.hasVoted } });
   } catch (e) {
     console.error(e);
