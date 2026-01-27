@@ -140,14 +140,14 @@ const Elections = () => {
   const handleStartElection = async (id) => {
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await axios.post(`/api/election/${id}/start`, {}, {
+      const response = await axios.patch(`/api/admin/election/${id}/status`, { status: 'ongoing' }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      if (response.data.success) {
-        // Update election status in the list
+      if (response.data && (response.data.success || response.data.election)) {
+        const newStatus = response.data.election ? response.data.election.status : 'ongoing';
+        // Update election status in the list using backend status value
         setElections(elections.map(election => 
-          election._id === id ? { ...election, status: 'active' } : election
+          election._id === id ? { ...election, status: newStatus } : election
         ));
       }
     } catch (err) {
@@ -158,14 +158,14 @@ const Elections = () => {
   const handlePauseElection = async (id) => {
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await axios.post(`/api/election/${id}/pause`, {}, {
+      // Backend supports statuses: 'scheduled','ongoing','ended'. Map pause -> scheduled
+      const response = await axios.patch(`/api/admin/election/${id}/status`, { status: 'scheduled' }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      if (response.data.success) {
-        // Update election status in the list
+      if (response.data && (response.data.success || response.data.election)) {
+        const newStatus = response.data.election ? response.data.election.status : 'scheduled';
         setElections(elections.map(election => 
-          election._id === id ? { ...election, status: 'paused' } : election
+          election._id === id ? { ...election, status: newStatus } : election
         ));
       }
     } catch (err) {
@@ -176,14 +176,13 @@ const Elections = () => {
   const handleEndElection = async (id) => {
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await axios.post(`/api/election/${id}/end`, {}, {
+      const response = await axios.patch(`/api/admin/election/${id}/status`, { status: 'ended' }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      if (response.data.success) {
-        // Update election status in the list
+      if (response.data && (response.data.success || response.data.election)) {
+        const newStatus = response.data.election ? response.data.election.status : 'ended';
         setElections(elections.map(election => 
-          election._id === id ? { ...election, status: 'completed' } : election
+          election._id === id ? { ...election, status: newStatus } : election
         ));
       }
     } catch (err) {
@@ -196,19 +195,22 @@ const Elections = () => {
     };
 
   const getStatusBadge = (status) => {
-    switch (status) {
-      case 'active':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>;
-      case 'draft':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Draft</span>;
-      case 'paused':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">Paused</span>;
-      case 'completed':
-        return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Completed</span>;
-      default:
-        // No badge when status is not provided
-        return null;
+    // Normalize backend status values and also accept legacy frontend labels
+    const s = status;
+    if (!s) return null;
+    if (s === 'ongoing' || s === 'active') {
+      return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>;
     }
+    if (s === 'scheduled' || s === 'draft') {
+      return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Draft</span>;
+    }
+    if (s === 'paused') {
+      return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">Paused</span>;
+    }
+    if (s === 'ended' || s === 'completed') {
+      return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Completed</span>;
+    }
+    return null;
   };
 
   // Format date strings defensively. Return a friendly placeholder when missing/invalid

@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
+import path from 'path';
 import mongoose from 'mongoose';
 import multer from 'multer';
 import Admin from '../models/Admin.js';
@@ -221,6 +222,50 @@ router.patch('/election/:id/status', adminAuth, async (req, res) => {
   }
 });
 
+// Compatibility endpoints for older admin bundles: start/pause/end
+router.post('/election/:id/start', adminAuth, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const election = await Election.findByIdAndUpdate(id, { status: 'ongoing' }, { new: true });
+    if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
+    const io = req.app.get('io');
+    if (io) io.emit('election_status', { id: election._id.toString(), status: election.status });
+    return res.json({ success: true, election });
+  } catch (e) {
+    console.error('start election error', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+router.post('/election/:id/pause', adminAuth, async (req, res) => {
+  try {
+    const id = req.params.id;
+    // Backend does not have a 'paused' enum; map pause -> scheduled (admin can re-open)
+    const election = await Election.findByIdAndUpdate(id, { status: 'scheduled' }, { new: true });
+    if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
+    const io = req.app.get('io');
+    if (io) io.emit('election_status', { id: election._id.toString(), status: election.status });
+    return res.json({ success: true, election });
+  } catch (e) {
+    console.error('pause election error', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+router.post('/election/:id/end', adminAuth, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const election = await Election.findByIdAndUpdate(id, { status: 'ended' }, { new: true });
+    if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
+    const io = req.app.get('io');
+    if (io) io.emit('election_status', { id: election._id.toString(), status: election.status });
+    return res.json({ success: true, election });
+  } catch (e) {
+    console.error('end election error', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Create candidate for an election
 router.post('/candidate', adminAuth, async (req, res) => {
   try {
@@ -252,11 +297,70 @@ router.get('/dashboard', adminAuth, async (req, res) => {
   }
 });
 
+// Admin: system health endpoint
+router.get('/health', adminAuth, async (req, res) => {
+  try {
+    // Lightweight system health information
+    const mem = process.memoryUsage();
+    const cpu = process.cpuUsage();
+    const uptime = process.uptime();
+    const mongooseState = mongoose.connection && mongoose.connection.readyState;
+    const dbStateMap = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+
+    // measure a quick DB ping to approximate API response time
+    let apiResponseTime = 0;
+    try {
+      const start = Date.now();
+      if (mongoose.connection && mongoose.connection.db) await mongoose.connection.db.admin().ping();
+      apiResponseTime = Date.now() - start;
+    } catch (e) {
+      apiResponseTime = 0;
+    }
+
+    // Active users: approximate by counting verified voters (if model exists)
+    let activeUsers = 0;
+    try {
+      const VoterModel = await import('../models/Voter.js');
+      if (VoterModel && VoterModel.default) {
+        activeUsers = await VoterModel.default.countDocuments({ verifiedAt: { $exists: true } });
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    const health = {
+      databaseStatus: dbStateMap[mongooseState] || 'unknown',
+      uptime: Math.floor(uptime),
+      memoryUsage: {
+        rss: mem.rss || 0,
+        heapTotal: mem.heapTotal || 0,
+        heapUsed: mem.heapUsed || 0,
+        external: mem.external || 0
+      },
+      cpuUsage: {
+        user: cpu.user || 0,
+        system: cpu.system || 0
+      },
+      apiResponseTime: apiResponseTime,
+      activeUsers: activeUsers,
+      recentErrors: 0
+    };
+
+    res.json({ success: true, health });
+  } catch (e) {
+    console.error('health endpoint error', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Admin-only endpoint: upload Excel and import students
 // POST /api/admin/import-students (multipart form-data: file, optional field rollCol like 'I' or '9')
 router.post('/import-students', adminAuth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'file required' });
+    // debug: show uploaded file metadata
+  try { console.log('Import upload:', req.file.originalname, req.file.mimetype, 'size', req.file.size || (req.file.buffer && req.file.buffer.length)); } catch (e) {}
+  try { const sig = req.file.buffer && req.file.buffer.slice && req.file.buffer.slice(0,8); console.log('Upload signature hex:', sig ? sig.toString('hex') : null); } catch (e) {}
     const rollColArg = req.body.rollCol || null;
     const previewFlag = (req.body.preview === '1' || req.body.preview === 'true' || req.query.preview === '1' || req.query.preview === 'true');
 
@@ -264,6 +368,8 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
   let rawRows = [];
   let data = [];
   let parseErrorMsg = null;
+  // map of files extracted from uploaded zip (basename -> { buffer, extension })
+  let zipFilesMap = {};
   // default sheetName so later image lookup won't throw if initial parse fails
   let sheetName = 'Sheet1';
     try {
@@ -303,10 +409,33 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
       data = [];
       let candidateText = null;
       try {
-        const zip = await JSZip.loadAsync(req.file.buffer);
+        let zip = null;
+        try {
+          zip = await JSZip.loadAsync(req.file.buffer);
+        } catch (zipErr) {
+          // some environments provide a Buffer-like object; try Uint8Array fallback
+          try {
+            zip = await JSZip.loadAsync(new Uint8Array(req.file.buffer));
+          } catch (zipErr2) {
+            throw zipErr2 || zipErr;
+          }
+        }
         // Search for candidate files inside the archive that look like CSV/TSV/PLAIN text or XML tables
+        // debug: list files discovered in the uploaded zip
+        try { console.log('ZIP files in upload:', Object.keys(zip.files).slice(0,50)); } catch (e) {}
         for (const fname of Object.keys(zip.files)) {
           const f = zip.files[fname];
+          // collect image files into zipFilesMap for later mapping by filename
+          try {
+            if (/\.(jpe?g|png|gif|webp|svg)$/i.test(fname)) {
+              try {
+                const buf = await f.async('nodebuffer');
+                const base = path.basename(fname).toLowerCase();
+                const ext = (path.extname(fname) || '').replace('.', '').toLowerCase() || 'png';
+                zipFilesMap[base] = { buffer: Buffer.from(buf), extension: ext };
+              } catch (ie) { /* ignore image extraction errors */ }
+            }
+          } catch (ie) { /* ignore */ }
           // prefer CSV/TSV or files with 'table' or 'index' in name
           if (/\.csv$/i.test(fname) || /\.tsv$/i.test(fname) || /table|index|sheet/i.test(fname)) {
             try {
@@ -336,6 +465,7 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
       if (candidateText) {
           // crude delimiter detection: prefer comma, fallback to tab
           const lines = candidateText.split(/\r?\n/).filter(l => l.trim() !== '');
+        console.log('ZIP candidateText lines count:', lines.length, 'first:', lines[0] && lines[0].slice(0,200));
           if (lines.length > 0) {
             const first = lines[0];
             const commaCount = (first.match(/,/g) || []).length;
@@ -465,7 +595,9 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
       } catch (e) { /* ignore parse errors - treat as no selection */ }
     }
 
-    // detect header row
+  // debug: show parsed row counts (rawRows/data)
+  try { console.log('Parsed rawRows length:', Array.isArray(rawRows) ? rawRows.length : 'N/A', 'data length:', Array.isArray(data) ? data.length : 'N/A'); } catch (e) {}
+  // detect header row
     const firstObj = data[0] || {};
     const lowerKeys = Object.keys(firstObj).map(k => String(k).toLowerCase());
     const expectedHeaders = ['roll', 'name', 'email', 'mobile'];
@@ -645,6 +777,18 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
             try {
               // allow AI-extracted fields to enrich headerless rows
               const aiRow = (aiExtractedRows && aiExtractedRows[i]) ? aiExtractedRows[i] : null;
+              // if photo is a filename and exists in uploaded zip, map it to an inline data URI
+              if (photo && !/^https?:\/\//i.test(photo) && zipFilesMap) {
+                try {
+                  const basePhoto = path.basename(photo).toLowerCase();
+                  const match = zipFilesMap[photo.toLowerCase()] || zipFilesMap[basePhoto];
+                  if (match && match.buffer) {
+                    const b64 = Buffer.from(match.buffer).toString('base64');
+                    photo = `data:image/${match.extension};base64,${b64}`;
+                  }
+                } catch (e) { /* ignore */ }
+              }
+
               const setObj = { name, email, mobile, photo: (photo || (aiRow && aiRow.photo)) || undefined, originalArr: rowObj.arr, originalObj: null, originalHeaders: null };
               if (aiRow && aiRow.fatherName) setObj.fatherName = aiRow.fatherName;
               if (aiRow && aiRow.address) setObj.address = aiRow.address;

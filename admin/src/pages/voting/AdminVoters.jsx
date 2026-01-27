@@ -124,12 +124,36 @@ const AdminVoters = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+
   const confirmDelete = async () => {
     const roll = deleteTarget;
     setShowDeleteModal(false);
     setDeleteTarget(null);
     if (!roll) return;
     try { await axios.delete(`/api/admin/students/${encodeURIComponent(roll)}`); toast.success('Deleted'); fetch(); } catch (e) { const msg = e.response?.data?.message || e.message; setError(msg); toast.error(msg); }
+  };
+
+  const removeSelected = () => {
+    if (selected.size === 0) return;
+    setShowBulkDeleteModal(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    setShowBulkDeleteModal(false);
+    const rolls = Array.from(selected);
+    if (rolls.length === 0) return;
+    try {
+      const res = await axios.post('/api/admin/students/bulk-delete', { rolls });
+      const deleted = res.data?.deleted ?? 0;
+      toast.success(`Deleted ${deleted} voter(s)`);
+      setSelected(new Set());
+      fetch();
+    } catch (e) {
+      const msg = e.response?.data?.message || e.message;
+      setError(msg);
+      toast.error(msg);
+    }
   };
 
   const openEdit = (student) => setEditing({ ...student });
@@ -181,6 +205,7 @@ const AdminVoters = () => {
         <button onClick={() => bulkUpdate(true)} className="px-3 py-1 bg-blue-600 text-white rounded">Mark Selected Voted</button>
         <button onClick={() => bulkUpdate(false)} className="px-3 py-1 bg-gray-200 rounded">Unmark Selected</button>
         <button onClick={exportSelected} className="px-3 py-1 bg-green-600 text-white rounded">Export Selected</button>
+        <button onClick={removeSelected} className="px-3 py-1 bg-red-600 text-white rounded">Delete Selected</button>
       </div>
       {loading ? <div>Loading...</div> : (
         <table className="w-full table-auto border-collapse">
@@ -257,6 +282,10 @@ const AdminVoters = () => {
 
       <Modal open={showDeleteModal} title="Delete voter" onClose={() => setShowDeleteModal(false)} onConfirm={confirmDelete} confirmLabel="Delete" confirmClass="bg-red-600 text-white">
         <div>Delete {deleteTarget}? This action cannot be undone.</div>
+      </Modal>
+
+      <Modal open={showBulkDeleteModal} title="Delete selected voters" onClose={() => setShowBulkDeleteModal(false)} onConfirm={confirmBulkDelete} confirmLabel="Delete" confirmClass="bg-red-600 text-white">
+        <div>Delete {selected.size} selected voter(s)? This action cannot be undone.</div>
       </Modal>
 
       <div className="mt-4 flex items-center justify-between">

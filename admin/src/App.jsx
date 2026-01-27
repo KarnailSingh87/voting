@@ -10,7 +10,6 @@ import Dashboard from './pages/voting/Dashboard';
 import Elections from './pages/voting/Elections';
 import ElectionDetail from './pages/voting/ElectionDetail';
 import Monitoring from './pages/voting/Monitoring';
-import Audit from './pages/voting/Audit';
 import ImportStudents from './pages/voting/ImportStudents';
 import AdminVoters from './pages/voting/AdminVoters';
 import Navbar from './components/Navbar';
@@ -92,11 +91,7 @@ const App = () => {
               <AdminVoters token={token} />
             </ProtectedRoute>
           }/>
-          <Route path='/audit' element={
-            <ProtectedRoute>
-              <Audit token={token} />
-            </ProtectedRoute>
-          }/>
+          {/* Audit page removed */}
         </Routes>
         </div>
       </div>

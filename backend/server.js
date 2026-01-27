@@ -5,6 +5,7 @@ import cors from 'cors';
 import http from 'http';
 import { Server } from 'socket.io';
 import { connectDB } from './config/db.js';
+import Election from './models/Election.js';
 import voterRoutes from './routes/voterRoutes.js';
 import voteRoutes from './routes/voteRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
@@ -60,6 +61,50 @@ async function startServer() {
     await initOTPService();
   } catch (err) {
     console.warn('OTP service init failed (emails will be mocked):', err && err.message ? err.message : err);
+  }
+
+  // Scheduler: auto-transition elections based on startTime/endTime.
+  // Runs periodically and updates election.status when time boundaries are crossed.
+  const scheduleIntervalMs = Number(process.env.ELECTION_SCHEDULE_INTERVAL_MS || 30_000); // default 30s
+  const runScheduler = async () => {
+    try {
+      const now = new Date();
+      // Start elections that are scheduled and whose startTime <= now
+      const toStart = await Election.find({ status: 'scheduled', startTime: { $lte: now } });
+      for (const e of toStart) {
+        try {
+          const updated = await Election.findByIdAndUpdate(e._id, { status: 'ongoing' }, { new: true });
+          if (updated) {
+            console.log('Auto-started election', updated._id.toString());
+            try { io.emit('election_status', { id: updated._id.toString(), status: updated.status }); } catch(_){}
+          }
+        } catch (err) { console.warn('Failed to auto-start election', e._id.toString(), err && err.message ? err.message : err); }
+      }
+
+      // End elections that are ongoing and whose endTime <= now
+      const toEnd = await Election.find({ status: 'ongoing', endTime: { $lte: now } });
+      for (const e of toEnd) {
+        try {
+          const updated = await Election.findByIdAndUpdate(e._id, { status: 'ended' }, { new: true });
+          if (updated) {
+            console.log('Auto-ended election', updated._id.toString());
+            try { io.emit('election_status', { id: updated._id.toString(), status: updated.status }); } catch(_){}
+          }
+        } catch (err) { console.warn('Failed to auto-end election', e._id.toString(), err && err.message ? err.message : err); }
+      }
+    } catch (err) {
+      console.warn('Election scheduler error', err && err.message ? err.message : err);
+    }
+  };
+
+  // Start periodic scheduler
+  try {
+    setInterval(runScheduler, scheduleIntervalMs);
+    // Run once at startup
+    runScheduler().catch(() => {});
+    console.log('Election scheduler started (interval ms):', scheduleIntervalMs);
+  } catch (err) {
+    console.warn('Failed to start election scheduler', err && err.message ? err.message : err);
   }
 
   const maxAttempts = 5; // try this port + up to maxAttempts-1 additional ports

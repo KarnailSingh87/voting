@@ -26,6 +26,19 @@ const ImportStudents = () => {
     setError('');
   };
 
+  const downloadTemplate = () => {
+    // Template columns in requested sequence: id_number, name, father_name, email, blood_group, mobile, photo, branch, category, batch, sequence
+    const headers = ['id_number', 'name', 'father_name', 'email', 'blood_group', 'mobile', 'photo', 'branch', 'category', 'batch'];
+    // Example row values: id_number, name, father's name, email, blood group, mobile, photo (filename or base64), branch, category, batch, sequence
+    const example = ['ID12345', 'John Doe', 'Rahul Kumar', 'john@example.com', 'A+', '+911234567890', 'photo.jpg', 'CSE', 'GEN', '2023-2027'];
+    const csv = headers.join(',') + '\n' + example.join(',') + '\n';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'voters_template.csv';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
@@ -34,6 +47,11 @@ const ImportStudents = () => {
     }
     if (!confirmImport) {
       setError('Please confirm the import by checking the confirmation box');
+      return;
+    }
+    // If a preview exists, require at least one preview row selected
+    if (previewRows && previewRows.length > 0 && (!selectedPreviewRows || selectedPreviewRows.size === 0)) {
+      setError('Please select at least one preview row to import');
       return;
     }
     setLoading(true);
@@ -141,24 +159,37 @@ const ImportStudents = () => {
   return (
     <div className="bg-white rounded-lg shadow p-6 max-w-3xl mx-auto">
       <h2 className="text-xl font-semibold mb-4">Import Students / Voter Master List</h2>
-  <p className="text-sm text-gray-600 mb-4">Upload an Excel (.xlsx) or CSV file containing roll numbers and names.</p>
+  <p className="text-sm text-gray-600 mb-4">Upload an Excel (.xlsx), CSV or a ZIP containing a CSV/XLSX plus image files. If you want to import profile images, upload a ZIP with the CSV/XLSX and the image files — the CSV's <code>photo</code> column should contain the image filename (e.g. <code>alice.jpg</code>).</p>
   <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">File</label>
-          <input data-testid="file-input" type="file" accept=".xlsx,.xls,.csv,.tsv,.numbers,.ods,.zip" onChange={handleFileChange} className="mt-1" />
+          <div className="flex items-center space-x-3">
+            <input data-testid="file-input" type="file" accept=".xlsx,.xls,.csv,.tsv,.numbers,.ods,.zip,.pdf" onChange={handleFileChange} className="mt-1" />
+            <button type="button" onClick={downloadTemplate} className="px-3 py-1 border rounded text-sm">Download template</button>
+          </div>
+          <div className="text-sm text-gray-500 mt-1">{file ? file.name : 'No file chosen'} · recommended max 10MB</div>
+          <div className="text-xs text-gray-500 mt-1">When uploading images, prefer a ZIP containing: <code>import.csv</code> (or <code>.xlsx</code>) plus image files. Example ZIP layout: <code>/import.csv</code>, <code>/photos/alice.jpg</code> — the CSV should reference <code>alice.jpg</code> in the <code>photo</code> column.</div>
+          {file && file.name && file.name.toLowerCase().endsWith('.pdf') && (
+            <div className="text-xs text-yellow-700 mt-1">PDF detected — PDF imports require backend OCR/text-extraction. Preview may take longer or be unavailable until OCR completes.</div>
+          )}
         </div>
         
         <div className="flex items-center space-x-2">
           <button data-testid="preview-btn" type="button" onClick={handlePreview} disabled={previewing} className="px-4 py-2 bg-yellow-600 text-white rounded">
             {previewing ? 'Previewing...' : 'Preview'}
           </button>
-          <button data-testid="import-btn" type="submit" disabled={loading} className="px-4 py-2 bg-cyan-600 text-white rounded">
+          <button
+            data-testid="import-btn"
+            type="submit"
+            disabled={loading || !confirmImport || (previewRows && previewRows.length > 0 && selectedPreviewRows.size === 0)}
+            className={`px-4 py-2 ${(loading || !confirmImport || (previewRows && previewRows.length > 0 && selectedPreviewRows.size === 0)) ? 'bg-cyan-300' : 'bg-cyan-600'} text-white rounded`}
+          >
             {loading ? 'Uploading...' : 'Import to DB'}
           </button>
           <button type="button" onClick={() => { setFile(null); setResult(null); setError(''); }} className="px-3 py-2 border rounded">Reset</button>
         </div>
 
-        <div className="flex items-center space-x-4">
+  <div className="flex items-center space-x-4">
           <div>
           </div>
           <div>
@@ -195,7 +226,7 @@ const ImportStudents = () => {
 
       {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
       <div className="mt-3">
-        <label className="inline-flex items-center"><input data-testid="confirm-checkbox" type="checkbox" className="mr-2" checked={confirmImport} onChange={e => setConfirmImport(e.target.checked)} /> I confirm I want to import the uploaded file into the master list (this cannot be undone)</label>
+        <label className="inline-flex items-center"><input data-testid="confirm-checkbox" type="checkbox" className="mr-2" checked={confirmImport} onChange={e => setConfirmImport(e.target.checked)} /> <span className="font-medium">I confirm I want to import the uploaded file into the master list</span> <span className="text-sm text-gray-500">(this cannot be undone)</span></label>
       </div>
       {result && (
         <div className="mt-4 p-3 bg-green-50 rounded">
@@ -204,7 +235,11 @@ const ImportStudents = () => {
       )}
       {previewRows && (
         <div className="mt-4">
-          <h4 className="text-sm font-medium mb-2">Preview (first {previewRows.length} rows)</h4>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium">Preview (first {previewRows.length} rows)</h4>
+            <div className="text-xs text-gray-600">Preview showing {previewRows.length} rows · Parsed {previewTotalParsed ?? previewRows.length}</div>
+          </div>
+          <div className="text-xs text-gray-600 mb-2">Valid: {previewRows.filter(r => r.valid).length} · Invalid: {previewRows.filter(r => !r.valid).length}</div>
           <div className="text-sm text-gray-600 mb-2">Select which rows to import into the DB / election. By default all previewed rows are selected.</div>
           <div className="text-xs text-gray-600 mb-2">Showing parsed rows and all columns found in the file. Rows flagged in red have missing required fields.</div>
           {previewTotalParsed != null && (
