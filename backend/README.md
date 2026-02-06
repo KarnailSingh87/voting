@@ -1,6 +1,6 @@
 # Aadhaar-Based Voting System Backend
 
-Secure, real-time voting backend with Aadhaar verification and OTP-based 2FA.
+Secure, real-time Voting backend with Aadhaar verification and OTP-based 2FA.
 
 ## Features
 
@@ -23,7 +23,7 @@ npm install
 Create `.env`:
 
 ```env
-MONGO_URI=mongodb://localhost:27017/aadhaar_voting
+MONGO_URI=mongodb://localhost:27017/aadhaar_Voting
 JWT_SECRET=your_secure_random_secret_256_bit
 CORS_ORIGIN=http://localhost:5173,http://localhost:5174
 PORT=5005
@@ -158,7 +158,7 @@ Body:
 ```json
 {
   "title": "General Election 2025",
-  "description": "National level voting",
+  "description": "National level Voting",
   "startTime": "2025-12-01T00:00:00Z",
   "endTime": "2025-12-10T23:59:59Z"
 }

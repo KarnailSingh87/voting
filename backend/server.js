@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import http from 'http';
 import { Server } from 'socket.io';
+import path from 'path';
 import { connectDB } from './config/db.js';
 import Election from './models/Election.js';
 import voterRoutes from './routes/voterRoutes.js';
@@ -18,6 +19,9 @@ const app = express();
 app.use(express.json());
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
 app.use(helmet());
+
+// Serve uploaded files (candidate photos etc.) from backend/public/uploads at /uploads
+app.use('/uploads', express.static(path.join(process.cwd(), 'backend', 'public', 'uploads')));
 
 // Routes
 app.use('/api/voter', voterRoutes);
@@ -54,7 +58,7 @@ io.on('connection', (socket) => {
 const PORT = Number(process.env.PORT) || 5005;
 
 async function startServer() {
-  await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_voting');
+  await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting');
 
   // initialize OTP/email transporter so requestOTP can actually send emails (Ethereal or SMTP)
   try {

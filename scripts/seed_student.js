@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../backend/.env') });
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/voting';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/Voting';
 
 async function seed() {
   try {

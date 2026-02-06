@@ -8,6 +8,8 @@ import Ballot from './pages/voting/Ballot';
 import History from './pages/voting/History';
 import Verify from './pages/voting/Verify';
 import PublicDashboard from './pages/voting/PublicDashboard';
+import PublicElection from './pages/voting/PublicElection';
+import PublicLedger from './pages/voting/PublicLedger';
 import StudentDetail from './pages/voting/StudentDetail';
 
 function App() {
@@ -24,6 +26,8 @@ function App() {
         <Route path='/history' element={<History />} />
         <Route path='/verify/:id' element={<Verify />} />
         <Route path='/public' element={<PublicDashboard />} />
+        <Route path='/public/election/:id' element={<PublicElection />} />
+        <Route path='/public/election/:id/ledger' element={<PublicLedger />} />
       </Routes>
     </div>
   );

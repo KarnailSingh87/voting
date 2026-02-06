@@ -5,13 +5,14 @@ import 'react-toastify/dist/ReactToastify.css';
 import { backendUrl } from './config/config';
 
 // Voting System Admin pages
-import Login from './pages/voting/Login';
-import Dashboard from './pages/voting/Dashboard';
-import Elections from './pages/voting/Elections';
-import ElectionDetail from './pages/voting/ElectionDetail';
-import Monitoring from './pages/voting/Monitoring';
-import ImportStudents from './pages/voting/ImportStudents';
-import AdminVoters from './pages/voting/AdminVoters';
+import Login from './pages/Voting/Login';
+import Dashboard from './pages/Voting/Dashboard';
+import ErrorBoundary from './components/ErrorBoundary';
+import Elections from './pages/Voting/Elections';
+import ElectionDetail from './pages/Voting/ElectionDetail';
+import Monitoring from './pages/Voting/Monitoring';
+import ImportStudents from './pages/Voting/ImportStudents';
+import AdminVoters from './pages/Voting/AdminVoters';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 
@@ -63,12 +64,16 @@ const App = () => {
           {/* Protected routes - Voting System */}
           <Route path='/dashboard' element={
             <ProtectedRoute>
-              <Dashboard token={token} />
+              <ErrorBoundary>
+                <Dashboard token={token} />
+              </ErrorBoundary>
             </ProtectedRoute>
           }/>
           <Route path='/elections' element={
             <ProtectedRoute>
-              <Elections token={token} />
+              <ErrorBoundary>
+                <Elections token={token} />
+              </ErrorBoundary>
             </ProtectedRoute>
           }/>
           <Route path='/elections/:id' element={
@@ -78,7 +83,9 @@ const App = () => {
           }/>
           <Route path='/monitoring' element={
             <ProtectedRoute>
-              <Monitoring token={token} />
+              <ErrorBoundary>
+                <Monitoring token={token} />
+              </ErrorBoundary>
             </ProtectedRoute>
           }/>
           <Route path='/import' element={

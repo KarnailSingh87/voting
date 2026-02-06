@@ -12,7 +12,7 @@ async function main() {
   }
 
   const roll = String(rollArg).trim().toUpperCase();
-  await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_voting');
+  await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting');
 
   const doc = await Student.findOne({ roll: { $regex: `^${roll}$`, $options: 'i' } }).lean();
   if (!doc) {

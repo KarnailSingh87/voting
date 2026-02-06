@@ -260,14 +260,14 @@ const AdminDashboard = () => {
                         <dt className="text-sm font-medium text-gray-500">Admin Role</dt>
                         <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {dashboardData.admin.role.replace('_', ' ')}
+                            {dashboardData?.admin?.role ? dashboardData.admin.role.replace('_', ' ') : 'Unknown'}
                           </span>
                         </dd>
                       </div>
                       <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt className="text-sm font-medium text-gray-500">Last Login</dt>
                         <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                          {dashboardData.admin.lastLogin 
+                          {dashboardData?.admin?.lastLogin
                             ? new Date(dashboardData.admin.lastLogin).toLocaleString()
                             : 'Never'}
                         </dd>

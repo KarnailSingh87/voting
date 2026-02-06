@@ -8,7 +8,7 @@ import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
-// Get voting history
+// Get Voting history
 router.get('/history', voterAuth, async (req, res) => {
   try {
     const voter = await Voter.findById(req.voter.id).populate('history.electionId', 'title');

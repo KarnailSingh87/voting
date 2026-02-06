@@ -10,7 +10,7 @@ const Ballot = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [voting, setVoting] = useState(false);
+  const [Voting, setVoting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -191,10 +191,10 @@ const Ballot = () => {
                 </button>
                 <button
                   onClick={handleVote}
-                  disabled={voting}
+                  disabled={Voting}
                   className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50"
                 >
-                  {voting ? (
+                  {Voting ? (
                     <>
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -255,7 +255,7 @@ const Ballot = () => {
                         <li>Your vote will be encrypted and stored securely</li>
                         <li>Your identity is cryptographically separated from your vote</li>
                         <li>You will receive a confirmation receipt for verification</li>
-                        <li>All voting data is immutable and auditable</li>
+                        <li>All Voting data is immutable and auditable</li>
                       </ul>
                     </dd>
                   </div>
@@ -264,7 +264,7 @@ const Ballot = () => {
               <div className="px-4 py-4 bg-gray-50 sm:px-6 flex justify-end">
                 <button
                   onClick={handleConfirmVote}
-                  disabled={!selectedCandidate || voting}
+                  disabled={!selectedCandidate || Voting}
                   className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50"
                 >
                   Review & Confirm Vote

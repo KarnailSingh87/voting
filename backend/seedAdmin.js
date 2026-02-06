@@ -7,10 +7,10 @@ dotenv.config();
 
 async function seedAdmin() {
   try {
-    await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_voting');
+    await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting');
     
     const username = process.env.ADMIN_USERNAME || 'admin';
-    const email = process.env.ADMIN_EMAIL || 'admin@voting.com';
+    const email = process.env.ADMIN_EMAIL || 'admin@Voting.com';
     const password = process.env.ADMIN_PASSWORD || 'Admin@123456';
     
     // Check if super admin already exists

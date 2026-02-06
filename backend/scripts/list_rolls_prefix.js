@@ -10,7 +10,7 @@ async function main() {
     console.error('Usage: node scripts/list_rolls_prefix.js <PREFIX>');
     process.exit(2);
   }
-  await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_voting');
+  await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting');
   const regex = new RegExp('^' + prefix);
   const docs = await Student.find({ roll: { $regex: regex, $options: 'i' } }).sort({ roll: 1 }).lean();
   console.log(`Found ${docs.length} students with prefix ${prefix}`);

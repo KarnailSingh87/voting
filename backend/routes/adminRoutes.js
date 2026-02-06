@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import path from 'path';
+import fs from 'fs';
 import mongoose from 'mongoose';
 import multer from 'multer';
 import Admin from '../models/Admin.js';
@@ -34,11 +35,38 @@ const upload = multer({
   }
 });
 
+// multer for image uploads (candidate photos)
+const imageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dest = path.join(process.cwd(), 'backend', 'public', 'uploads', 'candidates');
+      try { fs.mkdirSync(dest, { recursive: true }); } catch (e) {}
+      cb(null, dest);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || '') || '';
+      const name = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
+      cb(null, name);
+    }
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype || !file.mimetype.startsWith('image/')) return cb(new Error('Invalid file type'), false);
+    cb(null, true);
+  }
+});
+
+// helper to build absolute URL for returned photo paths
+function absoluteUrl(req, url) {
+  if (!url) return null;
+  try { return `${req.protocol}://${req.get('host')}${url}`; } catch (e) { return url; }
+}
+
 // Seed super admin if none exists (dev convenience)
 router.post('/seed-super', async (req, res) => {
   try {
     // align defaults with backend/seedAdmin.js for consistency
-    const { username='admin', email='admin@voting.com', password='Admin@123456' } = req.body;
+    const { username='admin', email='admin@Voting.com', password='Admin@123456' } = req.body;
     const existing = await Admin.findOne({ role: 'super_admin' });
     if (existing) return res.status(409).json({ message: 'Super admin already exists' });
     const passwordHash = await bcrypt.hash(password, 10);
@@ -48,6 +76,19 @@ router.post('/seed-super', async (req, res) => {
   } catch(e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Dev-only debug: list admins (only enabled in non-production or when ALLOW_ADMIN_DEBUG=1)
+router.get('/debug/admins', async (req, res) => {
+  try {
+    const enabled = (process.env.NODE_ENV !== 'production') || (process.env.ALLOW_ADMIN_DEBUG === '1');
+    if (!enabled) return res.status(404).json({ message: 'Not found' });
+    const admins = await Admin.find().select('username email role createdAt updatedAt').lean();
+    return res.json({ success: true, admins });
+  } catch (e) {
+    console.error('debug admins error', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
@@ -115,21 +156,24 @@ router.post('/election', adminAuth, async (req, res) => {
       importConcepts
     });
     
-    // If candidates provided, create them
+    // If candidates provided, create them and collect their ids so frontend can upload photos
+    const createdCandidates = [];
     if (candidates && Array.isArray(candidates)) {
       for (const c of candidates) {
         if (c.name) {
-          await Candidate.create({
+          const created = await Candidate.create({
             election: election._id,
             name: c.name,
             party: c.party || 'Independent',
-            manifesto: c.description || ''
+            manifesto: c.description || '',
+            photoUrl: c.photoUrl || undefined
           });
+          createdCandidates.push(created);
         }
       }
     }
-    
-    res.json({ success: true, election });
+
+    res.json({ success: true, election, candidates: createdCandidates.map(c => ({ id: c._id.toString(), name: c.name, party: c.party, manifesto: c.manifesto, photoUrl: absoluteUrl(req, c.photoUrl) })) });
   } catch(e) {
     console.error(e);
     res.status(500).json({ success: false, message: 'Server error: ' + e.message });
@@ -139,8 +183,20 @@ router.post('/election', adminAuth, async (req, res) => {
 // List elections (admin view)
 router.get('/election', adminAuth, async (req, res) => {
   try {
-    const elections = await Election.find().sort({ startTime: 1 });
-    
+    const elections = await Election.find();
+
+    // Sort so live/ongoing elections come first; among live ones, most recently started first
+    const rank = (s) => (s === 'ongoing' ? 0 : (s === 'scheduled' ? 1 : 2));
+    elections.sort((a, b) => {
+      const r = rank(a.status) - rank(b.status);
+      if (r !== 0) return r;
+      if (rank(a.status) === 0) {
+        // both ongoing: most recently started first
+        return new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime();
+      }
+      return new Date(a.startTime || 0).getTime() - new Date(b.startTime || 0).getTime();
+    });
+
     // Populate candidates for each election
     const electionsWithCandidates = await Promise.all(
       elections.map(async (election) => {
@@ -151,12 +207,13 @@ router.get('/election', adminAuth, async (req, res) => {
             id: c._id.toString(),
             name: c.name,
             party: c.party,
-            description: c.manifesto
+            description: c.manifesto,
+            photoUrl: absoluteUrl(req, c.photoUrl)
           }))
         };
       })
     );
-    
+
     res.json({ success: true, elections: electionsWithCandidates });
   } catch(e) {
     console.error(e);
@@ -199,7 +256,14 @@ router.get('/election/:id', adminAuth, async (req, res) => {
     const totalVoters = await Student.countDocuments({ elections: election._id });
     const votedCount = await Student.countDocuments({ elections: election._id, voted: true });
 
-    res.json({ success: true, election: election.toObject(), candidates: candidates.map(c => ({ id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount })), totalVotes, totalVoters, votedCount });
+    res.json({
+      success: true,
+      election: election.toObject(),
+      candidates: candidates.map(c => ({ id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount, photoUrl: absoluteUrl(req, c.photoUrl) })),
+      totalVotes,
+      totalVoters,
+      votedCount
+    });
   } catch (e) {
     console.error('election detail error', e);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -274,10 +338,32 @@ router.post('/candidate', adminAuth, async (req, res) => {
     const election = await Election.findById(electionId);
     if (!election) return res.status(404).json({ message: 'Election not found' });
     const candidate = await Candidate.create({ election: electionId, name, party, manifesto });
-    res.json({ candidate });
+    const payload = { id: candidate._id.toString(), name: candidate.name, party: candidate.party, manifesto: candidate.manifesto, photoUrl: absoluteUrl(req, candidate.photoUrl) };
+    res.json({ candidate: payload });
   } catch(e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Upload candidate photo
+router.post('/candidate/:id/photo', adminAuth, imageUpload.single('photo'), async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ success: false, message: 'candidate id required' });
+    if (!req.file) return res.status(400).json({ success: false, message: 'photo file required' });
+    const candidate = await Candidate.findById(id);
+    if (!candidate) return res.status(404).json({ success: false, message: 'Candidate not found' });
+
+    // store relative path which will be served from /uploads
+    const rel = `/uploads/candidates/${req.file.filename}`;
+    candidate.photoUrl = rel;
+    await candidate.save();
+
+    res.json({ success: true, photoUrl: absoluteUrl(req, rel) });
+  } catch (e) {
+    console.error('upload candidate photo error', e);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

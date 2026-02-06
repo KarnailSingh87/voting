@@ -88,7 +88,7 @@ export async function requestOTP(aadhaarNumber, contact) {
           from,
           to: contact,
           subject: 'Your Voting OTP',
-          text: `Your voting OTP is: ${otp}. Valid for 5 minutes.`,
+          text: `Your Voting OTP is: ${otp}. Valid for 5 minutes.`,
         });
         console.log(`[OTP] Sent ${otp} to ${contact} via SMTP`);
         if (isEthereal) {
@@ -107,7 +107,7 @@ export async function requestOTP(aadhaarNumber, contact) {
     if (twilioClient && process.env.TWILIO_PHONE_NUMBER) {
       try {
         await twilioClient.messages.create({
-          body: `Your voting OTP is: ${otp}. Valid for 5 minutes.`,
+          body: `Your Voting OTP is: ${otp}. Valid for 5 minutes.`,
           from: process.env.TWILIO_PHONE_NUMBER,
           to: `+91${contact}` // Assuming Indian numbers
         });

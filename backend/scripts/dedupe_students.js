@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import Student from '../models/Student.js';
 
 async function dedupe() {
-  const uri = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://localhost:27017/voting';
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://localhost:27017/Voting';
   await connectDB(uri);
 
   console.log('Scanning students for duplicate rolls (case-insensitive)...');

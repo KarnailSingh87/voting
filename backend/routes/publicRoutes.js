@@ -115,11 +115,40 @@ router.get('/election', async (req, res) => {
       status: e.status === 'ongoing' ? 'active' : (e.status === 'scheduled' ? 'draft' : (e.status === 'ended' ? 'completed' : e.status)),
       startDate: e.startTime,
       endDate: e.endTime,
-      candidates: (candidateMap[e._id]||[]).map(c => ({ id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount }))
+      candidates: (candidateMap[e._id]||[]).map(c => ({ id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount, photoUrl: c.photoUrl ? `${req.protocol}://${req.get('host')}${c.photoUrl}` : null }))
     }));
+    // Sort so live/active elections appear first; among live ones, most recently started first
+    const rank = (s) => (s === 'active' || s === 'ongoing') ? 0 : (s === 'scheduled' || s === 'draft') ? 1 : 2;
+    data.sort((a,b) => {
+      const r = rank(a.status) - rank(b.status);
+      if (r !== 0) return r;
+      // if both live/active, show most recently started first
+      if (rank(a.status) === 0 && rank(b.status) === 0) {
+        return new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime();
+      }
+      // otherwise earlier start first
+      return new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime();
+    });
+
     res.json({ success: true, elections: data });
   } catch(e) {
     console.error(e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Public: get single election by id
+router.get('/election/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ success: false, message: 'election id required' });
+    const election = await Election.findById(id);
+    if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
+    const candidates = await Candidate.find({ election: election._id }).sort({ voteCount: -1 });
+    const totalVotes = candidates.reduce((s, c) => s + (c.voteCount || 0), 0);
+  res.json({ success: true, election: { _id: election._id, title: election.title, description: election.description, status: election.status, startDate: election.startTime, endDate: election.endTime }, candidates: candidates.map(c => ({ id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount, photoUrl: c.photoUrl ? `${req.protocol}://${req.get('host')}${c.photoUrl}` : null })), totalVotes });
+  } catch (e) {
+    console.error('public election detail error', e);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -192,6 +221,45 @@ router.get('/ledger', async (req, res) => {
     res.json({ success: true, ledger });
   } catch (e) {
     console.error('LEDGER ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Public ledger filtered by election id with pagination
+// GET /api/ledger/:electionId?page=1&limit=50
+router.get('/ledger/:electionId', async (req, res) => {
+  try {
+    const { electionId } = req.params;
+    if (!electionId) return res.status(400).json({ success: false, message: 'electionId required' });
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(500, Number(req.query.limit) || 50);
+    const skip = (page - 1) * limit;
+
+    // Ensure election exists
+    const election = await Election.findById(electionId).lean();
+    if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
+
+    const [total, votes] = await Promise.all([
+      Vote.countDocuments({ election: election._id }),
+      Vote.find({ election: election._id })
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select('voteHash timestamp candidate voter')
+        .lean()
+    ]);
+
+    const ledger = votes.map(v => ({
+      _id: v.voteHash || v._id,
+      voteHash: v.voteHash,
+      timestamp: v.timestamp,
+      candidate: v.candidate,
+      voter: v.voter ? String(v.voter) : undefined
+    }));
+
+    res.json({ success: true, total, page, limit, ledger });
+  } catch (e) {
+    console.error('LEDGER BY ELECTION ERROR', e);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

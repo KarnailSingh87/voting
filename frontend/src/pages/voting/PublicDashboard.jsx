@@ -38,7 +38,16 @@ const PublicDashboard = () => {
       (async () => {
         try {
           const res = await axios.get('/api/election');
-          if (res?.data?.success) setElections(res.data.elections || []);
+          if (res?.data?.success) {
+            const list = res.data.elections || [];
+            const rank = (s) => (s === 'active' || s === 'ongoing') ? 0 : (s === 'scheduled' || s === 'draft') ? 1 : 2;
+            list.sort((a, b) => {
+              const r = rank(a.status) - rank(b.status);
+              if (r !== 0) return r;
+              return new Date(a.startDate || a.startTime || 0).getTime() - new Date(b.startDate || b.startTime || 0).getTime();
+            });
+            setElections(list);
+          }
         } catch (e) { /* ignore */ }
       })();
     });
@@ -85,7 +94,20 @@ const PublicDashboard = () => {
       if (!isMounted) return;
 
       if (statsResponse?.data?.success) setStats(statsResponse.data.statistics);
-      if (electionsResponse?.data?.success) setElections(electionsResponse.data.elections || []);
+      if (electionsResponse?.data?.success) {
+        const list = electionsResponse.data.elections || [];
+        // sort so live/active elections are on top
+        const rank = (s) => (s === 'active' || s === 'ongoing') ? 0 : (s === 'scheduled' || s === 'draft') ? 1 : 2;
+        list.sort((a, b) => {
+          const r = rank(a.status) - rank(b.status);
+          if (r !== 0) return r;
+          // fallback: newer start time first
+          const da = new Date(a.startDate || a.startTime || 0).getTime();
+          const db = new Date(b.startDate || b.startTime || 0).getTime();
+          return da - db;
+        });
+        setElections(list);
+      }
 
       setLastUpdated(new Date());
     } catch (err) {
@@ -210,7 +232,7 @@ const PublicDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Public Transparency Dashboard</h1>
-                <p className="mt-1 text-sm text-gray-500">Real-time view of voting system activity and immutable ledger</p>
+                <p className="mt-1 text-sm text-gray-500">Real-time view of Voting system activity and immutable ledger</p>
                 <p className="mt-2 text-xs text-gray-400">Official record published by SecureVote — Independent, auditable, and privacy preserving.</p>
               </div>
               <div className="text-right text-sm text-gray-500">

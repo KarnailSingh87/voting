@@ -63,7 +63,7 @@ describe('Integration: import -> lookup -> vote', () => {
     expect(res.body.name).toBe('Integration Tester');
   });
 
-  it('can cast a vote and prevents double voting', async () => {
+  it('can cast a vote and prevents double Voting', async () => {
     // sign token for voter
     const idHash = hashAadhaar(studentRoll);
     const token = jwt.sign({ vid: voterId, aadhaarHash: idHash }, SECRET, { expiresIn: '1h' });

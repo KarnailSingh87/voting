@@ -20,7 +20,7 @@ function findValueFromObj(obj, patterns) {
 }
 
 async function migrate() {
-  await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_voting');
+  await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting');
   const cursor = Student.find().cursor();
   let updated = 0;
   for (let doc = await cursor.next(); doc != null; doc = await cursor.next()) {

@@ -25,7 +25,7 @@ const History = () => {
           localStorage.removeItem('voterToken');
           navigate('/login');
         } else {
-          setError('Failed to fetch voting history');
+          setError('Failed to fetch Voting history');
         }
       } finally {
         setLoading(false);
@@ -36,7 +36,7 @@ const History = () => {
   }, [navigate]);
 
   const handleVerifyVote = (confirmationId) => {
-    navigate(`/voting/verify/${confirmationId}`);
+    navigate(`/Voting/verify/${confirmationId}`);
   };
 
   const handleLogout = () => {
@@ -96,7 +96,7 @@ const History = () => {
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Voting History</h1>
             <p className="mt-1 text-sm text-gray-500">
-              View your voting history and verify your votes
+              View your Voting history and verify your votes
             </p>
           </div>
 

@@ -122,6 +122,7 @@ const ElectionDetail = () => {
   const [importPanelOpen, setImportPanelOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', description: '', startTime: '', endTime: '' });
+  const [uploading, setUploading] = useState({}); // track photo uploads per candidate id
 
   useEffect(() => {
     if (election && election.importConcepts) setImportSettings(election.importConcepts);
@@ -270,11 +271,47 @@ const ElectionDetail = () => {
                 <div className="grid grid-cols-1 gap-2">
                   {candidates.map(c => (
                     <div key={c.id} className="flex justify-between items-center p-2 border rounded">
-                      <div>
-                        <div className="font-medium">{c.name}</div>
-                        <div className="text-sm text-gray-500">{c.party}</div>
+                      <div className="flex items-center">
+                        {c.photoUrl ? (
+                          <img src={c.photoUrl} alt={c.name} className="w-12 h-12 rounded-full object-cover mr-3" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gray-200 mr-3 flex items-center justify-center text-sm text-gray-600">{(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}</div>
+                        )}
+                        <div>
+                          <div className="font-medium">{c.name}</div>
+                          <div className="text-sm text-gray-500">{c.party}</div>
+                        </div>
                       </div>
-                      <div className="text-lg font-bold">{c.voteCount}</div>
+                      <div className="flex items-center space-x-3">
+                        <div className="text-lg font-bold">{c.voteCount}</div>
+                        <div>
+                          <label htmlFor={`file-${c.id}`} className="px-2 py-1 bg-gray-100 rounded text-sm cursor-pointer">{uploading[c.id] ? 'Uploading...' : 'Upload photo'}</label>
+                          <input id={`file-${c.id}`} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                            const file = e.target.files && e.target.files[0];
+                            if (!file) return;
+                            try {
+                              setUploading(u => ({ ...u, [c.id]: true }));
+                              const fd = new FormData();
+                              fd.append('photo', file);
+                              const res = await axios.post(`/api/admin/candidate/${c.id}/photo`, fd, { headers: { Authorization: `Bearer ${token}` } });
+                              if (res.data && res.data.success) {
+                                // update candidate local state with returned photoUrl
+                                setCandidates(prev => prev.map(item => item.id === c.id ? { ...item, photoUrl: res.data.photoUrl } : item));
+                                toast.success('Photo uploaded');
+                              } else {
+                                toast.error(res.data?.message || 'Upload failed');
+                              }
+                            } catch (err) {
+                              console.error('photo upload failed', err);
+                              toast.error(err.response?.data?.message || 'Upload failed');
+                            } finally {
+                              setUploading(u => ({ ...u, [c.id]: false }));
+                              // reset input so same file can be selected again
+                              e.target.value = '';
+                            }
+                          }} />
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>

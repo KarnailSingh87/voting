@@ -7,7 +7,7 @@ dotenv.config();
 
 async function listAdmins() {
   try {
-    const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_voting';
+    const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting';
     await connectDB(uri);
     const admins = await Admin.find().select('username email role createdAt updatedAt').lean();
     console.log('Admins in DB:');

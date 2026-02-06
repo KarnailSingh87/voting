@@ -5,7 +5,7 @@ import Student from '../models/Student.js';
 dotenv.config();
 
 async function main() {
-  await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_voting');
+  await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting');
   const count = await Student.countDocuments();
   console.log('Student count:', count);
   const one = await Student.findOne().lean();

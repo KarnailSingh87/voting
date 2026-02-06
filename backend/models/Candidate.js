@@ -4,6 +4,7 @@ const candidateSchema = new mongoose.Schema({
   name: { type: String, required: true },
   party: { type: String, required: true },
   manifesto: { type: String },
+  photoUrl: { type: String },
   election: { type: mongoose.Schema.Types.ObjectId, ref: 'Election', required: true },
   voteCount: { type: Number, default: 0 }
 }, { timestamps: true });

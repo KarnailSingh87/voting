@@ -16,9 +16,10 @@ const Elections = () => {
     description: '',
     startDate: '',
     endDate: '',
-    candidates: [{ id: Date.now().toString(), name: '', party: '', description: '' }],
+    candidates: [{ id: Date.now().toString(), name: '', party: '', description: '', photoFile: null }],
     isPublic: true
   });
+  const [uploadingFiles, setUploadingFiles] = useState({});
   // include importConcepts in the form data
   useEffect(() => {
     if (formData && !formData.importConcepts) {
@@ -76,10 +77,16 @@ const Elections = () => {
     });
   };
 
+  const handleCandidateFileChange = (index, file) => {
+    const updatedCandidates = [...formData.candidates];
+    updatedCandidates[index].photoFile = file;
+    setFormData({ ...formData, candidates: updatedCandidates });
+  };
+
   const addCandidate = () => {
     setFormData({
       ...formData,
-      candidates: [...formData.candidates, { id: Date.now().toString(), name: '', party: '', description: '' }]
+      candidates: [...formData.candidates, { id: Date.now().toString(), name: '', party: '', description: '', photoFile: null }]
     });
   };
 
@@ -106,14 +113,43 @@ const Elections = () => {
     try {
       const token = localStorage.getItem('adminToken');
       console.log('Creating election:', formData);
-      
+
+      // keep a copy of candidates with files so we can upload after creation
+      const localCandidates = formData.candidates ? [...formData.candidates] : [];
+
       const response = await axios.post('/api/admin/election', formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       console.log('Election created:', response.data);
-      
+
       if (response.data.success) {
+        // If backend returned created candidate ids, upload files for each
+        if (response.data.candidates && Array.isArray(response.data.candidates)) {
+          for (let i = 0; i < response.data.candidates.length; i++) {
+            const created = response.data.candidates[i];
+            const local = localCandidates[i];
+            if (local && local.photoFile) {
+              try {
+                setUploadingFiles(u => ({ ...u, [created.id]: true }));
+                const fd = new FormData();
+                fd.append('photo', local.photoFile);
+                const up = await axios.post(`/api/admin/candidate/${created.id}/photo`, fd, { headers: { Authorization: `Bearer ${token}` } });
+                if (up.data && up.data.success) {
+                  toast.success(`Uploaded photo for ${created.name}`);
+                } else {
+                  toast.error(`Failed to upload photo for ${created.name}`);
+                }
+              } catch (err) {
+                console.error('photo upload failed', err);
+                toast.error(`Photo upload failed for ${created.name}`);
+              } finally {
+                setUploadingFiles(u => ({ ...u, [created.id]: false }));
+              }
+            }
+          }
+        }
+
         // Add new election to the list
         setElections([...elections, response.data.election]);
         // Reset form
@@ -122,7 +158,7 @@ const Elections = () => {
           description: '',
           startDate: '',
           endDate: '',
-          candidates: [{ id: Date.now().toString(), name: '', party: '', description: '' }],
+          candidates: [{ id: Date.now().toString(), name: '', party: '', description: '', photoFile: null }],
           isPublic: true,
           importConcepts: { rollField: 'roll', nameField: 'name', emailField: 'email', mobileField: 'mobile', photoField: '' }
         });
@@ -379,6 +415,17 @@ const Elections = () => {
                                   onChange={(e) => handleCandidateChange(index, 'description', e.target.value)}
                                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
                                 />
+                                <div className="mt-2 flex items-center space-x-3">
+                                  {candidate.photoFile ? (
+                                    <img src={URL.createObjectURL(candidate.photoFile)} alt="preview" className="w-12 h-12 rounded-full object-cover" />
+                                  ) : (
+                                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">No photo</div>
+                                  )}
+                                  <div>
+                                    <label htmlFor={`candidate-photo-${index}`} className="px-2 py-1 bg-gray-100 rounded text-sm cursor-pointer">Select photo</label>
+                                    <input id={`candidate-photo-${index}`} type="file" accept="image/*" className="hidden" onChange={(e) => handleCandidateFileChange(index, e.target.files && e.target.files[0])} />
+                                  </div>
+                                </div>
                               </div>
                               <div className="sm:col-span-1 flex items-end">
                                 <button

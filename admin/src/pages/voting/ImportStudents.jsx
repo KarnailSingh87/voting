@@ -159,7 +159,7 @@ const ImportStudents = () => {
   return (
     <div className="bg-white rounded-lg shadow p-6 max-w-3xl mx-auto">
       <h2 className="text-xl font-semibold mb-4">Import Students / Voter Master List</h2>
-  <p className="text-sm text-gray-600 mb-4">Upload an Excel (.xlsx), CSV or a ZIP containing a CSV/XLSX plus image files. If you want to import profile images, upload a ZIP with the CSV/XLSX and the image files — the CSV's <code>photo</code> column should contain the image filename (e.g. <code>alice.jpg</code>).</p>
+  <p className="text-sm text-gray-600 mb-4">Upload an Excel (.xlsx), CSV or a ZIP containing a CSV/XLSX plus image files. If you want to import profile images, upload a ZIP with the CSV/XLSX and the image files — the CSV <code>photo</code> column should contain the image filename (e.g. <code>alice.jpg</code>).</p>
   <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">File</label>
