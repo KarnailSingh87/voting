@@ -754,3 +754,5 @@ MIT License - See LICENSE file
 <!-- Status check: README updated on 2026-01-30 -->
 
 <!-- Docs update: verified installation steps on 2026-02-17 -->
+
+<!-- Last documentation review: 2026-02-20 -->
