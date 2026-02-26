@@ -5,14 +5,14 @@ import 'react-toastify/dist/ReactToastify.css';
 import { backendUrl } from './config/config';
 
 // Voting System Admin pages
-import Login from './pages/Voting/Login';
-import Dashboard from './pages/Voting/Dashboard';
+import Login from './pages/voting/Login';
+import Dashboard from './pages/voting/Dashboard';
 import ErrorBoundary from './components/ErrorBoundary';
-import Elections from './pages/Voting/Elections';
-import ElectionDetail from './pages/Voting/ElectionDetail';
-import Monitoring from './pages/Voting/Monitoring';
-import ImportStudents from './pages/Voting/ImportStudents';
-import AdminVoters from './pages/Voting/AdminVoters';
+import Elections from './pages/voting/Elections';
+import ElectionDetail from './pages/voting/ElectionDetail';
+import Monitoring from './pages/voting/Monitoring';
+import SimpleImport from './pages/voting/SimpleImport';
+import AdminVoters from './pages/voting/AdminVoters';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 
@@ -88,9 +88,9 @@ const App = () => {
               </ErrorBoundary>
             </ProtectedRoute>
           }/>
-          <Route path='/import' element={
+          <Route path='/simple-import' element={
             <ProtectedRoute>
-              <ImportStudents token={token} />
+              <SimpleImport token={token} />
             </ProtectedRoute>
           }/>
           <Route path='/voters' element={

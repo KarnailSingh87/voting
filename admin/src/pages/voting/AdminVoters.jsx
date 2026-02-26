@@ -1,5 +1,5 @@
 /* global Set, Promise */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import axios from '../../utils/axios';
 import Modal from '../../components/Modal';
@@ -18,24 +18,15 @@ const AdminVoters = () => {
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(null);
 
-  const fetch = useCallback(async () => {
+  const fetchData = async () => {
     setLoading(true); setError('');
-    // ensure backend reachable before attempting heavy fetch
-    try {
-      await axios.get('/health');
-      setBackendHealthy(true);
-    } catch (he) {
-      setBackendHealthy(false);
-      setError(`Network error: could not reach backend at ${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005'}`);
-      setLoading(false);
-      return;
-    }
     try {
       const params = { q, page, limit: 50 };
       if (selectedElection) params.electionId = selectedElection;
       const res = await axios.get('/api/admin/students', { params });
       setItems(res.data.items || []);
       setTotal(res.data.total || 0);
+      setBackendHealthy(true);
     } catch (e) {
       if (!e.response) {
         setBackendHealthy(false);
@@ -44,19 +35,22 @@ const AdminVoters = () => {
         setError(e.response?.data?.message || e.message || 'Failed to fetch');
       }
     } finally { setLoading(false); }
-  }, [q, page, selectedElection]);
+  };
 
-  useEffect(() => { fetch(); }, [fetch, page, selectedElection]);
+  // Fetch on page/election change
+  useEffect(() => { 
+    fetchData(); 
+  }, [page, selectedElection]);
 
   // debounce search input for smoother UX
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setPage(1);
-      fetch();
+      fetchData();
     }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [q, fetch]);
+  }, [q]);
 
   // Preselect electionId from URL query (optional) so links can open AdminVoters filtered
   useEffect(() => {
@@ -71,10 +65,9 @@ const AdminVoters = () => {
     let mounted = true;
     (async () => {
       try {
-        await axios.get('/health'); // quick health probe
         const res = await axios.get('/api/admin/election');
         if (res.data && mounted) setElections(res.data.elections || []);
-      } catch (e) { setBackendHealthy(false); /* ignore elections load failure silently */ }
+      } catch (e) { /* ignore elections load failure silently */ }
     })();
     return () => { mounted = false; };
   }, []);
@@ -82,7 +75,7 @@ const AdminVoters = () => {
   const toggleVoted = async (roll, voted) => {
     try {
       await axios.patch(`/api/admin/students/${encodeURIComponent(roll)}`, { voted: !!voted });
-      fetch();
+      fetchData();
     } catch (e) { setError(e.response?.data?.message || e.message); }
   };
 
@@ -100,7 +93,7 @@ const AdminVoters = () => {
       const promises = Array.from(selected).map(r => axios.patch(`/api/admin/students/${encodeURIComponent(r)}`, { voted }));
       await Promise.all(promises);
       setSelected(new Set());
-      fetch();
+      fetchData();
     } catch (e) { setError(e.response?.data?.message || e.message); }
   };
 
@@ -131,7 +124,7 @@ const AdminVoters = () => {
     setShowDeleteModal(false);
     setDeleteTarget(null);
     if (!roll) return;
-    try { await axios.delete(`/api/admin/students/${encodeURIComponent(roll)}`); toast.success('Deleted'); fetch(); } catch (e) { const msg = e.response?.data?.message || e.message; setError(msg); toast.error(msg); }
+    try { await axios.delete(`/api/admin/students/${encodeURIComponent(roll)}`); toast.success('Deleted'); fetchData(); } catch (e) { const msg = e.response?.data?.message || e.message; setError(msg); toast.error(msg); }
   };
 
   const removeSelected = () => {
@@ -148,7 +141,7 @@ const AdminVoters = () => {
       const deleted = res.data?.deleted ?? 0;
       toast.success(`Deleted ${deleted} voter(s)`);
       setSelected(new Set());
-      fetch();
+      fetchData();
     } catch (e) {
       const msg = e.response?.data?.message || e.message;
       setError(msg);
@@ -184,7 +177,7 @@ const AdminVoters = () => {
     try {
       await axios.patch(`/api/admin/students/${encodeURIComponent(editing.roll)}`, { name: editing.name, email: editing.email, mobile: editing.mobile });
       toast.success('Saved');
-      closeEdit(); fetch();
+      closeEdit(); fetchData();
     } catch (e) { const msg = e.response?.data?.message || e.message; setError(msg); toast.error(msg); }
   };
 
@@ -197,7 +190,7 @@ const AdminVoters = () => {
           <option value="">All elections</option>
           {elections.map(ev => <option key={ev._id} value={ev._id}>{ev.title}</option>)}
         </select>
-        <button onClick={()=>{ setPage(1); fetch(); }} className="px-3 py-2 bg-cyan-600 text-white rounded">Search</button>
+        <button onClick={()=>{ setPage(1); fetchData(); }} className="px-3 py-2 bg-cyan-600 text-white rounded">Search</button>
       </div>
 
       {error && <div className="text-sm text-red-600 mb-3">{error}</div>}
