@@ -137,3 +137,9 @@ export function verifyOTP(aadhaarNumber, otp) {
   otpStore.delete(key);
   return { success: true, contact: entry.contact, contactType: entry.contactType };
 }
+
+// Dev helper: retrieve current OTP store entry for an identifier (returns raw entry or undefined)
+export function getOTPEntry(aadhaarNumber) {
+  const key = hashAadhaar(aadhaarNumber);
+  return otpStore.get(key);
+}

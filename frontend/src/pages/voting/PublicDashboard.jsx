@@ -3,6 +3,39 @@ import { useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
 import io from 'socket.io-client';
 
+const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
+
+// Helper to get full image URL (handles both absolute and relative URLs)
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${backendUrl}${url}`;
+};
+
+// Photo Modal Component
+const PhotoModal = ({ photoUrl, name, onClose }) => {
+  if (!photoUrl) return null;
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="relative max-w-3xl max-h-[90vh] p-2">
+        <button 
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300"
+        >
+          ×
+        </button>
+        <img 
+          src={photoUrl} 
+          alt={name} 
+          className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain"
+          onClick={(e) => e.stopPropagation()}
+        />
+        <p className="text-white text-center mt-2 text-lg font-medium">{name}</p>
+      </div>
+    </div>
+  );
+};
+
 let socket;
 
 const PublicDashboard = () => {
@@ -14,6 +47,7 @@ const PublicDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [elections, setElections] = useState([]);
   const [electionFilter, setElectionFilter] = useState('all');
+  const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
   // retry UI states removed — retries now run silently in background
 
   useEffect(() => {
@@ -386,9 +420,23 @@ const PublicDashboard = () => {
                           <div className="text-xs text-gray-500 mt-1">{formatLastUpdated(ev.startDate)} — {formatLastUpdated(ev.endDate)}</div>
                           <div className="mt-2 text-sm">
                             {ev.candidates && ev.candidates.length > 0 ? (
-                              <div className="flex space-x-2">
+                              <div className="flex flex-wrap items-center gap-2">
                                 {ev.candidates.map(c => (
-                                  <span key={c.id} className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-700">{c.name}</span>
+                                  <div key={c.id} className="flex items-center space-x-1 px-2 py-1 bg-gray-100 rounded text-xs text-gray-700">
+                                    {c.photoUrl ? (
+                                      <img 
+                                        src={getImageUrl(c.photoUrl)} 
+                                        alt={c.name} 
+                                        className="w-6 h-6 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
+                                        onClick={() => setPhotoModal({ show: true, url: getImageUrl(c.photoUrl), name: c.name })}
+                                      />
+                                    ) : (
+                                      <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-[10px] text-gray-600">
+                                        {(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
+                                      </div>
+                                    )}
+                                    <span>{c.name}</span>
+                                  </div>
                                 ))}
                               </div>
                             ) : (<span className="text-xs text-gray-400">No candidates</span>)}
@@ -447,6 +495,15 @@ const PublicDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Photo Modal */}
+      {photoModal.show && (
+        <PhotoModal 
+          photoUrl={photoModal.url} 
+          name={photoModal.name} 
+          onClose={() => setPhotoModal({ show: false, url: null, name: '' })} 
+        />
+      )}
     </div>
   );
 };

@@ -7,6 +7,39 @@ import Sidebar from '../../components/Sidebar';
 import { toast } from 'react-toastify';
 import Modal from '../../components/Modal';
 
+const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
+
+// Helper to get full image URL (handles both absolute and relative URLs)
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${backendUrl}${url}`;
+};
+
+// Photo Modal Component
+const PhotoModal = ({ photoUrl, name, onClose }) => {
+  if (!photoUrl) return null;
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="relative max-w-3xl max-h-[90vh] p-2">
+        <button 
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300"
+        >
+          ×
+        </button>
+        <img 
+          src={photoUrl} 
+          alt={name} 
+          className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain"
+          onClick={(e) => e.stopPropagation()}
+        />
+        <p className="text-white text-center mt-2 text-lg font-medium">{name}</p>
+      </div>
+    </div>
+  );
+};
+
 const ElectionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -14,6 +47,12 @@ const ElectionDetail = () => {
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [, setError] = useState('');
+  const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
+
+  // Edit candidate state
+  const [editingCandidate, setEditingCandidate] = useState(null);
+  const [candidateForm, setCandidateForm] = useState({ name: '', party: '' });
+  const [savingCandidate, setSavingCandidate] = useState(false);
 
   // voters pagination
   const [voters, setVoters] = useState({ total: 0, items: [] });
@@ -36,6 +75,42 @@ const ElectionDetail = () => {
       setError(e.response?.data?.message || 'Failed to load election');
     } finally { setLoading(false); }
   }, [id, token]);
+
+  // Start editing a candidate
+  const handleEditCandidate = (candidate) => {
+    setEditingCandidate(candidate.id);
+    setCandidateForm({ name: candidate.name, party: candidate.party || '' });
+  };
+
+  // Save candidate changes
+  const handleSaveCandidate = async (candidateId) => {
+    if (!candidateForm.name.trim()) {
+      toast.error('Name is required');
+      return;
+    }
+    setSavingCandidate(true);
+    try {
+      const res = await axios.put(`/api/admin/candidate/${candidateId}`, candidateForm, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data && res.data.success) {
+        setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, name: candidateForm.name, party: candidateForm.party } : c));
+        setEditingCandidate(null);
+        toast.success('Candidate updated');
+      } else {
+        toast.error(res.data?.message || 'Failed to update');
+      }
+    } catch (e) {
+      console.error('Failed to update candidate', e);
+      toast.error(e.response?.data?.message || 'Failed to update candidate');
+    } finally {
+      setSavingCandidate(false);
+    }
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setEditingCandidate(null);
+    setCandidateForm({ name: '', party: '' });
+  };
 
   const fetchVoters = useCallback(async (p = page, lim = limit) => {
     setVotersLoading(true);
@@ -270,47 +345,118 @@ const ElectionDetail = () => {
                 <h3 className="font-medium mb-2">Candidates</h3>
                 <div className="grid grid-cols-1 gap-2">
                   {candidates.map(c => (
-                    <div key={c.id} className="flex justify-between items-center p-2 border rounded">
-                      <div className="flex items-center">
-                        {c.photoUrl ? (
-                          <img src={c.photoUrl} alt={c.name} className="w-12 h-12 rounded-full object-cover mr-3" />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-gray-200 mr-3 flex items-center justify-center text-sm text-gray-600">{(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}</div>
-                        )}
-                        <div>
-                          <div className="font-medium">{c.name}</div>
-                          <div className="text-sm text-gray-500">{c.party}</div>
+                    <div key={c.id} className="flex justify-between items-center p-3 border rounded">
+                      <div className="flex items-center flex-1">
+                        {/* Photo with upload option */}
+                        <div className="relative group">
+                          {c.photoUrl ? (
+                            <img 
+                              src={getImageUrl(c.photoUrl)} 
+                              alt={c.name} 
+                              className="w-14 h-14 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
+                              onClick={() => setPhotoModal({ show: true, url: getImageUrl(c.photoUrl), name: c.name })}
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-sm text-gray-600">
+                              {(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
+                            </div>
+                          )}
+                          {/* Photo upload overlay */}
+                          <label 
+                            htmlFor={`file-${c.id}`} 
+                            className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          >
+                            <span className="text-white text-xs">📷</span>
+                          </label>
+                          <input 
+                            id={`file-${c.id}`} 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={async (e) => {
+                              const file = e.target.files && e.target.files[0];
+                              if (!file) return;
+                              try {
+                                setUploading(u => ({ ...u, [c.id]: true }));
+                                const fd = new FormData();
+                                fd.append('photo', file);
+                                const res = await axios.post(`/api/admin/candidate/${c.id}/photo`, fd, { headers: { Authorization: `Bearer ${token}` } });
+                                if (res.data && res.data.success) {
+                                  setCandidates(prev => prev.map(item => item.id === c.id ? { ...item, photoUrl: res.data.photoUrl } : item));
+                                  toast.success('Photo uploaded');
+                                } else {
+                                  toast.error(res.data?.message || 'Upload failed');
+                                }
+                              } catch (err) {
+                                console.error('photo upload failed', err);
+                                toast.error(err.response?.data?.message || 'Upload failed');
+                              } finally {
+                                setUploading(u => ({ ...u, [c.id]: false }));
+                                e.target.value = '';
+                              }
+                            }} 
+                          />
+                          {uploading[c.id] && (
+                            <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs">...</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Name and Party - Editable */}
+                        <div className="ml-4 flex-1">
+                          {editingCandidate === c.id ? (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={candidateForm.name}
+                                onChange={(e) => setCandidateForm(f => ({ ...f, name: e.target.value }))}
+                                placeholder="Candidate name"
+                                className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-cyan-400 focus:outline-none"
+                              />
+                              <input
+                                type="text"
+                                value={candidateForm.party}
+                                onChange={(e) => setCandidateForm(f => ({ ...f, party: e.target.value }))}
+                                placeholder="Party name"
+                                className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-cyan-400 focus:outline-none"
+                              />
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleSaveCandidate(c.id)}
+                                  disabled={savingCandidate}
+                                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
+                                >
+                                  {savingCandidate ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="px-3 py-1 bg-gray-400 text-white text-xs rounded hover:bg-gray-500"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div 
+                              className="cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors"
+                              onClick={() => handleEditCandidate(c)}
+                              title="Click to edit"
+                            >
+                              <div className="font-medium flex items-center">
+                                {c.name}
+                                <span className="ml-2 text-gray-400 text-xs">✏️</span>
+                              </div>
+                              <div className="text-sm text-gray-500">{c.party || <span className="italic text-gray-400">No party</span>}</div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
-                        <div className="text-lg font-bold">{c.voteCount}</div>
-                        <div>
-                          <label htmlFor={`file-${c.id}`} className="px-2 py-1 bg-gray-100 rounded text-sm cursor-pointer">{uploading[c.id] ? 'Uploading...' : 'Upload photo'}</label>
-                          <input id={`file-${c.id}`} type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                            const file = e.target.files && e.target.files[0];
-                            if (!file) return;
-                            try {
-                              setUploading(u => ({ ...u, [c.id]: true }));
-                              const fd = new FormData();
-                              fd.append('photo', file);
-                              const res = await axios.post(`/api/admin/candidate/${c.id}/photo`, fd, { headers: { Authorization: `Bearer ${token}` } });
-                              if (res.data && res.data.success) {
-                                // update candidate local state with returned photoUrl
-                                setCandidates(prev => prev.map(item => item.id === c.id ? { ...item, photoUrl: res.data.photoUrl } : item));
-                                toast.success('Photo uploaded');
-                              } else {
-                                toast.error(res.data?.message || 'Upload failed');
-                              }
-                            } catch (err) {
-                              console.error('photo upload failed', err);
-                              toast.error(err.response?.data?.message || 'Upload failed');
-                            } finally {
-                              setUploading(u => ({ ...u, [c.id]: false }));
-                              // reset input so same file can be selected again
-                              e.target.value = '';
-                            }
-                          }} />
-                        </div>
+
+                      {/* Vote count */}
+                      <div className="text-right ml-4">
+                        <div className="text-lg font-bold text-cyan-600">{c.voteCount}</div>
+                        <div className="text-xs text-gray-500">votes</div>
                       </div>
                     </div>
                   ))}
@@ -382,6 +528,15 @@ const ElectionDetail = () => {
           )}
         </main>
       </div>
+
+      {/* Photo Modal */}
+      {photoModal.show && (
+        <PhotoModal 
+          photoUrl={photoModal.url} 
+          name={photoModal.name} 
+          onClose={() => setPhotoModal({ show: false, url: null, name: '' })} 
+        />
+      )}
     </div>
   );
 };

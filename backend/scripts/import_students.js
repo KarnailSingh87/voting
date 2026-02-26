@@ -16,11 +16,13 @@ async function main() {
   const rawArgs = process.argv.slice(2);
   // flags: --preview, --roll-col=<LETTER|NUMBER>
   let preview = false;
+  let force = false;
   let rollColArg = null;
   let fileArg = null;
   for (let i = 0; i < rawArgs.length; i++) {
     const a = rawArgs[i];
     if (a === '--preview') preview = true;
+    else if (a === '--force') force = true;
     else if (a.startsWith('--roll-col=')) rollColArg = a.split('=')[1];
     else if (!fileArg) fileArg = a;
   }
@@ -83,7 +85,18 @@ async function main() {
     }
   }
   // detect whether the sheet contains header names we can use
-  const expectedHeaders = ['roll', 'name', 'email', 'mobile'];
+  // include common synonyms and the exact template keywords so headers like "ID No", "Mail ID", "Father's Name" are recognized
+  const expectedHeaders = [
+    'roll','rollno','roll_no','roll number',
+    'id','idno','id_no','id number','id no','student id','studentid','registration','regno',
+    "father's name", 'father name', 'father_name',
+    'name','full name',
+    'blood group','bloodgroup','blood_group',
+    'mobile','phone','phone number','phone_no',
+    'branch','department',
+    'address','addr','location',
+    'category','batch','mail id','mail_id','mail','email'
+  ];
   const firstObj = data[0] || {};
   const lowerKeys = Object.keys(firstObj).map(k => String(k).toLowerCase());
   const hasExpectedHeaders = lowerKeys.some(k => expectedHeaders.some(h => k.includes(h)));
@@ -141,11 +154,14 @@ async function main() {
       }
       const email = '';
       const mobile = '';
-      if (!roll || !name) continue;
+      // allow forced import when requested
+      const finalRoll = roll || (force ? `GEN${Date.now()}${Math.random().toString(36).slice(2,6)}` : '');
+      const finalName = name || (force ? 'Unknown' : '');
+      if ((!finalRoll || !finalName) && !force) continue;
       try {
         await Student.updateOne(
-          { roll },
-          { $set: { name, email, mobile }, $setOnInsert: { registeredAt: new Date(), voted: false } },
+          { roll: finalRoll },
+          { $set: { name: finalName, email, mobile }, $setOnInsert: { registeredAt: new Date(), voted: false } },
           { upsert: true }
         );
         imported++;
@@ -164,11 +180,13 @@ async function main() {
       const name = (row.name || row.Name || row.student || '').toString().trim();
       const email = (row.email || row.Email || '').toString().trim();
       const mobile = (row.mobile || row.Mobile || row.phone || row.Phone || '').toString().trim();
-      if (!roll || !name) continue;
+      const finalRoll = roll || (force ? `GEN${Date.now()}${Math.random().toString(36).slice(2,6)}` : '');
+      const finalName = name || (force ? 'Unknown' : '');
+      if ((!finalRoll || !finalName) && !force) continue;
       try {
         await Student.updateOne(
-          { roll },
-          { $set: { name, email, mobile }, $setOnInsert: { registeredAt: new Date(), voted: false } },
+          { roll: finalRoll },
+          { $set: { name: finalName, email, mobile }, $setOnInsert: { registeredAt: new Date(), voted: false } },
           { upsert: true }
         );
         imported++;

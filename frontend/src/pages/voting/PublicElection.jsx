@@ -3,6 +3,39 @@ import { io } from 'socket.io-client';
 import { useParams, Link } from 'react-router-dom';
 import axios from '../../utils/axios';
 
+const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
+
+// Helper to get full image URL (handles both absolute and relative URLs)
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${backendUrl}${url}`;
+};
+
+// Photo Modal Component
+const PhotoModal = ({ photoUrl, name, onClose }) => {
+  if (!photoUrl) return null;
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="relative max-w-3xl max-h-[90vh] p-2">
+        <button 
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300"
+        >
+          ×
+        </button>
+        <img 
+          src={photoUrl} 
+          alt={name} 
+          className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain"
+          onClick={(e) => e.stopPropagation()}
+        />
+        <p className="text-white text-center mt-2 text-lg font-medium">{name}</p>
+      </div>
+    </div>
+  );
+};
+
 const PAGE_SIZE = 20;
 
 const PublicElection = () => {
@@ -14,6 +47,7 @@ const PublicElection = () => {
   const [totalVotes, setTotalVotes] = useState(0);
   const [page, setPage] = useState(1);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
 
   useEffect(() => {
     const fetch = async () => {
@@ -112,7 +146,12 @@ const PublicElection = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         {c.photoUrl ? (
-                          <img src={c.photoUrl} alt={c.name} className="w-12 h-12 rounded-full object-cover mr-3" />
+                          <img 
+                            src={getImageUrl(c.photoUrl)} 
+                            alt={c.name} 
+                            className="w-12 h-12 rounded-full object-cover mr-3 cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
+                            onClick={() => setPhotoModal({ show: true, url: getImageUrl(c.photoUrl), name: c.name })}
+                          />
                         ) : (
                           <div className="w-12 h-12 rounded-full bg-gray-200 mr-3 flex items-center justify-center text-sm text-gray-600">{(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}</div>
                         )}
@@ -156,6 +195,15 @@ const PublicElection = () => {
           </div>
         )}
       </div>
+
+      {/* Photo Modal */}
+      {photoModal.show && (
+        <PhotoModal 
+          photoUrl={photoModal.url} 
+          name={photoModal.name} 
+          onClose={() => setPhotoModal({ show: false, url: null, name: '' })} 
+        />
+      )}
     </div>
   );
 };

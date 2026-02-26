@@ -12,7 +12,7 @@ import Election from '../models/Election.js';
 import Candidate from '../models/Candidate.js';
 import Student from '../models/Student.js';
 import AdminAction from '../models/AdminAction.js';
-import { requestOTP } from '../config/otpService.js';
+import { requestOTP, getOTPEntry } from '../config/otpService.js';
 import { parseFile } from '../config/aiParser.js';
 
 const router = express.Router();
@@ -39,7 +39,7 @@ const upload = multer({
 const imageUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      const dest = path.join(process.cwd(), 'backend', 'public', 'uploads', 'candidates');
+      const dest = path.join(process.cwd(), 'public', 'uploads', 'candidates');
       try { fs.mkdirSync(dest, { recursive: true }); } catch (e) {}
       cb(null, dest);
     },
@@ -88,6 +88,21 @@ router.get('/debug/admins', async (req, res) => {
     return res.json({ success: true, admins });
   } catch (e) {
     console.error('debug admins error', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Dev-only: inspect OTP store for a given identifier (aadhaar or roll). Protected by adminAuth.
+router.get('/debug/otp', adminAuth, async (req, res) => {
+  try {
+    const enabled = (process.env.NODE_ENV !== 'production');
+    if (!enabled) return res.status(404).json({ message: 'Not found' });
+    const identifier = req.query.identifier || req.query.roll || req.query.aadhaar;
+    if (!identifier) return res.status(400).json({ message: 'identifier query required (roll or aadhaar)' });
+    const entry = getOTPEntry(identifier);
+    return res.json({ success: true, entry: entry || null });
+  } catch (e) {
+    console.error('debug otp error', e);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -330,6 +345,68 @@ router.post('/election/:id/end', adminAuth, async (req, res) => {
   }
 });
 
+// Delete election and associated candidates/votes
+router.delete('/election/:id', adminAuth, async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid election id' });
+    }
+    
+    const election = await Election.findById(id);
+    if (!election) {
+      return res.status(404).json({ success: false, message: 'Election not found' });
+    }
+    
+    // Delete associated candidates
+    const deletedCandidates = await Candidate.deleteMany({ election: election._id });
+    
+    // Delete associated votes
+    const Vote = (await import('../models/Vote.js')).default;
+    const deletedVotes = await Vote.deleteMany({ election: election._id });
+    
+    // Remove election reference from students
+    await Student.updateMany(
+      { elections: election._id },
+      { $pull: { elections: election._id } }
+    );
+    
+    // Delete the election
+    await Election.findByIdAndDelete(id);
+    
+    // Log admin action
+    try {
+      await AdminAction.create({
+        admin: req.admin?.aid,
+        action: 'delete-election',
+        details: { 
+          electionId: id, 
+          title: election.title,
+          deletedCandidates: deletedCandidates.deletedCount,
+          deletedVotes: deletedVotes.deletedCount
+        },
+        ip: req.ip
+      });
+    } catch (_) {}
+    
+    // Notify via WebSocket
+    const io = req.app.get('io');
+    if (io) io.emit('election_deleted', { id: election._id.toString() });
+    
+    return res.json({ 
+      success: true, 
+      message: 'Election deleted successfully',
+      deleted: {
+        candidates: deletedCandidates.deletedCount,
+        votes: deletedVotes.deletedCount
+      }
+    });
+  } catch (e) {
+    console.error('delete election error', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Create candidate for an election
 router.post('/candidate', adminAuth, async (req, res) => {
   try {
@@ -343,6 +420,42 @@ router.post('/candidate', adminAuth, async (req, res) => {
   } catch(e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update candidate details (name, party, manifesto)
+router.put('/candidate/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, party, manifesto } = req.body;
+    
+    if (!id) return res.status(400).json({ success: false, message: 'Candidate id required' });
+    if (!name || !name.trim()) return res.status(400).json({ success: false, message: 'Name is required' });
+    
+    const candidate = await Candidate.findById(id);
+    if (!candidate) return res.status(404).json({ success: false, message: 'Candidate not found' });
+    
+    // Update fields
+    candidate.name = name.trim();
+    if (party !== undefined) candidate.party = party.trim();
+    if (manifesto !== undefined) candidate.manifesto = manifesto;
+    
+    await candidate.save();
+    
+    res.json({ 
+      success: true, 
+      candidate: { 
+        id: candidate._id.toString(), 
+        name: candidate.name, 
+        party: candidate.party, 
+        manifesto: candidate.manifesto,
+        photoUrl: absoluteUrl(req, candidate.photoUrl),
+        voteCount: candidate.voteCount
+      } 
+    });
+  } catch (e) {
+    console.error('update candidate error', e);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
@@ -458,6 +571,154 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
   let zipFilesMap = {};
   // default sheetName so later image lookup won't throw if initial parse fails
   let sheetName = 'Sheet1';
+
+  // Check if file is CSV/TSV - parse directly without ExcelJS
+  const fileName = (req.file.originalname || '').toLowerCase();
+  const isCSV = fileName.endsWith('.csv') || fileName.endsWith('.tsv') || req.file.mimetype === 'text/csv' || req.file.mimetype === 'text/tab-separated-values';
+  const isZIP = fileName.endsWith('.zip') || req.file.mimetype === 'application/zip' || req.file.mimetype === 'application/x-zip-compressed';
+  
+  if (isCSV) {
+    // Parse CSV/TSV directly
+    try {
+      const content = req.file.buffer.toString('utf8');
+      const lines = content.split(/\r?\n/).filter(l => l.trim() !== '');
+      if (lines.length > 0) {
+        const first = lines[0];
+        const commaCount = (first.match(/,/g) || []).length;
+        const tabCount = (first.match(/\t/g) || []).length;
+        const delim = commaCount >= tabCount ? ',' : '\t';
+        // build rawRows
+        rawRows = lines.map(line => {
+          // Handle quoted CSV fields properly
+          const cells = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"' && (i === 0 || line[i-1] !== '\\')) {
+              inQuotes = !inQuotes;
+            } else if (char === delim && !inQuotes) {
+              cells.push(current.trim().replace(/^"|"$/g, ''));
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          cells.push(current.trim().replace(/^"|"$/g, ''));
+          return cells;
+        });
+        // build data objects with headers
+        if (rawRows.length > 1) {
+          const headerRow = rawRows[0];
+          for (let r = 1; r < rawRows.length; r++) {
+            const rowArr = rawRows[r] || [];
+            const obj = {};
+            const maxLen = Math.max(headerRow.length, rowArr.length);
+            for (let c = 0; c < maxLen; c++) {
+              const rawHeaderCell = headerRow[c];
+              let key = (rawHeaderCell == null ? '' : String(rawHeaderCell).trim());
+              if (!key) key = `Col ${c+1}`;
+              obj[key] = (rowArr[c] == null ? '' : rowArr[c]);
+            }
+            data.push(obj);
+          }
+        }
+      }
+      console.log('CSV parsed successfully:', rawRows.length, 'rows');
+    } catch (csvErr) {
+      console.error('CSV parse error:', csvErr);
+      parseErrorMsg = csvErr.message || 'Failed to parse CSV';
+    }
+  } else if (isZIP) {
+    // Handle ZIP file directly - extract CSV/TSV and images
+    try {
+      let zip = null;
+      try {
+        zip = await JSZip.loadAsync(req.file.buffer);
+      } catch (zipErr) {
+        try {
+          zip = await JSZip.loadAsync(new Uint8Array(req.file.buffer));
+        } catch (zipErr2) {
+          throw zipErr2 || zipErr;
+        }
+      }
+      console.log('ZIP files in upload:', Object.keys(zip.files).slice(0, 50));
+      
+      let candidateText = null;
+      // Search for CSV/TSV files and collect images
+      for (const fname of Object.keys(zip.files)) {
+        const f = zip.files[fname];
+        // Skip directories
+        if (f.dir) continue;
+        // Collect image files
+        if (/\.(jpe?g|png|gif|webp|svg)$/i.test(fname)) {
+          try {
+            const buf = await f.async('nodebuffer');
+            const base = path.basename(fname).toLowerCase();
+            const ext = (path.extname(fname) || '').replace('.', '').toLowerCase() || 'png';
+            zipFilesMap[base] = { buffer: Buffer.from(buf), extension: ext };
+          } catch (ie) { /* ignore image extraction errors */ }
+        }
+        // Prefer CSV/TSV files
+        if (!candidateText && (/\.csv$/i.test(fname) || /\.tsv$/i.test(fname) || /table|index|sheet/i.test(fname))) {
+          try {
+            const content = await f.async('string');
+            if (content && content.trim().length > 0) {
+              candidateText = content;
+            }
+          } catch (ie) { /* ignore */ }
+        }
+      }
+      
+      // If no CSV found, try to find any text file
+      if (!candidateText) {
+        for (const fname of Object.keys(zip.files)) {
+          const f = zip.files[fname];
+          if (f.dir) continue;
+          if (!candidateText) {
+            try {
+              const content = await f.async('string');
+              if (content && content.trim().length > 0 && /[\t,]/.test(content)) {
+                candidateText = content;
+                break;
+              }
+            } catch (_) { /* ignore */ }
+          }
+        }
+      }
+
+      if (candidateText) {
+        const lines = candidateText.split(/\r?\n/).filter(l => l.trim() !== '');
+        console.log('ZIP candidateText lines count:', lines.length, 'first:', lines[0] && lines[0].slice(0, 200));
+        if (lines.length > 0) {
+          const first = lines[0];
+          const commaCount = (first.match(/,/g) || []).length;
+          const tabCount = (first.match(/\t/g) || []).length;
+          const delim = commaCount >= tabCount ? ',' : '\t';
+          rawRows = lines.map(line => line.split(delim).map(cell => cell.replace(/^"|"$/g, '').trim()));
+          if (rawRows.length > 1) {
+            const headerRow = rawRows[0];
+            for (let r = 1; r < rawRows.length; r++) {
+              const rowArr = rawRows[r] || [];
+              const obj = {};
+              const maxLen = Math.max(headerRow.length, rowArr.length);
+              for (let c = 0; c < maxLen; c++) {
+                const rawHeaderCell = headerRow[c];
+                let key = (rawHeaderCell == null ? '' : String(rawHeaderCell).trim());
+                if (!key) key = `Col ${c+1}`;
+                obj[key] = (rowArr[c] == null ? '' : rowArr[c]);
+              }
+              data.push(obj);
+            }
+          }
+        }
+      }
+      console.log('ZIP parsed successfully:', rawRows.length, 'rows,', Object.keys(zipFilesMap).length, 'images');
+    } catch (zipErr) {
+      console.error('ZIP parse error:', zipErr);
+      parseErrorMsg = zipErr.message || 'Failed to parse ZIP';
+    }
+  } else {
     try {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(req.file.buffer);
@@ -578,6 +839,7 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
           }
       }
       }
+    } // end else (non-CSV files)
 
     // continue processing when not preview or when parsing succeeded
 
@@ -686,7 +948,18 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
   // detect header row
     const firstObj = data[0] || {};
     const lowerKeys = Object.keys(firstObj).map(k => String(k).toLowerCase());
-    const expectedHeaders = ['roll', 'name', 'email', 'mobile'];
+    // include common synonyms and the exact template keywords so headers like "ID No", "Mail ID", "Father's Name" are recognized
+    const expectedHeaders = [
+      'roll','rollno','roll_no','roll number',
+      'id','idno','id_no','id number','id no','student id','studentid','registration','regno',
+      "father's name", 'father name', 'father_name',
+      'name','full name',
+      'blood group','bloodgroup','blood_group',
+      'mobile','phone','phone number','phone_no',
+      'branch','department',
+      'address','addr','location',
+      'category','batch','mail id','mail_id','mail','email'
+    ];
     const hasExpectedHeaders = lowerKeys.some(k => expectedHeaders.some(h => k.includes(h)));
     const headerless = !hasExpectedHeaders;
 
@@ -734,6 +1007,8 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
   const previewRows = [];
   // richer preview structure when previewFlag: we'll return headers (if present) and rows with raw arrays and objects
   const previewData = { headers: null, rows: [] };
+  // allow forcing import even if required fields missing
+  const forceImport = (req.body.force === '1' || req.body.force === 'true' || req.query.force === '1' || req.query.force === 'true');
   if (headerless) {
       // headerless: rawRows are arrays; include all columns. Provide sensible Col N headers
       // instead of showing sheetjs placeholders like __EMPTY
@@ -859,11 +1134,14 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
         if (previewFlag) {
           previewData.rows.push({ ...rowObj, extracted: { roll, name, email, mobile, photo }, valid: errors.length === 0, errors });
         } else {
-          if (errors.length === 0) {
+          // If forceImport is enabled, attempt to import rows even when roll/name are missing
+          const finalRoll = roll || (forceImport ? `GEN${Date.now()}${Math.random().toString(36).slice(2,6)}` : '');
+          const finalName = name || (forceImport ? 'Unknown' : '');
+          if ((!finalRoll || !finalName) && !forceImport) {
+            // skip row when required fields absent and not forcing
+          } else {
             try {
-              // allow AI-extracted fields to enrich headerless rows
               const aiRow = (aiExtractedRows && aiExtractedRows[i]) ? aiExtractedRows[i] : null;
-              // if photo is a filename and exists in uploaded zip, map it to an inline data URI
               if (photo && !/^https?:\/\//i.test(photo) && zipFilesMap) {
                 try {
                   const basePhoto = path.basename(photo).toLowerCase();
@@ -875,31 +1153,25 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
                 } catch (e) { /* ignore */ }
               }
 
-              const setObj = { name, email, mobile, photo: (photo || (aiRow && aiRow.photo)) || undefined, originalArr: rowObj.arr, originalObj: null, originalHeaders: null };
+              const setObj = { name: finalName, email, mobile, photo: (photo || (aiRow && aiRow.photo)) || undefined, originalArr: rowObj.arr, originalObj: null, originalHeaders: null };
               if (aiRow && aiRow.fatherName) setObj.fatherName = aiRow.fatherName;
               if (aiRow && aiRow.address) setObj.address = aiRow.address;
-              // perform case-insensitive find to avoid duplicate students differing only by roll casing
               const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const existing = await Student.findOne({ roll: { $regex: `^${escapeRegExp(roll)}$`, $options: 'i' } });
+              const existing = finalRoll ? await Student.findOne({ roll: { $regex: `^${escapeRegExp(finalRoll)}$`, $options: 'i' } }) : null;
               if (existing) {
-                // normalize stored roll to uppercase and merge fields
-                // If no electionObjectId provided, mark this student as part of the global master list
-                const updateObj = { $set: { ...setObj, roll: roll } };
+                const updateObj = { $set: { ...setObj, roll: finalRoll } };
                 if (electionObjectId) updateObj.$addToSet = { elections: electionObjectId };
                 else updateObj.$set = { ...(updateObj.$set || {}), masterList: true };
                 await Student.updateOne({ _id: existing._id }, updateObj);
               } else {
-                const createObj = { roll: roll, ...setObj };
+                const createObj = { roll: finalRoll || `GEN${Date.now()}${Math.random().toString(36).slice(2,6)}`, ...setObj };
                 if (electionObjectId) createObj.elections = [electionObjectId];
                 createObj.registeredAt = new Date();
                 createObj.voted = false;
-                // mark as master list if no election association provided
                 createObj.masterList = !electionObjectId;
                 await Student.create(createObj);
               }
               imported++;
-              // if requested, attempt to auto-send OTP to any detected email in the row
-              // auto-send OTP removed
             } catch (e) { console.error('import error', e); }
           }
         }
@@ -1005,6 +1277,18 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
                 if (!fatherName && aiRow.fatherName) fatherName = aiRow.fatherName;
                 if (!address && aiRow.address) address = aiRow.address;
                 if (!photo && aiRow.photo) photo = aiRow.photo;
+              }
+
+              // Resolve photo filename to data URI if found in zipFilesMap
+              if (photo && !/^https?:\/\//i.test(photo) && !/^data:image\//i.test(photo) && zipFilesMap) {
+                try {
+                  const basePhoto = path.basename(photo).toLowerCase();
+                  const match = zipFilesMap[photo.toLowerCase()] || zipFilesMap[basePhoto];
+                  if (match && match.buffer) {
+                    const b64 = Buffer.from(match.buffer).toString('base64');
+                    photo = `data:image/${match.extension};base64,${b64}`;
+                  }
+                } catch (e) { /* ignore */ }
               }
 
               // avoid duplicates by doing a case-insensitive lookup first

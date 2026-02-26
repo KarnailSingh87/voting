@@ -18,10 +18,10 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-// Serve uploaded files (candidate photos etc.) from backend/public/uploads at /uploads
-app.use('/uploads', express.static(path.join(process.cwd(), 'backend', 'public', 'uploads')));
+// Serve uploaded files (candidate photos etc.) from public/uploads at /uploads
+app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
 // Routes
 app.use('/api/voter', voterRoutes);
