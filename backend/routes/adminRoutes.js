@@ -1381,7 +1381,7 @@ router.patch('/students/:roll', adminAuth, async (req, res) => {
   try {
     const roll = req.params.roll;
     const updates = {};
-    const allowed = ['name', 'email', 'mobile', 'voted'];
+    const allowed = ['name', 'email', 'mobile', 'voted', 'fatherName', 'address'];
     for (const k of allowed) if (k in req.body) updates[k] = req.body[k];
     const escaped = roll.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const result = await Student.findOneAndUpdate({ roll: { $regex: `^${escaped}$`, $options: 'i' } }, { $set: updates }, { new: true });

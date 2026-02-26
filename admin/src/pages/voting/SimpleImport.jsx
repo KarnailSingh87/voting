@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
 import { toast } from 'react-toastify';
+import * as XLSX from 'xlsx';
 
 const SimpleImport = () => {
   const navigate = useNavigate();
@@ -134,19 +135,48 @@ const SimpleImport = () => {
   };
 
   const downloadTemplate = () => {
-    const headers = ['Roll No', 'Name', 'Email', 'Mobile', "Father's Name", 'Branch', 'Batch'];
-    const example1 = ['STU001', 'John Doe', 'john@example.com', '9876543210', 'Robert Doe', 'CSE', '2024'];
-    const example2 = ['STU002', 'Jane Smith', 'jane@example.com', '9876543211', 'Mark Smith', 'ECE', '2024'];
-    const csv = headers.join(',') + '\n' + example1.join(',') + '\n' + example2.join(',') + '\n';
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'voters_template.csv';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const headers = ['Name', "Father's Name", 'Blood Group', 'Mobile', 'Program', 'Address', 'Category', 'Batch', 'Roll No', 'Photo URL'];
+    const example1 = ['John Doe', 'Robert Doe', 'B+', '9876543210', 'B.Tech CSE', 'Vill. Gori PO Kulhera, Tehsil Dhatwal, Distt Hamirpur', 'General', '2023-2027', 'STU001', 'https://example.com/photo1.jpg'];
+    const example2 = ['Jane Smith', 'Mark Smith', 'O+', '9876543211', 'B.Tech CSE', 'Vill. Khagal PO Khagal, Teh. Hamirpur, Distt. Hamirpur', 'SC', '2023-2027', 'STU002', 'https://example.com/photo2.jpg'];
+    
+    // Create worksheet data
+    const wsData = [headers, example1, example2];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Set column widths for better readability
+    ws['!cols'] = [
+      { wch: 20 }, // Name
+      { wch: 20 }, // Father's Name
+      { wch: 15 }, // Blood Group
+      { wch: 15 }, // Mobile
+      { wch: 15 }, // Program
+      { wch: 40 }, // Address
+      { wch: 12 }, // Category
+      { wch: 12 }, // Batch
+      { wch: 12 }, // Roll No
+      { wch: 35 }, // Photo URL
+    ];
+    
+    // Style the header row
+    const headerStyle = {
+      font: { bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: '4472C4' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+    };
+    
+    // Apply header style
+    headers.forEach((_, idx) => {
+      const cellRef = XLSX.utils.encode_col(idx) + '1';
+      if (!ws[cellRef]) ws[cellRef] = {};
+      ws[cellRef].s = headerStyle;
+    });
+    
+    // Create workbook and add worksheet
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Voters Template');
+    
+    // Generate and download Excel file
+    XLSX.writeFile(wb, 'voters_template.xlsx');
   };
 
   const resetForm = () => {
@@ -249,7 +279,7 @@ const SimpleImport = () => {
               onClick={downloadTemplate}
               className="text-sm text-cyan-600 hover:text-cyan-700"
             >
-              📥 Download template CSV
+              📥 Download template Excel
             </button>
             {previewing && (
               <span className="text-sm text-gray-500">Loading preview...</span>

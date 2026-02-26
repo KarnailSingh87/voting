@@ -98,9 +98,29 @@ const AdminVoters = () => {
   };
 
   const exportSelected = () => {
-    const rows = items.filter(i => selected.has(i.roll)).map(i => `${i.roll},"${i.name}",${i.email || ''},${i.mobile || ''}`);
+    const rows = items.filter(i => selected.has(i.roll)).map(i => {
+      const escapeCsv = (val) => {
+        if (val == null) return '';
+        const str = String(val);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+      return [
+        escapeCsv(i.roll),
+        escapeCsv(i.name),
+        escapeCsv(i.fatherName),
+        escapeCsv(i.email),
+        escapeCsv(i.mobile),
+        escapeCsv(i.address),
+        escapeCsv(i.voted ? 'Yes' : 'No'),
+        escapeCsv(i.masterList ? 'Master' : (i.elections?.length || 0) + ' election(s)'),
+        escapeCsv(i.registeredAt ? new Date(i.registeredAt).toISOString() : '')
+      ].join(',');
+    });
     if (rows.length === 0) return;
-    const csv = 'roll,name,email,mobile\n' + rows.join('\n');
+    const csv = 'roll,name,fatherName,email,mobile,address,voted,scope,registeredAt\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -175,7 +195,13 @@ const AdminVoters = () => {
     }
 
     try {
-      await axios.patch(`/api/admin/students/${encodeURIComponent(editing.roll)}`, { name: editing.name, email: editing.email, mobile: editing.mobile });
+      await axios.patch(`/api/admin/students/${encodeURIComponent(editing.roll)}`, { 
+        name: editing.name, 
+        email: editing.email, 
+        mobile: editing.mobile,
+        fatherName: editing.fatherName,
+        address: editing.address
+      });
       toast.success('Saved');
       closeEdit(); fetchData();
     } catch (e) { const msg = e.response?.data?.message || e.message; setError(msg); toast.error(msg); }
@@ -201,69 +227,107 @@ const AdminVoters = () => {
         <button onClick={removeSelected} className="px-3 py-1 bg-red-600 text-white rounded">Delete Selected</button>
       </div>
       {loading ? <div>Loading...</div> : (
-        <table className="w-full table-auto border-collapse">
-          <thead>
-            <tr className="text-left border-b">
-              <th className="py-2"><input type="checkbox" onChange={(e)=>{ if(e.target.checked) setSelected(new Set(items.map(i=>i.roll))); else setSelected(new Set()); }} checked={items.length>0 && selected.size===items.length} /></th>
-              <th className="py-2">Roll</th>
-              <th className="py-2">Name</th>
-              <th className="py-2">Scope</th>
-              <th className="py-2">Email</th>
-              <th className="py-2">Mobile</th>
-              <th className="py-2">Voted</th>
-              <th className="py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((s) => (
-              <tr key={s._id} className="border-b">
-                <td className="py-2"><input type="checkbox" checked={selected.has(s.roll)} onChange={()=>toggleSelected(s.roll)} /></td>
-                <td className="py-2">{s.roll}</td>
-                <td className="py-2">{s.name}</td>
-                <td className="py-2">
-                  {s.masterList ? (
-                    <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">Master</span>
-                  ) : (s.elections && s.elections.length > 0 ? (
-                    <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">{s.elections.length} election(s)</span>
-                  ) : (
-                    <span className="text-sm text-gray-500">—</span>
-                  ))}
-                </td>
-                <td className="py-2">{s.email}</td>
-                <td className="py-2">{s.mobile}</td>
-                <td className="py-2">{s.voted ? 'Yes' : 'No'}</td>
-                <td className="py-2">
-                  <button onClick={()=>toggleVoted(s.roll, !s.voted)} className="mr-2 px-2 py-1 bg-blue-600 text-white rounded">{s.voted ? 'Unmark' : 'Mark Voted'}</button>
-                  <button onClick={()=>openEdit(s)} className="mr-2 px-2 py-1 bg-yellow-500 text-white rounded">Edit</button>
-                  <button onClick={()=>remove(s.roll)} className="px-2 py-1 bg-red-600 text-white rounded">Delete</button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full table-auto border-collapse min-w-max">
+            <thead>
+              <tr className="text-left border-b">
+                <th className="py-2 px-2"><input type="checkbox" onChange={(e)=>{ if(e.target.checked) setSelected(new Set(items.map(i=>i.roll))); else setSelected(new Set()); }} checked={items.length>0 && selected.size===items.length} /></th>
+                <th className="py-2 px-2">Photo</th>
+                <th className="py-2 px-2">Roll</th>
+                <th className="py-2 px-2">Name</th>
+                <th className="py-2 px-2">Father Name</th>
+                <th className="py-2 px-2">Email</th>
+                <th className="py-2 px-2">Mobile</th>
+                <th className="py-2 px-2">Address</th>
+                <th className="py-2 px-2">Scope</th>
+                <th className="py-2 px-2">Voted</th>
+                <th className="py-2 px-2">Registered</th>
+                <th className="py-2 px-2">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((s) => (
+                <tr key={s._id} className="border-b hover:bg-gray-50">
+                  <td className="py-2 px-2"><input type="checkbox" checked={selected.has(s.roll)} onChange={()=>toggleSelected(s.roll)} /></td>
+                  <td className="py-2 px-2">
+                    {s.photo ? (
+                      <img src={s.photo.startsWith('http') ? s.photo : `${import.meta.env.VITE_BACKEND_URL || ''}${s.photo}`} alt={s.name} className="w-10 h-10 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">N/A</div>
+                    )}
+                  </td>
+                  <td className="py-2 px-2 font-mono text-sm">{s.roll}</td>
+                  <td className="py-2 px-2">{s.name}</td>
+                  <td className="py-2 px-2">{s.fatherName || <span className="text-gray-400">—</span>}</td>
+                  <td className="py-2 px-2">{s.email || <span className="text-gray-400">—</span>}</td>
+                  <td className="py-2 px-2">{s.mobile || <span className="text-gray-400">—</span>}</td>
+                  <td className="py-2 px-2 max-w-xs truncate" title={s.address || ''}>{s.address || <span className="text-gray-400">—</span>}</td>
+                  <td className="py-2 px-2">
+                    {s.masterList ? (
+                      <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">Master</span>
+                    ) : (s.elections && s.elections.length > 0 ? (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">{s.elections.length} election(s)</span>
+                    ) : (
+                      <span className="text-sm text-gray-500">—</span>
+                    ))}
+                  </td>
+                  <td className="py-2 px-2">
+                    {s.voted ? (
+                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Yes</span>
+                    ) : (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">No</span>
+                    )}
+                  </td>
+                  <td className="py-2 px-2 text-sm text-gray-600">
+                    {s.registeredAt ? new Date(s.registeredAt).toLocaleDateString() : (s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '—')}
+                  </td>
+                  <td className="py-2 px-2 whitespace-nowrap">
+                    <button onClick={()=>toggleVoted(s.roll, !s.voted)} className="mr-1 px-2 py-1 bg-blue-600 text-white rounded text-sm">{s.voted ? 'Unmark' : 'Mark Voted'}</button>
+                    <button onClick={()=>openEdit(s)} className="mr-1 px-2 py-1 bg-yellow-500 text-white rounded text-sm">Edit</button>
+                    <button onClick={()=>remove(s.roll)} className="px-2 py-1 bg-red-600 text-white rounded text-sm">Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Inline edit modal */}
       {editing && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-          <div className="bg-white p-6 rounded shadow-lg w-96">
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow-lg w-[500px] max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-medium mb-3">Edit Voter {editing.roll}</h3>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div>
                 <label className="block text-sm text-gray-600">Name</label>
-                <input value={editing.name} onChange={e=>setEditing(s=>({...s, name: e.target.value}))} className="w-full px-3 py-2 border rounded" />
+                <input value={editing.name || ''} onChange={e=>setEditing(s=>({...s, name: e.target.value}))} className="w-full px-3 py-2 border rounded" />
                 {editing.__errs?.name && <div className="text-xs text-red-600 mt-1">{editing.__errs.name}</div>}
               </div>
               <div>
+                <label className="block text-sm text-gray-600">Father Name</label>
+                <input value={editing.fatherName || ''} onChange={e=>setEditing(s=>({...s, fatherName: e.target.value}))} className="w-full px-3 py-2 border rounded" />
+              </div>
+              <div>
                 <label className="block text-sm text-gray-600">Email</label>
-                <input value={editing.email} onChange={e=>setEditing(s=>({...s, email: e.target.value}))} className="w-full px-3 py-2 border rounded" />
+                <input value={editing.email || ''} onChange={e=>setEditing(s=>({...s, email: e.target.value}))} className="w-full px-3 py-2 border rounded" />
                 {editing.__errs?.email && <div className="text-xs text-red-600 mt-1">{editing.__errs.email}</div>}
               </div>
               <div>
                 <label className="block text-sm text-gray-600">Mobile</label>
-                <input value={editing.mobile} onChange={e=>setEditing(s=>({...s, mobile: e.target.value}))} className="w-full px-3 py-2 border rounded" />
+                <input value={editing.mobile || ''} onChange={e=>setEditing(s=>({...s, mobile: e.target.value}))} className="w-full px-3 py-2 border rounded" />
                 {editing.__errs?.mobile && <div className="text-xs text-red-600 mt-1">{editing.__errs.mobile}</div>}
               </div>
+              <div>
+                <label className="block text-sm text-gray-600">Address</label>
+                <textarea value={editing.address || ''} onChange={e=>setEditing(s=>({...s, address: e.target.value}))} className="w-full px-3 py-2 border rounded" rows={2} />
+              </div>
+              {editing.photo && (
+                <div>
+                  <label className="block text-sm text-gray-600">Photo</label>
+                  <img src={editing.photo.startsWith('http') ? editing.photo : `${import.meta.env.VITE_BACKEND_URL || ''}${editing.photo}`} alt={editing.name} className="w-20 h-20 rounded object-cover mt-1" />
+                </div>
+              )}
             </div>
             <div className="mt-4 flex justify-end space-x-2">
               <button onClick={closeEdit} className="px-3 py-1 border rounded">Cancel</button>
