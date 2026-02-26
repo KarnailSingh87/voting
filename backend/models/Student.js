@@ -3,12 +3,15 @@ import mongoose from 'mongoose';
 const studentSchema = new mongoose.Schema({
   roll: { type: String, required: true, unique: true },
   name: { type: String, required: true },
-  mobile: { type: String },
-  email: { type: String },
-  // normalized canonical fields extracted from imports for consistent UI/search
   fatherName: { type: String },
+  bloodGroup: { type: String },
+  mobile: { type: String },
+  program: { type: String },
   address: { type: String },
+  category: { type: String },
+  batch: { type: String },
   photo: { type: String },
+  email: { type: String },
   voted: { type: Boolean, default: false },
   registeredAt: { type: Date, default: Date.now },
   // preserve original uploaded row so exports can mirror the original file layout

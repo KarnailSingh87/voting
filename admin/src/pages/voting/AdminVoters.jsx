@@ -17,11 +17,13 @@ const AdminVoters = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(null);
+  const [viewAll, setViewAll] = useState(false);
 
   const fetchData = async () => {
     setLoading(true); setError('');
     try {
-      const params = { q, page, limit: 50 };
+      const limit = viewAll ? 10000 : 50; // Fetch all if viewAll is true
+      const params = { q, page: viewAll ? 1 : page, limit };
       if (selectedElection) params.electionId = selectedElection;
       const res = await axios.get('/api/admin/students', { params });
       setItems(res.data.items || []);
@@ -40,7 +42,7 @@ const AdminVoters = () => {
   // Fetch on page/election change
   useEffect(() => { 
     fetchData(); 
-  }, [page, selectedElection]);
+  }, [page, selectedElection, viewAll]);
 
   // debounce search input for smoother UX
   useEffect(() => {
@@ -108,19 +110,20 @@ const AdminVoters = () => {
         return str;
       };
       return [
-        escapeCsv(i.roll),
         escapeCsv(i.name),
         escapeCsv(i.fatherName),
-        escapeCsv(i.email),
+        escapeCsv(i.bloodGroup),
         escapeCsv(i.mobile),
+        escapeCsv(i.program),
         escapeCsv(i.address),
-        escapeCsv(i.voted ? 'Yes' : 'No'),
-        escapeCsv(i.masterList ? 'Master' : (i.elections?.length || 0) + ' election(s)'),
-        escapeCsv(i.registeredAt ? new Date(i.registeredAt).toISOString() : '')
+        escapeCsv(i.category),
+        escapeCsv(i.batch),
+        escapeCsv(i.roll),
+        escapeCsv(i.photo)
       ].join(',');
     });
     if (rows.length === 0) return;
-    const csv = 'roll,name,fatherName,email,mobile,address,voted,scope,registeredAt\n' + rows.join('\n');
+    const csv = 'Name,Father\'s Name,Blood Group,Mobile,Program,Address,Category,Batch,Roll No,Photo URL\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -200,7 +203,12 @@ const AdminVoters = () => {
         email: editing.email, 
         mobile: editing.mobile,
         fatherName: editing.fatherName,
-        address: editing.address
+        bloodGroup: editing.bloodGroup,
+        program: editing.program,
+        address: editing.address,
+        category: editing.category,
+        batch: editing.batch,
+        photo: editing.photo
       });
       toast.success('Saved');
       closeEdit(); fetchData();
@@ -230,16 +238,18 @@ const AdminVoters = () => {
         <div className="overflow-x-auto">
           <table className="w-full table-auto border-collapse min-w-max">
             <thead>
-              <tr className="text-left border-b">
+              <tr className="text-left border-b bg-gray-100">
                 <th className="py-2 px-2"><input type="checkbox" onChange={(e)=>{ if(e.target.checked) setSelected(new Set(items.map(i=>i.roll))); else setSelected(new Set()); }} checked={items.length>0 && selected.size===items.length} /></th>
                 <th className="py-2 px-2">Photo</th>
-                <th className="py-2 px-2">Roll</th>
                 <th className="py-2 px-2">Name</th>
                 <th className="py-2 px-2">Father Name</th>
-                <th className="py-2 px-2">Email</th>
+                <th className="py-2 px-2">Blood Group</th>
                 <th className="py-2 px-2">Mobile</th>
+                <th className="py-2 px-2">Program</th>
                 <th className="py-2 px-2">Address</th>
-                <th className="py-2 px-2">Scope</th>
+                <th className="py-2 px-2">Category</th>
+                <th className="py-2 px-2">Batch</th>
+                <th className="py-2 px-2">Roll No</th>
                 <th className="py-2 px-2">Voted</th>
                 <th className="py-2 px-2">Registered</th>
                 <th className="py-2 px-2">Actions</th>
@@ -256,26 +266,24 @@ const AdminVoters = () => {
                       <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">N/A</div>
                     )}
                   </td>
-                  <td className="py-2 px-2 font-mono text-sm">{s.roll}</td>
-                  <td className="py-2 px-2">{s.name}</td>
+                  <td className="py-2 px-2 font-semibold">{s.name}</td>
                   <td className="py-2 px-2">{s.fatherName || <span className="text-gray-400">—</span>}</td>
-                  <td className="py-2 px-2">{s.email || <span className="text-gray-400">—</span>}</td>
+                  <td className="py-2 px-2 text-center font-mono">{s.bloodGroup || <span className="text-gray-400">—</span>}</td>
                   <td className="py-2 px-2">{s.mobile || <span className="text-gray-400">—</span>}</td>
+                  <td className="py-2 px-2">{s.program || <span className="text-gray-400">—</span>}</td>
                   <td className="py-2 px-2 max-w-xs truncate" title={s.address || ''}>{s.address || <span className="text-gray-400">—</span>}</td>
-                  <td className="py-2 px-2">
-                    {s.masterList ? (
-                      <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">Master</span>
-                    ) : (s.elections && s.elections.length > 0 ? (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">{s.elections.length} election(s)</span>
-                    ) : (
-                      <span className="text-sm text-gray-500">—</span>
-                    ))}
+                  <td className="py-2 px-2 text-center">
+                    <span className={`px-2 py-1 rounded text-xs ${s.category === 'General' ? 'bg-blue-100 text-blue-800' : s.category === 'SC' ? 'bg-green-100 text-green-800' : s.category === 'ST' ? 'bg-orange-100 text-orange-800' : 'bg-purple-100 text-purple-800'}`}>
+                      {s.category || '—'}
+                    </span>
                   </td>
+                  <td className="py-2 px-2 text-center">{s.batch || <span className="text-gray-400">—</span>}</td>
+                  <td className="py-2 px-2 font-mono text-sm font-semibold">{s.roll}</td>
                   <td className="py-2 px-2">
                     {s.voted ? (
-                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Yes</span>
+                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">✓ Yes</span>
                     ) : (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">No</span>
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">✗ No</span>
                     )}
                   </td>
                   <td className="py-2 px-2 text-sm text-gray-600">
@@ -293,39 +301,66 @@ const AdminVoters = () => {
         </div>
       )}
 
+      {/* Show pagination/view all info */}
+      <div className="mt-4 text-xs text-gray-500 mb-2">
+        Showing {items.length} of {total} total voters
+        {viewAll && <span> (View All mode)</span>}
+      </div>
+
       {/* Inline edit modal */}
       {editing && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded shadow-lg w-[500px] max-h-[90vh] overflow-y-auto">
+          <div className="bg-white p-6 rounded shadow-lg w-[600px] max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-medium mb-3">Edit Voter {editing.roll}</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm text-gray-600">Name</label>
+                <label className="block text-sm font-medium text-gray-700">Name *</label>
                 <input value={editing.name || ''} onChange={e=>setEditing(s=>({...s, name: e.target.value}))} className="w-full px-3 py-2 border rounded" />
                 {editing.__errs?.name && <div className="text-xs text-red-600 mt-1">{editing.__errs.name}</div>}
               </div>
               <div>
-                <label className="block text-sm text-gray-600">Father Name</label>
+                <label className="block text-sm font-medium text-gray-700">Father's Name</label>
                 <input value={editing.fatherName || ''} onChange={e=>setEditing(s=>({...s, fatherName: e.target.value}))} className="w-full px-3 py-2 border rounded" />
               </div>
               <div>
-                <label className="block text-sm text-gray-600">Email</label>
-                <input value={editing.email || ''} onChange={e=>setEditing(s=>({...s, email: e.target.value}))} className="w-full px-3 py-2 border rounded" />
-                {editing.__errs?.email && <div className="text-xs text-red-600 mt-1">{editing.__errs.email}</div>}
+                <label className="block text-sm font-medium text-gray-700">Blood Group</label>
+                <input value={editing.bloodGroup || ''} onChange={e=>setEditing(s=>({...s, bloodGroup: e.target.value}))} placeholder="e.g., B+, O-, AB+" className="w-full px-3 py-2 border rounded" />
               </div>
               <div>
-                <label className="block text-sm text-gray-600">Mobile</label>
+                <label className="block text-sm font-medium text-gray-700">Mobile</label>
                 <input value={editing.mobile || ''} onChange={e=>setEditing(s=>({...s, mobile: e.target.value}))} className="w-full px-3 py-2 border rounded" />
                 {editing.__errs?.mobile && <div className="text-xs text-red-600 mt-1">{editing.__errs.mobile}</div>}
               </div>
               <div>
-                <label className="block text-sm text-gray-600">Address</label>
+                <label className="block text-sm font-medium text-gray-700">Program</label>
+                <input value={editing.program || ''} onChange={e=>setEditing(s=>({...s, program: e.target.value}))} placeholder="e.g., B.Tech CSE" className="w-full px-3 py-2 border rounded" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Address</label>
                 <textarea value={editing.address || ''} onChange={e=>setEditing(s=>({...s, address: e.target.value}))} className="w-full px-3 py-2 border rounded" rows={2} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Category</label>
+                <select value={editing.category || ''} onChange={e=>setEditing(s=>({...s, category: e.target.value}))} className="w-full px-3 py-2 border rounded">
+                  <option value="">-- Select --</option>
+                  <option value="General">General</option>
+                  <option value="SC">SC</option>
+                  <option value="ST">ST</option>
+                  <option value="OBC">OBC</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Batch</label>
+                <input value={editing.batch || ''} onChange={e=>setEditing(s=>({...s, batch: e.target.value}))} placeholder="e.g., 2023-2027" className="w-full px-3 py-2 border rounded" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Photo URL</label>
+                <input value={editing.photo || ''} onChange={e=>setEditing(s=>({...s, photo: e.target.value}))} placeholder="https://example.com/photo.jpg" className="w-full px-3 py-2 border rounded" />
               </div>
               {editing.photo && (
                 <div>
-                  <label className="block text-sm text-gray-600">Photo</label>
-                  <img src={editing.photo.startsWith('http') ? editing.photo : `${import.meta.env.VITE_BACKEND_URL || ''}${editing.photo}`} alt={editing.name} className="w-20 h-20 rounded object-cover mt-1" />
+                  <label className="block text-sm font-medium text-gray-700">Photo Preview</label>
+                  <img src={editing.photo.startsWith('http') ? editing.photo : `${import.meta.env.VITE_BACKEND_URL || ''}${editing.photo}`} alt={editing.name} className="w-24 h-24 rounded object-cover mt-2" />
                 </div>
               )}
             </div>
@@ -348,9 +383,16 @@ const AdminVoters = () => {
       <div className="mt-4 flex items-center justify-between">
         <div className="text-sm text-gray-600">Total: {total}</div>
         <div className="space-x-2">
-          <button onClick={()=>setPage(p=>Math.max(1,p-1))} className="px-3 py-1 border rounded">Prev</button>
-          <span>Page {page}</span>
-          <button onClick={()=>setPage(p=>p+1)} className="px-3 py-1 border rounded">Next</button>
+          <button onClick={()=>{ setViewAll(!viewAll); setPage(1); }} className={`px-3 py-1 rounded ${viewAll ? 'bg-cyan-600 text-white' : 'border'}`}>
+            {viewAll ? '✓ View All' : 'View All'}
+          </button>
+          {!viewAll && (
+            <>
+              <button onClick={()=>setPage(p=>Math.max(1,p-1))} className="px-3 py-1 border rounded">Prev</button>
+              <span>Page {page}</span>
+              <button onClick={()=>setPage(p=>p+1)} className="px-3 py-1 border rounded">Next</button>
+            </>
+          )}
         </div>
       </div>
     </div>

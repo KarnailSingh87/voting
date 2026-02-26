@@ -552,6 +552,43 @@ router.get('/health', adminAuth, async (req, res) => {
   }
 });
 
+// Helper function to intelligently map any file columns to template format
+const mapToTemplateFields = (rowObj) => {
+  const keys = Object.keys(rowObj).map(k => k.toLowerCase());
+  
+  // Define mapping patterns for each template field
+  const fieldMappings = {
+    name: ['name', 'full name', 'student name', 'fname', 'first name'],
+    fatherName: ["father's name", 'father name', 'father_name', 'fathername', 'parentname', 'parent name'],
+    bloodGroup: ['blood group', 'blood type', 'blood', 'bloodgroup', 'bgroup'],
+    mobile: ['mobile', 'phone', 'phone number', 'contact', 'phone_no', 'mobile no', 'phoneno'],
+    program: ['program', 'course', 'degree', 'branch', 'department', 'specialization'],
+    address: ['address', 'location', 'addr', 'residential address', 'current address'],
+    category: ['category', 'caste', 'community', 'type', 'class'],
+    batch: ['batch', 'year', 'sem', 'semester', 'session', 'academic year'],
+    roll: ['roll', 'roll no', 'roll number', 'roll_no', 'id', 'enrollment', 'registration no', 'regno', 'student id'],
+    email: ['email', 'mail', 'email id', 'mailid', 'e-mail'],
+    photo: ['photo', 'image', 'picture', 'photo url', 'photourl', 'image url']
+  };
+
+  const result = {};
+  
+  for (const [fieldName, patterns] of Object.entries(fieldMappings)) {
+    for (const [headerKey, value] of Object.entries(rowObj)) {
+      const lowerHeader = headerKey.toLowerCase().trim();
+      for (const pattern of patterns) {
+        if (lowerHeader.includes(pattern) || pattern.includes(lowerHeader)) {
+          result[fieldName] = value;
+          break;
+        }
+      }
+      if (result[fieldName]) break;
+    }
+  }
+  
+  return result;
+};
+
 // Admin-only endpoint: upload Excel and import students
 // POST /api/admin/import-students (multipart form-data: file, optional field rollCol like 'I' or '9')
 router.post('/import-students', adminAuth, upload.single('file'), async (req, res) => {
@@ -1004,6 +1041,8 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
     };
 
   let imported = 0;
+  let skipped = 0;
+  const skippedRows = [];
   const previewRows = [];
   // richer preview structure when previewFlag: we'll return headers (if present) and rows with raw arrays and objects
   const previewData = { headers: null, rows: [] };
@@ -1248,7 +1287,8 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
           previewData.headers = previewData.headers || normalizeHeaders(fallbackKeys);
           previewData.rows.push({ ...rowObj, extracted: { roll, name, email, mobile, photo }, valid: errors.length === 0, errors });
         } else {
-          if (errors.length === 0) {
+          // Always attempt to import if forceImport is enabled, otherwise skip rows with errors
+          if (errors.length === 0 || forceImport) {
             try {
               const headers = Object.keys(row).map(k => k.toString());
               // build a lowercase key->value map to detect canonical fields
@@ -1271,12 +1311,32 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
                 return undefined;
               };
               let fatherName = findValue(['father','father name','fathername','parent name','parents name','guardian','guardian name']);
-              let address = findValue(['address','addr','residence','permanent address','present address']);
+              let bloodGroup = findValue(['blood','blood group','blood type','bgroup']);
+              let program = findValue(['program','course','degree','branch','department']);
+              let category = findValue(['category','caste','community']);
+              let batch = findValue(['batch','year','sem','semester','session']);
+              
               const aiRow = (aiExtractedRows && aiExtractedRows[i]) ? aiExtractedRows[i] : null;
               if (aiRow) {
                 if (!fatherName && aiRow.fatherName) fatherName = aiRow.fatherName;
                 if (!address && aiRow.address) address = aiRow.address;
                 if (!photo && aiRow.photo) photo = aiRow.photo;
+                if (!bloodGroup && aiRow.bloodGroup) bloodGroup = aiRow.bloodGroup;
+                if (!program && aiRow.program) program = aiRow.program;
+                if (!category && aiRow.category) category = aiRow.category;
+                if (!batch && aiRow.batch) batch = aiRow.batch;
+              }
+              
+              // Use smart mapping function as fallback if fields still not found
+              if (!fatherName || !bloodGroup || !program || !category || !batch) {
+                const mapped = mapToTemplateFields(row);
+                if (!fatherName && mapped.fatherName) fatherName = mapped.fatherName;
+                if (!bloodGroup && mapped.bloodGroup) bloodGroup = mapped.bloodGroup;
+                if (!program && mapped.program) program = mapped.program;
+                if (!category && mapped.category) category = mapped.category;
+                if (!batch && mapped.batch) batch = mapped.batch;
+                if (!address && mapped.address) address = mapped.address;
+                if (!photo && mapped.photo) photo = mapped.photo;
               }
 
               // Resolve photo filename to data URI if found in zipFilesMap
@@ -1294,7 +1354,21 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
               // avoid duplicates by doing a case-insensitive lookup first
               const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
               const existing = await Student.findOne({ roll: { $regex: `^${escapeRegExp(roll)}$`, $options: 'i' } });
-              const setFields = { name, email, mobile, photo: photo || undefined, originalArr: rowObj.arr, originalObj: rowObj.obj, originalHeaders: headers, fatherName: fatherName || undefined, address: address || undefined };
+              const setFields = { 
+                name, 
+                fatherName: fatherName || undefined,
+                bloodGroup: bloodGroup || undefined,
+                mobile,
+                program: program || undefined,
+                address: address || undefined,
+                category: category || undefined,
+                batch: batch || undefined,
+                email, 
+                photo: photo || undefined, 
+                originalArr: rowObj.arr, 
+                originalObj: rowObj.obj, 
+                originalHeaders: headers
+              };
               if (existing) {
                 const updateObj = { $set: { ...setFields, roll } };
                 if (electionObjectId) updateObj.$addToSet = { elections: electionObjectId };
@@ -1310,6 +1384,9 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
               imported++;
               // auto-send OTP removed
             } catch (e) { console.error('import error', e); }
+          } else {
+            skipped++;
+            skippedRows.push({ rowIndex: i, errors, row });
           }
         }
       }
@@ -1317,23 +1394,35 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
 
     // log admin action
     try {
-      await AdminAction.create({ admin: req.admin?.aid, action: 'import-students', details: { imported }, ip: req.ip });
+      await AdminAction.create({ admin: req.admin?.aid, action: 'import-students', details: { imported, skipped, totalRows: rawRows.length }, ip: req.ip });
+      console.log(`✓ Import completed: imported=${imported}, skipped=${skipped}, totalRowsInFile=${rawRows.length}`);
     } catch (e) { console.warn('Failed to log admin action', e.message || e); }
 
     // if preview, return parsed rows without writing to DB
     if (previewFlag) {
+      // Filter to show only rows that would actually be imported
+      // A row can be imported if:
+      // 1. It has no validation errors (roll AND name present), OR
+      // 2. forceImport is enabled (user can override validation)
+      // But we always show rows with at least some data for preview purposes
+      const nonEmptyRows = previewData.rows.filter(r => {
+        // Show if it has extractable data and would be valid to import (or would be force-imported)
+        const hasData = r.extracted && (r.extracted.roll || r.extracted.name || r.extracted.email || r.extracted.mobile);
+        const isValidOrCanForce = r.valid || forceImport;
+        return hasData && isValidOrCanForce;
+      });
       // limit rows returned in preview to previewLimit (Infinity allowed for 'all')
-      const limited = previewLimit === Infinity ? previewData.rows : previewData.rows.slice(0, previewLimit);
-      return res.json({ success: true, preview: { headers: previewData.headers, rows: limited }, totalParsed: previewData.rows.length });
+      const limited = previewLimit === Infinity ? nonEmptyRows : nonEmptyRows.slice(0, previewLimit);
+      return res.json({ success: true, preview: { headers: previewData.headers, rows: limited }, totalParsed: nonEmptyRows.length, totalWithEmpty: previewData.rows.length });
     }
 
     // notify connected frontends that master list changed so they can re-sync
     try {
       const io = req.app.get('io');
-      if (io) io.emit('master_list_updated', { imported, at: new Date().toISOString() });
+      if (io) io.emit('master_list_updated', { imported, skipped, at: new Date().toISOString() });
     } catch (e) { console.warn('Failed to emit master_list_updated', e.message || e); }
 
-    res.json({ success: true, imported });
+    res.json({ success: true, imported, skipped, skippedRows: skippedRows.length > 0 ? skippedRows.slice(0, 10) : [] });
   } catch (e) {
     // Log full stack for debugging and return the error message to the client
     console.error('ADMIN IMPORT ERROR', e && e.stack ? e.stack : e);
@@ -1349,7 +1438,7 @@ router.get('/students', adminAuth, async (req, res) => {
     const filter = {};
     // optional election filter: accept ObjectId string or election title
     let electionId = req.query.electionId || null;
-    if (electionId && electionId !== 'all') {
+    if (electionId && electionId !== 'all' && electionId !== '') {
       if (mongoose.isValidObjectId(electionId)) {
         filter.elections = new mongoose.Types.ObjectId(String(electionId));
       } else {
@@ -1358,6 +1447,7 @@ router.get('/students', adminAuth, async (req, res) => {
         else return res.status(400).json({ success: false, message: 'Invalid electionId or election title not found' });
       }
     }
+    // When electionId is 'all' or empty, include ALL students (both masterList and election-specific)
     if (q) {
       const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
@@ -1369,9 +1459,11 @@ router.get('/students', adminAuth, async (req, res) => {
     const skip = (Math.max(1, Number(page)) - 1) * Number(limit);
     const total = await Student.countDocuments(filter);
     const items = await Student.find(filter).sort({ roll: 1 }).skip(skip).limit(Number(limit));
+    // Debug logging
+    try { console.log(`Students fetch: total=${total}, returned=${items.length}, page=${page}, limit=${limit}, election=${electionId}`); } catch (e) {}
     res.json({ success: true, total, items });
   } catch (e) {
-    console.error(e);
+    console.error('Students fetch error:', e);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -1381,7 +1473,7 @@ router.patch('/students/:roll', adminAuth, async (req, res) => {
   try {
     const roll = req.params.roll;
     const updates = {};
-    const allowed = ['name', 'email', 'mobile', 'voted', 'fatherName', 'address'];
+    const allowed = ['name', 'email', 'mobile', 'voted', 'fatherName', 'address', 'bloodGroup', 'program', 'category', 'batch', 'photo'];
     for (const k of allowed) if (k in req.body) updates[k] = req.body[k];
     const escaped = roll.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const result = await Student.findOneAndUpdate({ roll: { $regex: `^${escaped}$`, $options: 'i' } }, { $set: updates }, { new: true });

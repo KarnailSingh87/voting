@@ -96,7 +96,7 @@ const ImportStudents = () => {
       // include election importConcepts as guidance to backend
       if (importDefaults) fd.append('importConcepts', JSON.stringify(importDefaults));
       fd.append('preview', '1');
-      fd.append('previewLimit', limit || '500');
+      fd.append('previewLimit', limit || 'all');
       if (importDefaults) fd.append('importConcepts', JSON.stringify(importDefaults));
       const res = await axios.post('/api/admin/import-students', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       if (res.data && res.data.preview) {
@@ -297,16 +297,37 @@ const ImportStudents = () => {
       </div>
       {result && (
         <div className="mt-4 p-3 bg-green-50 rounded">
-          <div className="text-sm text-green-800">Imported: {result.imported}</div>
+          <div className="text-sm text-green-800">
+            <strong>✓ Import completed</strong>
+            <div>Imported: <strong>{result.imported}</strong> voters</div>
+            {result.skipped > 0 && (
+              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
+                <strong>⚠ Skipped: {result.skipped}</strong> rows had validation errors (missing roll or name). 
+                {result.skippedRows && result.skippedRows.length > 0 && (
+                  <div className="mt-2 text-xs">
+                    <strong>First {result.skippedRows.length} skipped rows:</strong>
+                    <ul className="list-disc ml-5 mt-1">
+                      {result.skippedRows.map((sr, idx) => (
+                        <li key={idx}>Row {sr.rowIndex + 1}: {sr.errors.join(', ')}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="mt-2 text-xs">
+                  To import rows with missing roll or name numbers, use the <strong>"Force import missing fields"</strong> checkbox and re-upload the file.
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
       {previewRows && (
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-medium">Preview (first {previewRows.length} rows)</h4>
-            <div className="text-xs text-gray-600">Preview showing {previewRows.length} rows · Parsed {previewTotalParsed ?? previewRows.length}</div>
+            <h4 className="text-sm font-medium">Preview ({previewRows.length} rows with data)</h4>
+            <div className="text-xs text-gray-600">Showing {previewRows.length} rows with data · Total parsed: {previewTotalParsed ?? previewRows.length}</div>
           </div>
-          <div className="text-sm text-gray-600 mb-2">Showing parsed rows and detected columns. The preview will fetch automatically when you add a file.</div>
+          <div className="text-sm text-gray-600 mb-2">Showing only rows with data (empty rows filtered out). The preview will fetch automatically when you add a file.</div>
           {previewTotalParsed != null && (
             <div className="text-xs text-gray-600 mb-2">Showing {previewRows.length} of {previewTotalParsed} parsed rows. {previewTotalParsed > previewRows.length && (<button type="button" onClick={() => fetchPreview('all')} className="underline text-sm text-blue-600">Load all</button>)}</div>
           )}

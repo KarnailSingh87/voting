@@ -78,7 +78,7 @@ const SimpleImport = () => {
       const fd = new FormData();
       fd.append('file', fileToPreview);
       fd.append('preview', '1');
-      fd.append('previewLimit', '10');
+      fd.append('previewLimit', 'all');
       if (selectedElection) fd.append('electionId', selectedElection);
 
       const res = await axios.post('/api/admin/import-students', fd, {
@@ -123,7 +123,12 @@ const SimpleImport = () => {
 
       if (res.data) {
         setResult(res.data);
-        toast.success(`Successfully imported ${res.data.imported || 0} voters`);
+        const skipped = res.data.skipped || 0;
+        if (skipped > 0) {
+          toast.warning(`Imported ${res.data.imported || 0} voters, but ${skipped} rows were skipped due to validation errors`);
+        } else {
+          toast.success(`Successfully imported ${res.data.imported || 0} voters`);
+        }
       }
     } catch (e) {
       console.error('Import failed', e);
@@ -292,8 +297,11 @@ const SimpleImport = () => {
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-700">
-                Preview ({previewData.rows.length} of {previewData.totalParsed} rows)
+                Preview ({previewData.rows.length} rows with data)
               </h3>
+              <div className="text-xs text-gray-600">
+                Showing {previewData.rows.length} rows with data · Total parsed: {previewData.totalParsed}
+              </div>
             </div>
             <div className="overflow-x-auto border rounded-lg max-h-64">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -344,6 +352,21 @@ const SimpleImport = () => {
             <p className="text-green-700 mt-1">
               Successfully imported <strong>{result.imported}</strong> voters
             </p>
+            {result.skipped > 0 && (
+              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm">
+                <strong>⚠ {result.skipped} rows were skipped</strong> due to missing roll number or name. 
+                {result.skippedRows && result.skippedRows.length > 0 && (
+                  <div className="mt-2">
+                    <strong>Details:</strong>
+                    <ul className="list-disc ml-5 mt-1 text-xs">
+                      {result.skippedRows.map((sr, idx) => (
+                        <li key={idx}>Row {sr.rowIndex + 1}: {sr.errors.join(', ')}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
             {result.skipped > 0 && (
               <p className="text-yellow-700 mt-1">
                 Skipped {result.skipped} duplicate/invalid entries
