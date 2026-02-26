@@ -54,6 +54,11 @@ const ElectionDetail = () => {
   const [candidateForm, setCandidateForm] = useState({ name: '', party: '' });
   const [savingCandidate, setSavingCandidate] = useState(false);
 
+  // Add new candidate state
+  const [showAddCandidate, setShowAddCandidate] = useState(false);
+  const [newCandidate, setNewCandidate] = useState({ name: '', party: '', manifesto: '' });
+  const [addingCandidate, setAddingCandidate] = useState(false);
+
   // voters pagination
   const [voters, setVoters] = useState({ total: 0, items: [] });
   const [page, setPage] = useState(1);
@@ -110,6 +115,37 @@ const ElectionDetail = () => {
   const handleCancelEdit = () => {
     setEditingCandidate(null);
     setCandidateForm({ name: '', party: '' });
+  };
+
+  // Add new candidate
+  const handleAddCandidate = async () => {
+    if (!newCandidate.name.trim()) {
+      toast.error('Candidate name is required');
+      return;
+    }
+    setAddingCandidate(true);
+    try {
+      const res = await axios.post('/api/admin/candidate', {
+        electionId: id,
+        name: newCandidate.name.trim(),
+        party: newCandidate.party.trim(),
+        manifesto: newCandidate.manifesto.trim()
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      
+      if (res.data && res.data.candidate) {
+        setCandidates(prev => [...prev, { ...res.data.candidate, voteCount: 0 }]);
+        setNewCandidate({ name: '', party: '', manifesto: '' });
+        setShowAddCandidate(false);
+        toast.success('Candidate added successfully');
+      } else {
+        toast.error(res.data?.message || 'Failed to add candidate');
+      }
+    } catch (e) {
+      console.error('Failed to add candidate', e);
+      toast.error(e.response?.data?.message || 'Failed to add candidate');
+    } finally {
+      setAddingCandidate(false);
+    }
   };
 
   const fetchVoters = useCallback(async (p = page, lim = limit) => {
@@ -342,9 +378,80 @@ const ElectionDetail = () => {
                 </div>
 
               <div className="bg-white p-4 rounded shadow">
-                <h3 className="font-medium mb-2">Candidates</h3>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-medium">Candidates ({candidates.length})</h3>
+                  <button
+                    onClick={() => setShowAddCandidate(true)}
+                    className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 flex items-center"
+                  >
+                    <span className="mr-1">+</span> Add Candidate
+                  </button>
+                </div>
+
+                {/* Add Candidate Form */}
+                {showAddCandidate && (
+                  <div className="mb-4 p-4 border-2 border-dashed border-green-300 rounded-lg bg-green-50">
+                    <h4 className="font-medium text-green-800 mb-3">New Candidate</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                        <input
+                          type="text"
+                          value={newCandidate.name}
+                          onChange={(e) => setNewCandidate(f => ({ ...f, name: e.target.value }))}
+                          placeholder="Enter candidate name"
+                          className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-green-400 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Party</label>
+                        <input
+                          type="text"
+                          value={newCandidate.party}
+                          onChange={(e) => setNewCandidate(f => ({ ...f, party: e.target.value }))}
+                          placeholder="Enter party name (optional)"
+                          className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-green-400 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Manifesto</label>
+                        <textarea
+                          value={newCandidate.manifesto}
+                          onChange={(e) => setNewCandidate(f => ({ ...f, manifesto: e.target.value }))}
+                          placeholder="Enter candidate manifesto (optional)"
+                          rows={3}
+                          className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-green-400 focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex space-x-2 pt-2">
+                        <button
+                          onClick={handleAddCandidate}
+                          disabled={addingCandidate}
+                          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {addingCandidate ? 'Adding...' : 'Add Candidate'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowAddCandidate(false);
+                            setNewCandidate({ name: '', party: '', manifesto: '' });
+                          }}
+                          className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 gap-2">
-                  {candidates.map(c => (
+                  {candidates.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No candidates yet.</p>
+                      <p className="text-sm mt-1">Click "Add Candidate" to add one.</p>
+                    </div>
+                  ) : candidates.map(c => (
                     <div key={c.id} className="flex justify-between items-center p-3 border rounded">
                       <div className="flex items-center flex-1">
                         {/* Photo with upload option */}
