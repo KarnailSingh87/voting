@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
 import { toast } from 'react-toastify';
+import Modal from '../../components/Modal';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ const Login = () => {
   const [photo, setPhoto] = useState('');
   const [extraInfo, setExtraInfo] = useState(null); // arbitrary fields from originalObj
   const [studentData, setStudentData] = useState(null);
+  const [showStudentModal, setShowStudentModal] = useState(false);
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [rollDetected, setRollDetected] = useState('');
@@ -111,7 +113,13 @@ const Login = () => {
     try {
       const resp = await axios.post('/api/voter/verify-otp', { roll, otp });
       localStorage.setItem('voterToken', resp.data.token);
-      navigate('/dashboard');
+      // Expect student details in resp.data.student
+      if (resp.data.student) {
+        setStudentData(resp.data.student);
+        setShowStudentModal(true);
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'OTP verification failed');
     } finally {
@@ -373,46 +381,68 @@ const Login = () => {
                       </button>
                     </div>
                     {rollDetected && <p className="text-sm text-gray-600">Roll: <span className="font-medium">{rollDetected}</span></p>}
-                    {photo ? (
-                      <div className="mt-2 flex items-start space-x-4">
-                        <img src={photo} alt="student" className="h-28 w-28 object-cover rounded-md border" />
-                        <div>
-                          {email && <p className="text-sm text-gray-700">Email: <span className="font-medium">{email}</span></p>}
-                          {mobile && <p className="text-sm text-gray-700">Mobile: <span className="font-medium">{mobile}</span></p>}
-                          {registeredAtDetected && <p className="text-sm text-gray-700">Registered: <span className="font-medium">{new Date(registeredAtDetected).toLocaleString()}</span></p>}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-2">
-                        {email && <p className="text-sm text-gray-700">Email: <span className="font-medium">{email}</span></p>}
-                        {mobile && <p className="text-sm text-gray-700">Mobile: <span className="font-medium">{mobile}</span></p>}
-                        {registeredAtDetected && <p className="text-sm text-gray-700">Registered: <span className="font-medium">{new Date(registeredAtDetected).toLocaleString()}</span></p>}
-                      </div>
-                    )}
-
-                    {/* show original headers/array if available */}
-                    {originalHeadersDetected && originalHeadersDetected.length > 0 && (
-                      <div className="mt-3">
-                        <h4 className="text-sm font-semibold">Original Headers</h4>
-                        <div className="text-sm text-gray-600">
-                          {originalHeadersDetected.map((h,i) => (
-                            <p key={i}>{h}: {originalArrDetected && originalArrDetected[i] ? String(originalArrDetected[i]) : ''}</p>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* arbitrary originalObj fields */}
-                    {extraInfo && (
-                      <div className="mt-3">
-                        <h4 className="text-sm font-semibold">Additional details</h4>
-                        <div className="mt-1 text-sm text-gray-700 space-y-1">
-                          {Object.entries(extraInfo).map(([k,v]) => (
-                            <p key={k}><strong>{k}:</strong> {String(v)}</p>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {stage === 'otp' ? (
+                      <>
+                        <form className="mt-8 space-y-6" onSubmit={verifyOtp}>
+                          {error && (
+                            <div className="rounded-md bg-red-50 p-4">
+                              <div className="flex">
+                                <div className="flex-shrink-0">
+                                  <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                                <div className="ml-3">
+                                  <h3 className="text-sm font-medium text-red-800">{error}</h3>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          <div>
+                            <label htmlFor="otp" className="block text-sm font-medium text-gray-700">OTP</label>
+                            <input
+                              id="otp"
+                              name="otp"
+                              type="text"
+                              autoComplete="one-time-code"
+                              required
+                              value={otp}
+                              onChange={e => setOtp(e.target.value)}
+                              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                              placeholder="Enter OTP"
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700"
+                          >
+                            {loading ? 'Verifying...' : 'Verify OTP'}
+                          </button>
+                        </form>
+                        <Modal show={showStudentModal} onClose={() => { setShowStudentModal(false); navigate('/dashboard'); }}>
+                          {studentData ? (
+                            <div>
+                              <div className="text-lg font-semibold mb-2">Student Details</div>
+                              <div className="mb-2"><strong>Name:</strong> {studentData.name}</div>
+                              <div className="mb-2"><strong>Father's Name:</strong> {studentData.fatherName || '-'}</div>
+                              <div className="mb-2"><strong>Blood Group:</strong> {studentData.bloodGroup || '-'}</div>
+                              <div className="mb-2"><strong>Mobile:</strong> {studentData.mobile}</div>
+                              <div className="mb-2"><strong>Program:</strong> {studentData.program || '-'}</div>
+                              <div className="mb-2"><strong>Address:</strong> {studentData.address || '-'}</div>
+                              <div className="mb-2"><strong>Category:</strong> {studentData.category || '-'}</div>
+                              <div className="mb-2"><strong>Batch:</strong> {studentData.batch || '-'}</div>
+                              <div className="mb-2"><strong>Roll No:</strong> {studentData.roll}</div>
+                              <div className="mb-2"><strong>Registered:</strong> {studentData.registeredAt ? new Date(studentData.registeredAt).toLocaleString() : '-'}</div>
+                              <div className="mb-2"><strong>Photo URL:</strong> {studentData.photoUrl ? (<a href={studentData.photoUrl} target="_blank" rel="noopener noreferrer">View Photo</a>) : '-'}</div>
+                              {studentData.photoUrl && (
+                                <img src={studentData.photoUrl} alt="Student" className="mt-2 w-24 h-24 rounded-full object-cover border" />
+                              )}
+                            </div>
+                          ) : null}
+                        </Modal>
+                      </>
+                      ) : null}
 
                     {/* removed 'View full details' and raw JSON per user request */}
                   </div>

@@ -7,6 +7,9 @@ import Student from '../models/Student.js';
 import voterAuth from '../middleware/voterAuth.js';
 import jwt from 'jsonwebtoken';
 import upload from '../middleware/voterPhotoUpload.js';
+
+const router = express.Router();
+
 // Upload voter photo
 router.post('/upload-photo', voterAuth, upload.single('photo'), async (req, res) => {
   try {
@@ -24,8 +27,6 @@ router.post('/upload-photo', voterAuth, upload.single('photo'), async (req, res)
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
-
-const router = express.Router();
 
 // Get Voting history
 router.get('/history', voterAuth, async (req, res) => {

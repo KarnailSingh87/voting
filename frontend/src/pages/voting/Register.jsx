@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
+import Modal from '../../components/Modal';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showStudentFound, setShowStudentFound] = useState(false);
 
   const rollDebounceRef = useRef(null);
   const nameRef = useRef(null);
@@ -60,6 +62,7 @@ const Register = () => {
       if (name) {
         setRollValid(true);
         setFormData((s) => ({ ...s, name: name || s.name }));
+        setShowStudentFound(true);
         if (autoAdvance) setStep(2);
       } else {
         setRollValid(false);
@@ -151,7 +154,12 @@ const Register = () => {
         )}
 
         {!success && step === 1 && (
-          <div>
+          <>
+            <Modal show={showStudentFound} onClose={() => setShowStudentFound(false)}>
+              <div className="text-lg font-semibold text-green-700 mb-2">Student found</div>
+              <div className="text-gray-700">A student record was found for this roll number.</div>
+            </Modal>
+            <div>
               <label htmlFor="roll" className="block text-sm font-medium text-gray-700">University Roll Number</label>
               <div className="relative">
                 <input
@@ -192,7 +200,6 @@ const Register = () => {
                   <span className="ml-2">{formData.name || '—'}</span>
                 </div>
               </div>
-
               <button
                 type="button"
                 onClick={handleRollContinue}
@@ -201,6 +208,7 @@ const Register = () => {
                 {rollLoading ? 'Looking up...' : 'Continue'}
               </button>
             </div>
+          </>
         )}
 
         {!success && step === 2 && (
