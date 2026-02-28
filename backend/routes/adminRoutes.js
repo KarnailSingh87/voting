@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import ExcelJS from 'exceljs';
+import XLSX from 'xlsx';
 import JSZip from 'jszip';
 import path from 'path';
 import fs from 'fs';
@@ -129,10 +130,15 @@ router.post('/login', async (req, res) => {
 
 // Auth middleware inline for brevity
 function adminAuth(req, res, next) {
+  // Accept token from Authorization header OR query param (for <img src> etc.)
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ message: 'Missing token' });
+  const tokenFromQuery = req.query.token;
+  let token = null;
+  if (auth && auth.startsWith('Bearer ')) token = auth.slice(7);
+  else if (tokenFromQuery) token = tokenFromQuery;
+  if (!token) return res.status(401).json({ message: 'Missing token' });
   try {
-    const payload = jwt.verify(auth.slice(7), process.env.JWT_SECRET || 'dev_secret');
+    const payload = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret');
     req.admin = payload; // aid, role
     next();
   } catch(e) {
@@ -577,7 +583,7 @@ const mapToTemplateFields = (rowObj) => {
     for (const [headerKey, value] of Object.entries(rowObj)) {
       const lowerHeader = headerKey.toLowerCase().trim();
       for (const pattern of patterns) {
-        if (lowerHeader.includes(pattern) || pattern.includes(lowerHeader)) {
+        if (lowerHeader === pattern || lowerHeader.includes(pattern)) {
           result[fieldName] = value;
           break;
         }
@@ -613,6 +619,8 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
   const fileName = (req.file.originalname || '').toLowerCase();
   const isCSV = fileName.endsWith('.csv') || fileName.endsWith('.tsv') || req.file.mimetype === 'text/csv' || req.file.mimetype === 'text/tab-separated-values';
   const isZIP = fileName.endsWith('.zip') || req.file.mimetype === 'application/zip' || req.file.mimetype === 'application/x-zip-compressed';
+  const isNumbers = fileName.endsWith('.numbers');
+  const isODS = fileName.endsWith('.ods');
   
   if (isCSV) {
     // Parse CSV/TSV directly
@@ -650,8 +658,7 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
           for (let r = 1; r < rawRows.length; r++) {
             const rowArr = rawRows[r] || [];
             const obj = {};
-            const maxLen = Math.max(headerRow.length, rowArr.length);
-            for (let c = 0; c < maxLen; c++) {
+            for (let c = 0; c < headerRow.length; c++) {
               const rawHeaderCell = headerRow[c];
               let key = (rawHeaderCell == null ? '' : String(rawHeaderCell).trim());
               if (!key) key = `Col ${c+1}`;
@@ -738,8 +745,7 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
             for (let r = 1; r < rawRows.length; r++) {
               const rowArr = rawRows[r] || [];
               const obj = {};
-              const maxLen = Math.max(headerRow.length, rowArr.length);
-              for (let c = 0; c < maxLen; c++) {
+              for (let c = 0; c < headerRow.length; c++) {
                 const rawHeaderCell = headerRow[c];
                 let key = (rawHeaderCell == null ? '' : String(rawHeaderCell).trim());
                 if (!key) key = `Col ${c+1}`;
@@ -755,17 +761,74 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
       console.error('ZIP parse error:', zipErr);
       parseErrorMsg = zipErr.message || 'Failed to parse ZIP';
     }
+  } else if (isNumbers || isODS) {
+    // ── Apple Numbers (.numbers) and OpenDocument (.ods) via SheetJS ──
+    try {
+      const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const wsName = wb.SheetNames && wb.SheetNames[0];
+      if (wsName) {
+        sheetName = wsName;
+        const ws = wb.Sheets[wsName];
+        // sheet_to_json with header:1 returns an array of arrays (like rawRows)
+        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        rawRows = aoa.map(row => (Array.isArray(row) ? row : []).map(cell => {
+          if (cell == null) return '';
+          if (cell instanceof Date) return cell.toISOString().split('T')[0];
+          if (typeof cell === 'object') {
+            if (cell.richText) return cell.richText.map(s => (s && s.text) || '').join('');
+            if (cell.text != null) return cell.text;
+            try { return JSON.stringify(cell); } catch (_) { return String(cell); }
+          }
+          return cell;
+        }));
+        // build data objects from headers
+        if (rawRows.length > 1) {
+          const headerRow = rawRows[0] || [];
+          for (let r = 1; r < rawRows.length; r++) {
+            const rowArr = rawRows[r] || [];
+            const obj = {};
+            for (let c = 0; c < headerRow.length; c++) {
+              const rawHeaderCell = headerRow[c];
+              let key = (rawHeaderCell == null ? '' : String(rawHeaderCell).trim());
+              if (!key) key = `Col ${c+1}`;
+              obj[key] = (rowArr[c] == null ? '' : rowArr[c]);
+            }
+            data.push(obj);
+          }
+        }
+      }
+      console.log('SheetJS parsed', isNumbers ? '.numbers' : '.ods', 'successfully:', rawRows.length, 'rows');
+    } catch (numbersErr) {
+      console.error('SheetJS parse error:', numbersErr);
+      parseErrorMsg = numbersErr.message || 'Failed to parse ' + (isNumbers ? '.numbers' : '.ods') + ' file';
+    }
   } else {
     try {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(req.file.buffer);
       const worksheet = workbook.worksheets && workbook.worksheets[0];
       sheetName = worksheet ? worksheet.name : (workbook.worksheets[0] && workbook.worksheets[0].name) || 'Sheet1';
+      // Normalize an ExcelJS cell value to a plain string or number.
+      // ExcelJS cells can be: null, string, number, boolean, Date,
+      // { text, hyperlink } (hyperlink), { richText: [{text, font}, ...] },
+      // { formula, result }, or { error }.
+      const normalizeCell = (v) => {
+        if (v == null) return '';
+        if (typeof v !== 'object') return v; // string, number, boolean
+        if (v instanceof Date) return v.toISOString().split('T')[0]; // YYYY-MM-DD
+        if (Array.isArray(v.richText)) return v.richText.map(seg => (seg && seg.text) || '').join('');
+        if (v.text != null) return v.text; // hyperlink cell
+        if (v.result != null) return v.result; // formula cell – use computed result
+        if (v.error != null) return ''; // error cell
+        // unknown object – coerce to string to avoid [object Object]
+        try { return JSON.stringify(v); } catch (_) { return String(v); }
+      };
+
       // build rawRows (array of arrays) from worksheet
       if (worksheet) {
-        worksheet.eachRow({ includeEmpty: true }, (row) => {
+        worksheet.eachRow({ includeEmpty: false }, (row) => {
           // row.values is 1-based; slice(1) to make it 0-based and normalize empty -> ''
-          const vals = (row.values ? row.values.slice(1) : []).map(v => (v == null ? '' : (typeof v === 'object' && v.text ? v.text : v)));
+          const vals = (row.values ? row.values.slice(1) : []).map(normalizeCell);
           rawRows.push(vals);
         });
       }
@@ -775,8 +838,7 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
         for (let r = 1; r < rawRows.length; r++) {
           const rowArr = rawRows[r] || [];
           const obj = {};
-          const maxLen = Math.max(headerRow.length, rowArr.length);
-          for (let c = 0; c < maxLen; c++) {
+          for (let c = 0; c < headerRow.length; c++) {
             const rawHeaderCell = headerRow[c];
             let key = (rawHeaderCell == null ? '' : String(rawHeaderCell).trim());
             if (!key) key = `Col ${c+1}`;
@@ -863,8 +925,7 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
               for (let r = 1; r < rawRows.length; r++) {
                 const rowArr = rawRows[r] || [];
                 const obj = {};
-                const maxLen = Math.max(headerRow.length, rowArr.length);
-                for (let c = 0; c < maxLen; c++) {
+                for (let c = 0; c < headerRow.length; c++) {
                   const rawHeaderCell = headerRow[c];
                   let key = (rawHeaderCell == null ? '' : String(rawHeaderCell).trim());
                   if (!key) key = `Col ${c+1}`;
@@ -980,23 +1041,113 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
       } catch (e) { /* ignore parse errors - treat as no selection */ }
     }
 
+  // ── Strip empty rows and trailing empty cells from rawRows ─────
+  // 1. Trim trailing empty cells from every row so that Excel
+  //    formatting artefacts don't produce extra "Col N" columns.
+  // 2. Remove data rows where every cell is blank.
+  if (rawRows.length > 0) {
+    const trimTrailing = (row) => {
+      if (!Array.isArray(row)) return row;
+      let last = row.length - 1;
+      while (last >= 0 && String(row[last] ?? '').trim() === '') last--;
+      return row.slice(0, last + 1);
+    };
+    rawRows = rawRows.map(trimTrailing);
+
+    const isRowEmpty = (row) => !Array.isArray(row) || row.length === 0;
+    // Always keep the first row (potential header), filter the rest
+    const header = rawRows[0];
+    const filtered = rawRows.slice(1).filter(r => !isRowEmpty(r));
+    rawRows = [header, ...filtered];
+
+    // Rebuild data from the cleaned rawRows — only use header-length columns
+    data = [];
+    if (rawRows.length > 1) {
+      const headerRow = rawRows[0] || [];
+      for (let r = 1; r < rawRows.length; r++) {
+        const rowArr = rawRows[r] || [];
+        const obj = {};
+        for (let c = 0; c < headerRow.length; c++) {
+          const rawHeaderCell = headerRow[c];
+          let key = (rawHeaderCell == null ? '' : String(rawHeaderCell).trim());
+          if (!key) key = `Col ${c+1}`;
+          obj[key] = (rowArr[c] == null ? '' : rowArr[c]);
+        }
+        data.push(obj);
+      }
+    }
+  }
+
+  // ── Auto-detect header row ──────────────────────────────────────
+  // Real-world Excel files often have a title row, blank row, or
+  // merged-cell banner above the actual column headers.  Scan the
+  // first 10 rows of rawRows for the one that best matches expected
+  // header keywords and, if it isn't row 0, rebuild `data` from
+  // the correct header row.
+  const headerKeywords = [
+    'roll','rollno','roll_no','roll number',
+    'id','idno','id_no','id number','id no','student id','studentid','registration','regno',
+    "father's name",'father name','father_name',
+    'name','full name','student name',
+    'blood group','bloodgroup','blood_group',
+    'mobile','phone','phone number','phone_no',
+    'branch','department','program',
+    'address','addr','location',
+    'category','batch','mail id','mail_id','mail','email'
+  ];
+
+  const _rowMatchesHeader = (rowArr) => {
+    if (!Array.isArray(rowArr) || rowArr.length < 2) return 0;
+    let hits = 0;
+    for (const cell of rowArr) {
+      const lc = String(cell || '').toLowerCase().trim();
+      if (!lc) continue;
+      if (headerKeywords.some(h => lc === h || lc.includes(h))) hits++;
+    }
+    return hits;
+  };
+
+  // scan up to first 10 rows
+  let bestHeaderIdx = 0;
+  let bestHeaderHits = _rowMatchesHeader(rawRows[0]);
+  const scanLimit = Math.min(rawRows.length, 10);
+  for (let ri = 1; ri < scanLimit; ri++) {
+    const hits = _rowMatchesHeader(rawRows[ri]);
+    if (hits > bestHeaderHits) {
+      bestHeaderHits = hits;
+      bestHeaderIdx = ri;
+    }
+  }
+
+  // If the best header row is NOT the first row, rebuild rawRows and data
+  if (bestHeaderIdx > 0 && bestHeaderHits >= 2) {
+    console.log(`Header row auto-detected at rawRows[${bestHeaderIdx}] (${bestHeaderHits} keyword hits). Discarding ${bestHeaderIdx} leading row(s).`);
+    rawRows = rawRows.slice(bestHeaderIdx); // header row is now rawRows[0]
+    // rebuild data from corrected rawRows
+    data = [];
+    if (rawRows.length > 1) {
+      const headerRow = rawRows[0] || [];
+      for (let r = 1; r < rawRows.length; r++) {
+        const rowArr = rawRows[r] || [];
+        const obj = {};
+        for (let c = 0; c < headerRow.length; c++) {
+          const rawHeaderCell = headerRow[c];
+          let key = (rawHeaderCell == null ? '' : String(rawHeaderCell).trim());
+          if (!key) key = `Col ${c+1}`;
+          obj[key] = (rowArr[c] == null ? '' : rowArr[c]);
+        }
+        data.push(obj);
+      }
+    }
+  }
+
   // debug: show parsed row counts (rawRows/data)
   try { console.log('Parsed rawRows length:', Array.isArray(rawRows) ? rawRows.length : 'N/A', 'data length:', Array.isArray(data) ? data.length : 'N/A'); } catch (e) {}
   // detect header row
     const firstObj = data[0] || {};
     const lowerKeys = Object.keys(firstObj).map(k => String(k).toLowerCase());
     // include common synonyms and the exact template keywords so headers like "ID No", "Mail ID", "Father's Name" are recognized
-    const expectedHeaders = [
-      'roll','rollno','roll_no','roll number',
-      'id','idno','id_no','id number','id no','student id','studentid','registration','regno',
-      "father's name", 'father name', 'father_name',
-      'name','full name',
-      'blood group','bloodgroup','blood_group',
-      'mobile','phone','phone number','phone_no',
-      'branch','department',
-      'address','addr','location',
-      'category','batch','mail id','mail_id','mail','email'
-    ];
+    const expectedHeaders = headerKeywords;
     const hasExpectedHeaders = lowerKeys.some(k => expectedHeaders.some(h => k.includes(h)));
     const headerless = !hasExpectedHeaders;
 
@@ -1021,7 +1172,10 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
     const headerRowArray = Array.isArray(rawRows) && rawRows.length > 0 ? rawRows[0] : [];
     const normalizeHeaders = (fallbackKeys) => {
       // fallbackKeys: array of keys from sheet_to_json objects (may contain __EMPTY placeholders)
-      const maxLen = Math.max((headerRowArray && headerRowArray.length) || 0, (fallbackKeys && fallbackKeys.length) || 0);
+      // Prefer headerRowArray length to avoid generating extra "Col N" entries for trailing empty cells
+      const hLen = (headerRowArray && headerRowArray.length) || 0;
+      const fLen = (fallbackKeys && fallbackKeys.length) || 0;
+      const maxLen = hLen > 0 ? hLen : fLen;
       const out = [];
       for (let i = 0; i < maxLen; i++) {
         const rawHeaderCell = headerRowArray[i];
@@ -1048,6 +1202,16 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
   const previewData = { headers: null, rows: [] };
   // allow forcing import even if required fields missing
   const forceImport = (req.body.force === '1' || req.body.force === 'true' || req.query.force === '1' || req.query.force === 'true');
+
+  // Guard: if the file only had a header row and no data rows, return early.
+  // We detect this when rawRows has only 1 row and it looks like a header (has keyword matches).
+  if (data.length === 0 && rawRows.length <= 1 && bestHeaderHits >= 2) {
+    if (previewFlag) {
+      return res.json({ success: true, preview: { headers: headerRowArray.map(h => String(h || '').trim()), rows: [] }, totalParsed: 0, totalWithEmpty: 0 });
+    }
+    return res.json({ success: true, imported: 0, skipped: 0, skippedRows: [], message: 'File contains only headers with no data rows.' });
+  }
+
   if (headerless) {
       // headerless: rawRows are arrays; include all columns. Provide sensible Col N headers
       // instead of showing sheetjs placeholders like __EMPTY
@@ -1056,15 +1220,35 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
       const firstRow = rawRows[0] || [];
       for (let i = 0; i < firstRow.length; i++) fallbackKeys.push(`Col ${i+1}`);
       previewData.headers = normalizeHeaders(fallbackKeys);
+      // Detect common "I-card" style layout where columns are:
+      // [0]=Name, [1]=Father's Name, [2]=Blood Group, [3]=Mobile,
+      // [4]=Program, [5]=Address, [6]=Category, [7]=Batch, [8]=ID/Roll, [9]=Photo
+      let headerlessTemplate = null;
+      try {
+        if (firstRow.length >= 9) {
+          const bg = (firstRow[2] || '').toString().trim();
+          const batch = (firstRow[7] || '').toString().trim();
+          const rollCandidate = (firstRow[8] || '').toString().trim();
+          const bgOk = /^[ABO]{1,2}[+-]$/i.test(bg); // e.g. B+, O-
+          const batchOk = /\d{4}\s*[-–]\s*\d{2,4}/.test(batch) || /\d{4}\s*[-–]\s*\d{4}/.test(batch);
+          const rollOk = /\d/.test(rollCandidate);
+          if (bgOk && batchOk && rollOk) {
+            headerlessTemplate = 'icard_v1';
+          }
+        }
+      } catch (_) { headerlessTemplate = null; }
       for (let i = 0; i < rawRows.length; i++) {
         // if a selection set was provided from preview, skip rows not selected
         if (selectedRowsSet && !selectedRowsSet.has(i)) continue;
         const arrRow = rawRows[i] || [];
-        // attempt to extract roll using rollColIndex if provided, else heuristic
+        // attempt to extract roll using known template, rollColIndex, or heuristic
         let rawRoll = '';
         let detectedRollIdx = rollColIndex;
 
-        if (detectedRollIdx != null) {
+        if (headerlessTemplate === 'icard_v1' && arrRow.length >= 9) {
+          detectedRollIdx = 8;
+          rawRoll = (arrRow[8] || '').toString().trim();
+        } else if (detectedRollIdx != null) {
           rawRoll = (arrRow[detectedRollIdx] || '').toString().trim();
         } else {
           // Heuristic: prefer column with digits as Roll
@@ -1103,15 +1287,19 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
             }
           }
         }
-        const roll = rawRoll ? rawRoll.toString().trim().toUpperCase() : '';
+        let roll = rawRoll ? rawRoll.toString().trim().toUpperCase() : '';
 
         // attempt to find a name candidate (first cell with letters that's not roll)
         let name = '';
-        for (let j = 0; j < arrRow.length; j++) {
-          const v = (arrRow[j] || '').toString().trim();
-          if (!v) continue;
-          if (detectedRollIdx != null && j === detectedRollIdx) continue;
-          if (v && /[A-Za-z]/.test(v) && !v.includes('@')) { name = v; break; }
+        if (headerlessTemplate === 'icard_v1' && arrRow.length >= 1) {
+          name = (arrRow[0] || '').toString().trim();
+        } else {
+          for (let j = 0; j < arrRow.length; j++) {
+            const v = (arrRow[j] || '').toString().trim();
+            if (!v) continue;
+            if (detectedRollIdx != null && j === detectedRollIdx) continue;
+            if (v && /[A-Za-z]/.test(v) && !v.includes('@')) { name = v; break; }
+          }
         }
 
         // attempt to detect email (look for @ symbol)
@@ -1140,13 +1328,45 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
         }
 
         const rowObj = { arr: arrRow.map(c => (c == null ? '' : c)), obj: null };
-        // validations
+        // optional extended fields for known template layout
+        let fatherName = '';
+        let bloodGroup = '';
+        let program = '';
+        let address = '';
+        let category = '';
+        let batch = '';
+        if (headerlessTemplate === 'icard_v1') {
+          fatherName = (arrRow[1] || '').toString().trim();
+          bloodGroup = (arrRow[2] || '').toString().trim();
+          mobile = mobile || (arrRow[3] || '').toString().trim();
+          program = (arrRow[4] || '').toString().trim();
+          address = (arrRow[5] || '').toString().trim();
+          category = (arrRow[6] || '').toString().trim();
+          batch = (arrRow[7] || '').toString().trim();
+        }
+        // integrate AI-extracted fields for headerless rows when available
+        const aiRow = (aiExtractedRows && aiExtractedRows[i]) ? aiExtractedRows[i] : null;
+        if (aiRow) {
+          if (!roll && aiRow.roll) roll = String(aiRow.roll).trim().toUpperCase();
+          if (!name && aiRow.name) name = String(aiRow.name).trim();
+          if (!email && aiRow.email) email = String(aiRow.email).trim();
+          if (!mobile && aiRow.mobile) mobile = String(aiRow.mobile).trim();
+          if (!fatherName && aiRow.fatherName) fatherName = aiRow.fatherName;
+          if (!address && aiRow.address) address = aiRow.address;
+        }
+
+        // validations (after heuristics + AI so preview reflects final values)
         const errors = [];
         if (!roll) errors.push('missing roll');
         if (!name) errors.push('missing name');
-        // try to detect photo: explicit photoColIndex or any cell that looks like an image URL
+
+        // try to detect photo: explicit photoColIndex, known template column, AI, or any cell that looks like an image URL
         let photo = '';
-        if (photoColIndex != null) photo = (arrRow[photoColIndex] || '').toString().trim();
+        if (headerlessTemplate === 'icard_v1' && arrRow.length >= 10) {
+          photo = (arrRow[9] || '').toString().trim();
+        }
+        if (!photo && photoColIndex != null) photo = (arrRow[photoColIndex] || '').toString().trim();
+        if (!photo && aiRow && aiRow.photo) photo = aiRow.photo;
         if (!photo) {
           for (let j = 0; j < arrRow.length; j++) {
             const v = (arrRow[j] || '').toString().trim();
@@ -1178,9 +1398,10 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
           const finalName = name || (forceImport ? 'Unknown' : '');
           if ((!finalRoll || !finalName) && !forceImport) {
             // skip row when required fields absent and not forcing
+            skipped++;
+            skippedRows.push({ rowIndex: i, errors, row: rowObj.arr });
           } else {
             try {
-              const aiRow = (aiExtractedRows && aiExtractedRows[i]) ? aiExtractedRows[i] : null;
               if (photo && !/^https?:\/\//i.test(photo) && zipFilesMap) {
                 try {
                   const basePhoto = path.basename(photo).toLowerCase();
@@ -1192,7 +1413,22 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
                 } catch (e) { /* ignore */ }
               }
 
-              const setObj = { name: finalName, email, mobile, photo: (photo || (aiRow && aiRow.photo)) || undefined, originalArr: rowObj.arr, originalObj: null, originalHeaders: null };
+              const setObj = {
+                name: finalName,
+                email,
+                mobile,
+                fatherName: fatherName || undefined,
+                bloodGroup: bloodGroup || undefined,
+                program: program || undefined,
+                address: address || undefined,
+                category: category || undefined,
+                batch: batch || undefined,
+                photo: photo || undefined,
+                originalArr: rowObj.arr,
+                originalObj: null,
+                originalHeaders: null,
+                importOrder: i
+              };
               if (aiRow && aiRow.fatherName) setObj.fatherName = aiRow.fatherName;
               if (aiRow && aiRow.address) setObj.address = aiRow.address;
               const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1227,6 +1463,30 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
           rawRoll = (row[importConcepts.rollField] || row[importConcepts.rollField.toLowerCase()] || row[importConcepts.rollField.toUpperCase()] || '').toString().trim();
         }
         if (!rawRoll) rawRoll = (row.roll || row.Roll || row.RollNumber || row['Roll Number'] || '').toString().trim();
+        // additional heuristics: treat common ID-style headers (e.g. "ID No", "Student ID", "Registration No") as roll column
+        if (!rawRoll) {
+          for (const key of Object.keys(row)) {
+            if (!row[key]) continue;
+            const lk = key.toString().toLowerCase().trim();
+            if (
+              lk.includes('roll') ||
+              lk === 'id' ||
+              lk.includes('id no') ||
+              lk.includes('id number') ||
+              lk.includes('student id') ||
+              lk.includes('registration') ||
+              lk.includes('reg no') ||
+              lk.includes('reg. no') ||
+              lk.includes('enrollment')
+            ) {
+              const candidate = (row[key] || '').toString().trim();
+              if (candidate) {
+                rawRoll = candidate;
+                break;
+              }
+            }
+          }
+        }
         if ((!rawRoll || rawRoll === '') && rollColIndex != null) rawRoll = (arrRow[rollColIndex] || '').toString().trim();
         const roll = rawRoll ? rawRoll.toUpperCase() : '';
         let name = '';
@@ -1240,7 +1500,27 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
         if (!name) name = (row.name || row.Name || row.student || '').toString().trim();
         if (!email) email = (row.email || row.Email || '').toString().trim();
         if (!mobile) mobile = (row.mobile || row.Mobile || row.phone || row.Phone || '').toString().trim();
-        const rowObj = { arr: arrRow.map(c => (c == null ? '' : c)), obj: row };
+        // broader header-agnostic fallback for name, email and mobile using synonyms
+        if (!name || !email || !mobile) {
+          for (const key of Object.keys(row)) {
+            if (!row[key]) continue;
+            const lk = key.toString().toLowerCase().trim();
+            const val = String(row[key]).trim();
+            if (!name && ((lk.includes('name') && !lk.includes('father') && !lk.includes('parent') && !lk.includes('guardian')) || lk === 'student')) {
+              name = val;
+            }
+            if (!email && (lk.includes('email') || lk.includes('mail') || lk.includes('e-mail'))) {
+              email = val;
+            }
+            if (!mobile && (lk.includes('mobile') || lk.includes('phone') || lk.includes('contact') || lk === 'tel' || lk === 'telephone')) {
+              mobile = val;
+            }
+          }
+        }
+        // Cap arrRow to header column count so preview doesn't show extra "Col N" columns
+        const hdrLen = (rawRows[0] || []).length;
+        const cappedArr = hdrLen > 0 ? arrRow.slice(0, hdrLen) : arrRow;
+        const rowObj = { arr: cappedArr.map(c => (c == null ? '' : c)), obj: row };
         const errors = [];
         if (!roll) errors.push('missing roll');
         if (!name) errors.push('missing name');
@@ -1315,6 +1595,7 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
               let program = findValue(['program','course','degree','branch','department']);
               let category = findValue(['category','caste','community']);
               let batch = findValue(['batch','year','sem','semester','session']);
+              let address = findValue(['address','addr','location','residential address','current address']);
               
               const aiRow = (aiExtractedRows && aiExtractedRows[i]) ? aiExtractedRows[i] : null;
               if (aiRow) {
@@ -1328,7 +1609,7 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
               }
               
               // Use smart mapping function as fallback if fields still not found
-              if (!fatherName || !bloodGroup || !program || !category || !batch) {
+              if (!fatherName || !bloodGroup || !program || !category || !batch || !address) {
                 const mapped = mapToTemplateFields(row);
                 if (!fatherName && mapped.fatherName) fatherName = mapped.fatherName;
                 if (!bloodGroup && mapped.bloodGroup) bloodGroup = mapped.bloodGroup;
@@ -1367,7 +1648,8 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
                 photo: photo || undefined, 
                 originalArr: rowObj.arr, 
                 originalObj: rowObj.obj, 
-                originalHeaders: headers
+                originalHeaders: headers,
+                importOrder: i
               };
               if (existing) {
                 const updateObj = { $set: { ...setFields, roll } };
@@ -1386,7 +1668,16 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
             } catch (e) { console.error('import error', e); }
           } else {
             skipped++;
-            skippedRows.push({ rowIndex: i, errors, row });
+            // Sanitize row for JSON response — strip large values (e.g. base64 photos)
+            const safeRow = {};
+            try {
+              for (const k of Object.keys(row)) {
+                const v = row[k];
+                const s = v == null ? '' : String(v);
+                safeRow[k] = s.length > 200 ? s.slice(0, 200) + '…' : s;
+              }
+            } catch (_) { /* ignore */ }
+            skippedRows.push({ rowIndex: i, errors, row: safeRow });
           }
         }
       }
@@ -1400,16 +1691,12 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
 
     // if preview, return parsed rows without writing to DB
     if (previewFlag) {
-      // Filter to show only rows that would actually be imported
-      // A row can be imported if:
-      // 1. It has no validation errors (roll AND name present), OR
-      // 2. forceImport is enabled (user can override validation)
-      // But we always show rows with at least some data for preview purposes
+      // Filter to show only rows that have some non-empty cell content.
+      // We no longer hide rows just because roll/name detection failed, so that
+      // admins can see what the parser saw even for invalid rows.
       const nonEmptyRows = previewData.rows.filter(r => {
-        // Show if it has extractable data and would be valid to import (or would be force-imported)
-        const hasData = r.extracted && (r.extracted.roll || r.extracted.name || r.extracted.email || r.extracted.mobile);
-        const isValidOrCanForce = r.valid || forceImport;
-        return hasData && isValidOrCanForce;
+        const hasAnyCell = Array.isArray(r.arr) && r.arr.some(c => String(c || '').trim() !== '');
+        return hasAnyCell;
       });
       // limit rows returned in preview to previewLimit (Infinity allowed for 'all')
       const limited = previewLimit === Infinity ? nonEmptyRows : nonEmptyRows.slice(0, previewLimit);
@@ -1422,7 +1709,13 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
       if (io) io.emit('master_list_updated', { imported, skipped, at: new Date().toISOString() });
     } catch (e) { console.warn('Failed to emit master_list_updated', e.message || e); }
 
-    res.json({ success: true, imported, skipped, skippedRows: skippedRows.length > 0 ? skippedRows.slice(0, 10) : [] });
+    try {
+      res.json({ success: true, imported, skipped, skippedRows: skippedRows.length > 0 ? skippedRows.slice(0, 10) : [] });
+    } catch (jsonErr) {
+      console.error('Failed to serialize import response:', jsonErr.message || jsonErr);
+      // Fallback: return without skippedRows detail
+      res.json({ success: true, imported, skipped, skippedRows: [] });
+    }
   } catch (e) {
     // Log full stack for debugging and return the error message to the client
     console.error('ADMIN IMPORT ERROR', e && e.stack ? e.stack : e);
@@ -1458,12 +1751,60 @@ router.get('/students', adminAuth, async (req, res) => {
     }
     const skip = (Math.max(1, Number(page)) - 1) * Number(limit);
     const total = await Student.countDocuments(filter);
-    const items = await Student.find(filter).sort({ roll: 1 }).skip(skip).limit(Number(limit));
+    // Prefer explicit importOrder (when present) so lists mirror file row order.
+    // Fall back to _id (insertion order) which also mirrors file order for bulk imports.
+    // Exclude heavy fields that aren't needed for the list view.
+    // originalArr / originalObj store full row data, photo stores base64 images –
+    // together they can push documents above MongoDB's 32 MB sort-memory cap.
+    const items = await Student.find(filter)
+      .select('-originalArr -originalObj -originalHeaders -photo')
+      .sort({ importOrder: 1, _id: 1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
+
+    // Instead of sending full base64 photos (avg ~700KB each) in the list response,
+    // just check which students have a photo and set a boolean flag.
+    // The frontend can fetch individual photos via GET /students/:roll/photo.
+    if (items.length > 0) {
+      const ids = items.map(s => s._id);
+      const photoDocs = await Student.find({ _id: { $in: ids }, photo: { $exists: true, $ne: '' } })
+        .select('_id')
+        .lean();
+      const hasPhotoSet = new Set(photoDocs.map(p => String(p._id)));
+      for (const s of items) {
+        s.hasPhoto = hasPhotoSet.has(String(s._id));
+      }
+    }
     // Debug logging
     try { console.log(`Students fetch: total=${total}, returned=${items.length}, page=${page}, limit=${limit}, election=${electionId}`); } catch (e) {}
     res.json({ success: true, total, items });
   } catch (e) {
     console.error('Students fetch error:', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Admin: get student photo (returns base64 data URI or redirect to URL)
+router.get('/students/:roll/photo', adminAuth, async (req, res) => {
+  try {
+    const escaped = req.params.roll.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const student = await Student.findOne({ roll: { $regex: `^${escaped}$`, $options: 'i' } }).select('photo').lean();
+    if (!student || !student.photo) return res.status(404).json({ success: false, message: 'No photo' });
+    // If it's a data URI, extract and send as binary image for efficiency
+    const m = student.photo.match(/^data:image\/([^;]+);base64,(.+)$/);
+    if (m) {
+      const ext = m[1] === 'image' ? 'png' : m[1]; // normalise "image/image" → png
+      const buf = Buffer.from(m[2], 'base64');
+      res.set('Content-Type', `image/${ext}`);
+      res.set('Cache-Control', 'public, max-age=86400');
+      return res.send(buf);
+    }
+    // If it's a URL, just redirect
+    if (/^https?:\/\//.test(student.photo)) return res.redirect(student.photo);
+    // fallback: return as JSON
+    res.json({ success: true, photo: student.photo });
+  } catch (e) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

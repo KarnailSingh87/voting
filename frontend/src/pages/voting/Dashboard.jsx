@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
 import axios from '../../utils/axios';
 import { io } from 'socket.io-client';
 
@@ -34,6 +35,12 @@ const PhotoModal = ({ photoUrl, name, onClose }) => {
       </div>
     </div>
   );
+};
+
+PhotoModal.propTypes = {
+  photoUrl: PropTypes.string,
+  name: PropTypes.string,
+  onClose: PropTypes.func.isRequired,
 };
 
 const Dashboard = () => {

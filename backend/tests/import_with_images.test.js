@@ -59,6 +59,11 @@ describe('Import with images (ZIP + CSV)', () => {
   const found = items.find(i => i.roll && i.roll.toString().toUpperCase() === 'R200');
   expect(found).toBeDefined();
   expect(found.name).toBe('Jane Doe');
-  expect(typeof found.photo === 'string' && found.photo.startsWith('data:image/')).toBe(true);
+  // The list endpoint now returns hasPhoto flag instead of full base64 to keep responses small.
+  // Verify the photo exists via the dedicated photo endpoint.
+  expect(found.hasPhoto).toBe(true);
+  const photoRes = await request(app).get(`/api/admin/students/${encodeURIComponent(found.roll)}/photo`).set('Authorization', `Bearer ${token}`);
+  expect(photoRes.status).toBe(200);
+  expect(photoRes.headers['content-type']).toMatch(/^image\//);
   }, 20000);
 });

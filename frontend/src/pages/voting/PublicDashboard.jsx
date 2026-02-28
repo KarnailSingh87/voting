@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
+import { toast } from 'react-toastify';
 import axios from '../../utils/axios';
 import io from 'socket.io-client';
 
@@ -36,6 +38,12 @@ const PhotoModal = ({ photoUrl, name, onClose }) => {
   );
 };
 
+PhotoModal.propTypes = {
+  photoUrl: PropTypes.string,
+  name: PropTypes.string,
+  onClose: PropTypes.func.isRequired,
+};
+
 let socket;
 
 const PublicDashboard = () => {
@@ -58,7 +66,7 @@ const PublicDashboard = () => {
       console.log('Connected to WebSocket server');
     });
 
-    socket.on('voteUpdate', (data) => {
+    socket.on('voteUpdate', () => {
       // Update statistics only
       setStats(prevStats => ({
         ...prevStats,
@@ -67,7 +75,7 @@ const PublicDashboard = () => {
       }));
     });
 
-    socket.on('electionUpdate', (data) => {
+    socket.on('electionUpdate', () => {
       // Refresh elections list optimistically
       (async () => {
         try {
@@ -174,10 +182,6 @@ const PublicDashboard = () => {
     };
   }, [fetchLatest]);
 
-  const handleViewVote = (confirmationId) => {
-    navigate(`/verify/${confirmationId}`);
-  };
-
   const formatDateTime = (d) => {
     try {
       if (!d) return '—';
@@ -272,6 +276,7 @@ const PublicDashboard = () => {
               <div className="text-right text-sm text-gray-500">
                 <div>Last updated:</div>
                 <div className="font-mono last-updated-digital">{lastUpdated ? formatLastUpdated(lastUpdated) : '—'}</div>
+                {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
               </div>
             </div>
           </div>

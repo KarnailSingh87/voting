@@ -353,11 +353,11 @@ const ImportStudents = () => {
                         const cell = c || '';
                         const s = String(cell);
                         const isDataUrl = /^data:image\/.+;base64,/.test(s);
-                        const isImageUrl = /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg)(\?.*)?$/i.test(s);
+                        const isImageUrl = /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(s);
                         if (isDataUrl || isImageUrl) {
                           return (
                             <td key={ci} className="p-2">
-                              <img src={s} alt={`cell-img-${ci}`} className="h-12 w-12 object-cover rounded" />
+                              <img src={s} alt={`cell-img-${ci}`} className="h-8 w-8 object-cover rounded-full border border-gray-200" />
                             </td>
                           );
                         }
@@ -366,7 +366,7 @@ const ImportStudents = () => {
                       <td className="p-2 font-medium">{r.extracted?.roll || r.extracted?.id || '—'}</td>
                       <td className="p-2">
                         {r.extracted?.photo ? (
-                          <img src={r.extracted.photo} alt={`photo-${idx}`} className="h-12 w-12 object-cover rounded" />
+                          <img src={r.extracted.photo} alt={`photo-${idx}`} className="h-8 w-8 object-cover rounded-full border border-gray-200" />
                         ) : (
                           <span className="text-gray-400">—</span>
                         )}

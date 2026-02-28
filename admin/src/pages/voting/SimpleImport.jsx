@@ -123,11 +123,14 @@ const SimpleImport = () => {
 
       if (res.data) {
         setResult(res.data);
+        const imported = res.data.imported || 0;
         const skipped = res.data.skipped || 0;
-        if (skipped > 0) {
-          toast.warning(`Imported ${res.data.imported || 0} voters, but ${skipped} rows were skipped due to validation errors`);
+        if (imported === 0) {
+          toast.warning('No voters were imported. Check that your file has Name and Roll No columns.');
+        } else if (skipped > 0) {
+          toast.warning(`Imported ${imported} voters, but ${skipped} rows were skipped due to validation errors`);
         } else {
-          toast.success(`Successfully imported ${res.data.imported || 0} voters`);
+          toast.success(`Successfully imported ${imported} voter${imported !== 1 ? 's' : ''}! Click "View All Voters" to see them.`);
         }
       }
     } catch (e) {
@@ -265,14 +268,14 @@ const SimpleImport = () => {
                     browse
                     <input
                       type="file"
-                      accept=".csv,.xlsx,.xls"
+                      accept=".csv,.xlsx,.xls,.numbers,.ods"
                       onChange={(e) => e.target.files[0] && handleFileSelect(e.target.files[0])}
                       className="hidden"
                     />
                   </label>
                 </p>
                 <p className="text-sm text-gray-400 mt-2">
-                  Supports CSV, Excel (.xlsx, .xls)
+                  Supports CSV, Excel (.xlsx, .xls), Numbers, ODS
                 </p>
               </div>
             )}
@@ -307,38 +310,93 @@ const SimpleImport = () => {
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    {previewData.headers.map((h, i) => (
-                      <th
-                        key={i}
-                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        {h}
-                      </th>
-                    ))}
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Photo
+                    </th>
+                    {previewData.headers.map((h, i) => {
+                      // Skip photo/image columns from raw headers since we have a dedicated Photo column
+                      const ht = h.trim().toLowerCase();
+                      if (/^(photo|photo[_ ]?url|image|image[_ ]?url|avatar|picture|pic)$/.test(ht)) return null;
+                      return (
+                        <th
+                          key={i}
+                          className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          {h}
+                        </th>
+                      );
+                    })}
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {previewData.rows.map((row, idx) => (
+                  {previewData.rows.map((row, idx) => {
+                    // Resolve photo: prefer extracted.photo, fallback to scanning arr cells for image URLs/data URIs
+                    let photoSrc = row.extracted?.photo || '';
+                    if (!photoSrc) {
+                      for (let ci = 0; ci < (row.arr || []).length; ci++) {
+                        const s = String(row.arr[ci] || '');
+                        if (/^data:image\/.+;base64,/.test(s) || /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(s)) {
+                          photoSrc = s;
+                          break;
+                        }
+                      }
+                    }
+                    return (
                     <tr key={idx} className={row.valid ? '' : 'bg-red-50'}>
-                      {(row.arr || []).map((cell, ci) => (
-                        <td key={ci} className="px-3 py-2 whitespace-nowrap">
-                          {String(cell || '')}
-                        </td>
-                      ))}
+                      {/* Dedicated photo column */}
+                      <td className="px-3 py-2">
+                        {photoSrc ? (
+                          <img
+                            src={photoSrc}
+                            alt="photo"
+                            className="h-8 w-8 rounded-full object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          </div>
+                        )}
+                      </td>
+                      {(row.arr || []).map((cell, ci) => {
+                        // Skip photo columns in raw data (already shown in dedicated column)
+                        const headerName = (previewData.headers[ci] || '').trim().toLowerCase();
+                        if (/^(photo|photo[_ ]?url|image|image[_ ]?url|avatar|picture|pic)$/.test(headerName)) return null;
+                        const s = String(cell || '');
+                        // Also skip cells that are data URIs or image URLs (shown in photo column)
+                        if (/^data:image\/.+;base64,/.test(s) || /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(s)) {
+                          return <td key={ci} className="px-3 py-2 text-gray-400 text-xs italic">📷 photo</td>;
+                        }
+                        return (
+                          <td key={ci} className="px-3 py-2 whitespace-nowrap max-w-[200px] truncate" title={s}>
+                            {s}
+                          </td>
+                        );
+                      })}
                       <td className="px-3 py-2 whitespace-nowrap">
                         {row.valid ? (
-                          <span className="text-green-600">✓ Valid</span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Valid
+                          </span>
                         ) : (
-                          <span className="text-red-600" title={row.errors?.join(', ')}>
-                            ✗ Invalid
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700" title={row.errors?.join(', ')}>
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            {row.errors?.join(', ') || 'Invalid'}
                           </span>
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -347,11 +405,28 @@ const SimpleImport = () => {
 
         {/* Import Result */}
         {result && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h3 className="font-medium text-green-800">Import Complete!</h3>
-            <p className="text-green-700 mt-1">
-              Successfully imported <strong>{result.imported}</strong> voters
-            </p>
+          <div className={`mb-6 p-4 border rounded-lg ${result.imported > 0 ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+            {result.imported > 0 ? (
+              <>
+                <h3 className="font-medium text-green-800">✓ Import Complete!</h3>
+                <p className="text-green-700 mt-1">
+                  Successfully imported <strong>{result.imported}</strong> voter{result.imported !== 1 ? 's' : ''}
+                </p>
+                <button
+                  onClick={() => navigate('/voters')}
+                  className="mt-3 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm font-medium"
+                >
+                  👁 View All Voters
+                </button>
+              </>
+            ) : (
+              <>
+                <h3 className="font-medium text-yellow-800">⚠ No voters were imported</h3>
+                <p className="text-yellow-700 mt-1">
+                  All rows were skipped. Make sure your file has a <strong>Name</strong> column and a <strong>Roll No</strong> (or ID No) column.
+                </p>
+              </>
+            )}
             {result.skipped > 0 && (
               <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm">
                 <strong>⚠ {result.skipped} rows were skipped</strong> due to missing roll number or name. 
@@ -366,11 +441,6 @@ const SimpleImport = () => {
                   </div>
                 )}
               </div>
-            )}
-            {result.skipped > 0 && (
-              <p className="text-yellow-700 mt-1">
-                Skipped {result.skipped} duplicate/invalid entries
-              </p>
             )}
           </div>
         )}
@@ -421,8 +491,8 @@ const SimpleImport = () => {
         <ul className="text-sm text-blue-700 space-y-1">
           <li>• <strong>Required columns:</strong> Name, Roll No (or ID No)</li>
           <li>• <strong>Optional columns:</strong> Email, Mobile, Branch, Batch, Address, Category</li>
-          <li>• First row should contain column headers</li>
-          <li>• Supported formats: CSV, Excel (.xlsx, .xls)</li>
+          <li>• First row should contain column headers (title rows above headers are auto-detected)</li>
+          <li>• Supported formats: CSV, Excel (.xlsx, .xls), Apple Numbers (.numbers), ODS</li>
           <li>• Maximum recommended file size: 10MB</li>
         </ul>
       </div>

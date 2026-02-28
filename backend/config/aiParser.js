@@ -107,21 +107,60 @@ export async function parseFile({ buffer, originalname, mimetype, data = [], raw
       // headerless: best-effort per-row extraction from rawRows (array of arrays)
       for (let i = 0; i < rawRows.length; i++) {
         const arr = rawRows[i] || [];
-        let fatherName, address, photo;
+        let fatherName;
+        let address;
+        let photo;
+        let roll;
+        let name;
+        let email;
+        let mobile;
+
         for (let j = 0; j < arr.length; j++) {
           const v = (arr[j] || '').toString().trim();
           if (!v) continue;
-          if (!fatherName && /^(father|father name|s\/o|son of|daughter of)/i.test(v)) fatherName = v;
-          if (!address && /\d+\s+\w+/.test(v) && v.length > 10) address = v;
+
+          const lower = v.toLowerCase();
+          const digitsOnly = v.replace(/\D/g, '');
+
+          // father name style hints or "S/O", "D/O"
+          if (!fatherName && /^(father|father name|s\/o|d\/o|son of|daughter of)/i.test(v)) fatherName = v;
+
+          // email
+          if (!email && /\S+@\S+\.\S+/.test(v)) email = v;
+
+          // mobile-like numbers (10-15 digits)
+          if (!mobile && digitsOnly.length >= 10 && digitsOnly.length <= 15) mobile = v;
+
+          // roll/id-like tokens: contains digits but is not clearly a phone or email
+          if (!roll && digitsOnly.length > 0 && (digitsOnly.length < 10 || digitsOnly.length > 15) && !v.includes('@')) {
+            roll = v;
+          }
+
+          // candidate for name: mostly letters/spaces, no '@' and few or no digits
+          if (!name && /[A-Za-z]{2,}/.test(v) && !v.includes('@') && digitsOnly.length === 0 && lower.length <= 60) {
+            name = v;
+          }
+
+          // address heuristic: long-ish string with spaces and at least one digit (e.g. house no)
+          if (!address && v.length > 10 && /\d+\s+\w+/.test(v)) address = v;
+
+          // direct photo URL
           if (!photo && /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg)(\?.*)?$/i.test(v)) photo = v;
         }
+
         // try imagesMap for this row (if any)
         if (!photo && imagesMap) {
           // search any key that ends with :<row+1>:<col>
           const possible = Object.keys(imagesMap).find(k => k.includes(`:${i+1}:`));
-          if (possible) photo = `data:image/${imagesMap[possible].extension};base64,${Buffer.from(imagesMap[possible].buffer || '').toString('base64')}`;
+          if (possible) {
+            const img = imagesMap[possible];
+            if (img && img.buffer) {
+              photo = `data:image/${img.extension};base64,${Buffer.from(img.buffer).toString('base64')}`;
+            }
+          }
         }
-        result.extractedRows.push({ fatherName, address, photo, originalArr: arr });
+
+        result.extractedRows.push({ fatherName, address, photo, roll, name, email, mobile, originalArr: arr });
       }
     }
   } catch (e) {

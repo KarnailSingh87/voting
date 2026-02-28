@@ -1,0 +1,536 @@
+# 🗳️ Secure & Transparent Online Voting System
+
+A comprehensive voting platform with OTP authentication, real-time updates, and blockchain integration support.
+
+---
+
+## 📁 Project Structure
+
+```
+voting/
+├── admin/                      # Admin Dashboard (React + Vite)
+│   ├── src/
+│   │   ├── pages/voting/      # Admin pages (elections, monitoring, import)
+│   │   ├── components/        # Reusable components (navbar, modal, sidebar)
+│   │   ├── config/            # Configuration files
+│   │   └── utils/             # Utility functions
+│   ├── package.json
+│   ├── vite.config.js
+│   └── tailwind.config.js
+│
+├── frontend/                   # Voter Application (React + Vite)
+│   ├── src/
+│   │   ├── pages/voting/      # Voter pages (login, ballot, history)
+│   │   ├── components/        # UI components
+│   │   ├── utils/             # Axios config, helpers
+│   │   └── context/           # Blockchain context (optional)
+│   ├── package.json
+│   ├── vite.config.js
+│   └── tailwind.config.js
+│
+├── backend/                    # Express Server + MongoDB
+│   ├── models/                # MongoDB schemas (Voter, Vote, Election, Candidate)
+│   ├── routes/                # API endpoints (voter, vote, admin, public)
+│   ├── config/                # Database, OTP, file parser config
+│   ├── middleware/            # Authentication middleware
+│   ├── services/              # Business logic (blockchain service)
+│   ├── tests/                 # Jest & Cypress tests
+│   ├── public/uploads/        # Candidate photos & uploads
+│   ├── package.json
+│   └── server.js              # Entry point
+│
+├── scripts/                   # Utility scripts (imports, admin setup)
+├── docs/                      # Documentation files
+├── logs/                      # Application logs
+│
+├── package.json               # Root package.json (if monorepo)
+├── README.md                  # This file
+└── .gitignore
+
+```
+
+---
+
+## 🚀 Quick Start
+
+### **Prerequisites**
+
+- Node.js 16+
+- MongoDB (local or Atlas)
+- npm or yarn
+
+### **Installation**
+
+```bash
+# 1. Clone repository
+git clone https://github.com/KarnailSingh87/voting.git
+cd voting
+
+# 2. Install backend dependencies
+cd backend
+npm install
+
+# 3. Install frontend dependencies
+cd ../frontend
+npm install
+
+# 4. Install admin dependencies
+cd ../admin
+npm install
+
+# 5. Return to root
+cd ..
+```
+
+### **Configuration**
+
+Create `.env` in backend folder:
+
+```bash
+# Database
+MONGO_URI=mongodb://localhost:27017/aadhaar_Voting
+
+# Server
+NODE_ENV=development
+PORT=5005
+
+# OTP & Security
+SMTP_HOST=smtp.ethereal.email
+SMTP_PORT=587
+SMTP_USER=your-email
+SMTP_PASS=your-password
+OTP_TIMEOUT=300000
+
+# CORS
+CORS_ORIGIN=http://localhost:5173,http://localhost:3000
+
+# Admin
+ADMIN_EMAIL=admin@voting.com
+ADMIN_PASSWORD=Admin@123456
+
+# Optional: Blockchain
+VOTING_CONTRACT_ADDRESS=0x...
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
+PRIVATE_KEY=your_wallet_private_key
+```
+
+### **Running the Application**
+
+```bash
+# Terminal 1: Start Backend
+cd backend
+npm run dev
+
+# Terminal 2: Start Frontend
+cd frontend
+npm run dev
+
+# Terminal 3: Start Admin Dashboard
+cd admin
+npm run dev
+```
+
+Access:
+- **Voter App**: http://localhost:5173
+- **Admin Dashboard**: http://localhost:3000
+- **Backend API**: http://localhost:5005
+
+---
+
+## 🔐 Core Features
+
+### **Voter Authentication**
+- ✅ Roll/Aadhaar-based login
+- ✅ OTP verification (email/SMS)
+- ✅ JWT token authentication
+- ✅ Session management
+
+### **Voting System**
+- ✅ Multi-election support
+- ✅ Real-time vote updates (Socket.io)
+- ✅ Vote confirmation & receipt
+- ✅ Voting history/audit trail
+
+### **Admin Panel**
+- ✅ Election management (create, edit, delete)
+- ✅ Candidate management with photos
+- ✅ CSV/Excel bulk import
+- ✅ Real-time vote monitoring
+- ✅ Results analytics
+
+### **Security**
+- ✅ Hash-based voter identification
+- ✅ Encrypted vote storage
+- ✅ Rate limiting on OTP requests
+- ✅ Input validation & sanitization
+- ✅ HTTPS/CORS support
+
+### **Transparency**
+- ✅ Public election dashboard
+- ✅ Real-time vote ledger
+- ✅ Vote verification system
+- ✅ Blockchain integration (optional)
+
+---
+
+## 📚 API Documentation
+
+### **Voter Routes** (`/api/voter`)
+
+```bash
+POST /request-otp
+- Request OTP for login
+- Body: { roll, name, mobile, email }
+- Response: { message, sentTo, contactType }
+
+POST /verify-otp
+- Verify OTP and get JWT token
+- Body: { roll, otp }
+- Response: { token, voter }
+
+GET /history
+- Get voting history (requires auth)
+- Headers: { Authorization: Bearer TOKEN }
+- Response: { voteHistory: [...] }
+```
+
+### **Vote Routes** (`/api/vote`)
+
+```bash
+POST /cast
+- Cast a vote
+- Body: { candidateId }
+- Response: { voteHash, blockchainTxHash }
+
+GET /verify/:voteHash
+- Verify vote on blockchain
+- Response: { verified, timestamp }
+
+GET /results/:electionId/blockchain
+- Get results from blockchain
+- Response: { results: [...], immutable: true }
+```
+
+### **Admin Routes** (`/api/admin`)
+
+```bash
+POST /login
+- Admin login
+- Body: { username, password }
+- Response: { token, admin }
+
+POST /elections
+- Create election
+- Headers: { Authorization: Bearer TOKEN }
+- Body: { title, description, startTime, endTime }
+
+POST /import-students
+- Bulk import students
+- File upload (CSV/Excel)
+- Response: { imported, skipped, errors }
+
+GET /monitoring
+- Real-time election monitoring
+- Response: { elections, voteCount, status }
+```
+
+### **Public Routes** (`/api`)
+
+```bash
+GET /election
+- List all elections
+- Response: { elections: [...] }
+
+GET /election/:id
+- Get election details
+- Response: { election, candidates }
+
+POST /student-lookup
+- Lookup student by roll
+- Body: { roll }
+- Response: { name, email, mobile }
+```
+
+---
+
+## 🧪 Testing
+
+```bash
+# Backend Tests
+cd backend
+npm test
+
+# Admin E2E Tests
+cd ../admin
+npm run test:e2e
+
+# Frontend E2E Tests
+cd ../frontend
+npm run test:e2e
+
+# Run all tests
+npm run test:all
+```
+
+---
+
+## 🔗 Blockchain Integration
+
+For immutable vote records and transparency, integrate blockchain:
+
+1. **Install Dependencies**
+   ```bash
+   npm install ethers hardhat @nomicfoundation/hardhat-toolbox
+   ```
+
+2. **Deploy Smart Contract**
+   ```bash
+   npx hardhat run scripts/deploy.js --network sepolia
+   ```
+
+3. **Update Backend Configuration**
+   ```bash
+   VOTING_CONTRACT_ADDRESS=0x...
+   SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
+   ```
+
+See `docs/BLOCKCHAIN_INTEGRATION.txt` for detailed instructions.
+
+---
+
+## 📊 Database Schema
+
+### **Voter Collection**
+```javascript
+{
+  aadhaarHash: String (unique),
+  identifierRaw: String,
+  name: String,
+  mobile: String,
+  email: String,
+  hasVoted: Boolean,
+  history: [{
+    electionId: ObjectId,
+    voteHash: String,
+    timestamp: Date
+  }],
+  verifiedAt: Date,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+### **Vote Collection**
+```javascript
+{
+  voteHash: String (unique),
+  election: ObjectId (ref: Election),
+  candidate: ObjectId (ref: Candidate),
+  timestamp: Date,
+  createdAt: Date
+}
+```
+
+### **Election Collection**
+```javascript
+{
+  title: String,
+  description: String,
+  startTime: Date,
+  endTime: Date,
+  status: String (scheduled|ongoing|ended),
+  importConcepts: Object,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+### **Student Collection (Master List)**
+```javascript
+{
+  roll: String (unique),
+  name: String,
+  fatherName: String,
+  email: String,
+  mobile: String,
+  program: String,
+  category: String,
+  batch: String,
+  photo: String,
+  voted: Boolean,
+  masterList: Boolean,
+  createdAt: Date
+}
+```
+
+---
+
+## 🛠️ Development Commands
+
+### **Backend**
+```bash
+cd backend
+
+npm run dev              # Start with nodemon
+npm test                # Run tests
+npm run seed-admin      # Create admin user
+npm run import-students # Bulk import students
+```
+
+### **Frontend**
+```bash
+cd frontend
+
+npm run dev             # Start dev server
+npm run build           # Build for production
+npm run preview         # Preview build
+npm run lint            # Run ESLint
+```
+
+### **Admin**
+```bash
+cd admin
+
+npm run dev             # Start dev server
+npm run build           # Build for production
+npm run test:e2e        # Run Cypress tests
+```
+
+---
+
+## 🔄 Deployment
+
+### **Frontend (Vercel/Netlify)**
+```bash
+cd frontend
+npm run build
+# Deploy 'dist' folder
+```
+
+### **Backend (Heroku/Railway)**
+```bash
+# Set environment variables
+# Deploy using Git push or Docker
+```
+
+### **Admin (Vercel/AWS)**
+```bash
+cd admin
+npm run build
+# Deploy 'dist' folder
+```
+
+---
+
+## 📝 Environment Variables
+
+**Backend (.env)**
+```
+MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/voting
+NODE_ENV=production
+PORT=5005
+JWT_SECRET=your_jwt_secret
+VOTE_SECRET=your_vote_secret
+
+# Email
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+
+# OTP
+OTP_TIMEOUT=300000
+OTP_MAX_ATTEMPTS=3
+
+# CORS
+CORS_ORIGIN=https://yourdomain.com,https://admin.yourdomain.com
+
+# Blockchain (Optional)
+VOTING_CONTRACT_ADDRESS=0x...
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
+PRIVATE_KEY=0x...
+
+# Security
+ALLOW_ADMIN_DEBUG=0
+ALLOW_ANY_UPLOAD=0
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### **Port Already in Use**
+```bash
+# Kill process on port 5005
+lsof -ti:5005 | xargs kill -9
+```
+
+### **MongoDB Connection Error**
+```bash
+# Ensure MongoDB is running
+mongod
+
+# Or use MongoDB Atlas
+MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/voting
+```
+
+### **OTP Not Sending**
+```bash
+# Check SMTP credentials
+# Verify email provider allows SMTP
+# Check logs for errors
+tail -f backend/logs/app.log
+```
+
+### **CORS Issues**
+```bash
+# Update CORS_ORIGIN in .env
+CORS_ORIGIN=http://localhost:5173,http://localhost:3000
+```
+
+---
+
+## 📚 Documentation
+
+- **Blockchain Integration**: `docs/BLOCKCHAIN_INTEGRATION.txt`
+- **Component Analysis**: `docs/` folder
+- **API Documentation**: See above
+- **Scripts**: `scripts/` folder
+
+---
+
+## 👥 Team & Support
+
+- **Developer**: Harsh Singh
+- **Repository**: https://github.com/KarnailSingh87/voting
+- **Issues**: Report on GitHub
+
+---
+
+## 📄 License
+
+MIT License - See LICENSE file
+
+---
+
+## ✅ Checklist for Production
+
+- [ ] Set all environment variables
+- [ ] Configure MongoDB (Atlas or local)
+- [ ] Setup email/SMS provider
+- [ ] Deploy smart contract (if using blockchain)
+- [ ] Configure CORS for production domains
+- [ ] Enable HTTPS
+- [ ] Setup monitoring & logging
+- [ ] Run security audit
+- [ ] Load testing
+- [ ] Backup strategy
+- [ ] Documentation review
+
+---
+
+**Last Updated**: February 27, 2026  
+**Status**: Production Ready ✅  
+**Version**: 1.0.0

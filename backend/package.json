@@ -25,7 +25,8 @@
     "multer": "^2.0.2",
     "nodemailer": "^7.0.12",
     "socket.io": "^4.7.5",
-    "twilio": "^5.10.6"
+    "twilio": "^5.10.6",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "baseline-browser-mapping": "^2.9.17",

@@ -57,4 +57,35 @@ describe('E2E import workflow', () => {
     expect(found).toBeDefined();
     expect(found.name).toBe('John Doe');
   }, 20000);
+
+  it('imports CSV with template-style headers (ID No, Mail ID, etc.)', async () => {
+    const token = jwt.sign({ aid: '000000000000000000000000', role: 'super_admin' }, ADMIN_SECRET, { expiresIn: '1h' });
+
+    // CSV content using the admin template headers
+    const csv = [
+      'Name,Father\'s Name,Blood Group,Mobile,Branch,Address,Category,Batch,ID No,Mail ID',
+      'Alice Kumar,Raj Kumar,B+,9876543210,CSE,MG Road Bengaluru,GEN,2023-2027,STU100,alice@example.com',
+      'Bob Singh,Harpal Singh,O+,9876543211,ECE,Model Town Delhi,SC,2023-2027,STU101,bob@example.com',
+    ].join('\n');
+    const csvBuf = Buffer.from(csv, 'utf8');
+
+    const importRes = await request(app)
+      .post('/api/admin/import-students')
+      .set('Authorization', `Bearer ${token}`)
+      .attach('file', csvBuf, { filename: 'template_students.csv', contentType: 'text/csv' });
+
+    expect(importRes.status).toBe(200);
+    expect(importRes.body.success).toBe(true);
+    expect(importRes.body.imported).toBe(2);
+
+    // verify the students were imported with correct field extraction
+    const studentsRes = await request(app).get('/api/admin/students').set('Authorization', `Bearer ${token}`).query({ q: 'STU100' });
+    expect(studentsRes.status).toBe(200);
+    const items = studentsRes.body.items || [];
+    const alice = items.find(i => i.roll === 'STU100');
+    expect(alice).toBeDefined();
+    expect(alice.name).toBe('Alice Kumar');
+    expect(alice.email).toBe('alice@example.com');
+    expect(alice.mobile).toBe('9876543210');
+  }, 20000);
 });

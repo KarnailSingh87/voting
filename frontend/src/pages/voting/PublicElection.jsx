@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { io } from 'socket.io-client';
+import PropTypes from 'prop-types';
 import { useParams, Link } from 'react-router-dom';
 import axios from '../../utils/axios';
 
@@ -34,6 +35,12 @@ const PhotoModal = ({ photoUrl, name, onClose }) => {
       </div>
     </div>
   );
+};
+
+PhotoModal.propTypes = {
+  photoUrl: PropTypes.string,
+  name: PropTypes.string,
+  onClose: PropTypes.func.isRequired,
 };
 
 const PAGE_SIZE = 20;
@@ -97,7 +104,6 @@ const PublicElection = () => {
     socket.on('disconnect', () => setSocketConnected(false));
     socket.on('vote_cast', onVote);
     return () => socket.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [election, id, candidates]);
 
   if (loading) return <div className="p-6">Loading...</div>;
@@ -120,7 +126,10 @@ const PublicElection = () => {
       <div className="bg-white shadow rounded p-4 mt-6">
         <h3 className="font-medium mb-4">
           {election.status === 'ongoing' ? (
-            <span className="flex items-center space-x-2"><span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" /> <span>Live overview</span></span>
+            <span className="flex items-center space-x-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span>Live overview {socketConnected ? '(connected)' : '(connecting...)'}</span>
+            </span>
           ) : (
             'Results'
           )}

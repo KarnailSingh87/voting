@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
 import axios from '../../utils/axios';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
@@ -33,6 +34,12 @@ const PhotoModal = ({ photoUrl, name, onClose }) => {
       </div>
     </div>
   );
+};
+
+PhotoModal.propTypes = {
+  photoUrl: PropTypes.string,
+  name: PropTypes.string,
+  onClose: PropTypes.func.isRequired,
 };
 
 const Ballot = () => {

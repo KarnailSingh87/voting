@@ -260,11 +260,22 @@ const AdminVoters = () => {
                 <tr key={s._id} className="border-b hover:bg-gray-50">
                   <td className="py-2 px-2"><input type="checkbox" checked={selected.has(s.roll)} onChange={()=>toggleSelected(s.roll)} /></td>
                   <td className="py-2 px-2">
-                    {s.photo ? (
-                      <img src={s.photo.startsWith('http') ? s.photo : `${import.meta.env.VITE_BACKEND_URL || ''}${s.photo}`} alt={s.name} className="w-10 h-10 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">N/A</div>
-                    )}
+                    {s.hasPhoto ? (
+                      <img
+                        src={`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005'}/api/admin/students/${encodeURIComponent(s.roll)}/photo?token=${localStorage.getItem('adminToken') || ''}`}
+                        alt={s.name}
+                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                        loading="lazy"
+                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                      />
+                    ) : null}
+                    <div
+                      className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-100 to-cyan-200 flex items-center justify-center text-cyan-700 text-sm font-bold border border-cyan-300"
+                      style={{ display: s.hasPhoto ? 'none' : 'flex' }}
+                      title={s.name || 'N/A'}
+                    >
+                      {s.name ? s.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : 'N/A'}
+                    </div>
                   </td>
                   <td className="py-2 px-2 font-semibold">{s.name}</td>
                   <td className="py-2 px-2">{s.fatherName || <span className="text-gray-400">—</span>}</td>

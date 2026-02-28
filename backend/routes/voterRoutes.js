@@ -1,3 +1,4 @@
+
 import express from 'express';
 import crypto from 'crypto';
 import { requestOTP, verifyOTP, hashAadhaar } from '../config/otpService.js';
@@ -5,6 +6,24 @@ import Voter from '../models/Voter.js';
 import Student from '../models/Student.js';
 import voterAuth from '../middleware/voterAuth.js';
 import jwt from 'jsonwebtoken';
+import upload from '../middleware/voterPhotoUpload.js';
+// Upload voter photo
+router.post('/upload-photo', voterAuth, upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    const voter = await Voter.findById(req.voter.id);
+    if (!voter) return res.status(404).json({ success: false, message: 'Voter not found' });
+    // Save relative path for frontend access
+    voter.photoUrl = `/uploads/voters/${req.file.filename}`;
+    await voter.save();
+    res.json({ success: true, photoUrl: voter.photoUrl });
+  } catch (e) {
+    console.error('PHOTO UPLOAD ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 const router = express.Router();
 

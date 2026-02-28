@@ -22,6 +22,14 @@ const studentSchema = new mongoose.Schema({
   elections: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Election' }],
   // whether this student belongs to the global master voter list (not tied to a specific election)
   masterList: { type: Boolean, default: false },
+  // optional per-import row ordering so admin lists can mirror file order when desired
+  importOrder: { type: Number },
 }, { timestamps: true });
+
+// Compound index used by the GET /students list query (sort by importOrder, _id).
+// _id fallback preserves insertion order which mirrors file row order.
+studentSchema.index({ importOrder: 1, _id: 1 });
+// Index for election-scoped queries
+studentSchema.index({ elections: 1 });
 
 export default mongoose.model('Student', studentSchema);
