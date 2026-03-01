@@ -10,6 +10,7 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 // Helper to get full image URL (handles both absolute and relative URLs)
 const getImageUrl = (url) => {
   if (!url) return null;
+  if (url.startsWith('data:')) return url;
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   return `${backendUrl}${url}`;
 };

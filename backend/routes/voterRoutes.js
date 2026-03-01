@@ -64,6 +64,13 @@ router.get('/profile', voterAuth, async (req, res) => {
       }).lean();
     }
     
+    // Get photo URL - prefer student photo (always freshest), fall back to voter's own upload
+    let photoUrl = studentDetails?.photo || voter.photoUrl || null;
+    // If photo is a base64 data URI, use as-is; if a relative path, prepend /uploads/
+    if (photoUrl && !photoUrl.startsWith('data:') && !photoUrl.startsWith('http') && !photoUrl.startsWith('/')) {
+      photoUrl = `/uploads/${photoUrl}`;
+    }
+    
     // Build profile response
     const profile = {
       id: voter._id,
@@ -71,7 +78,7 @@ router.get('/profile', voterAuth, async (req, res) => {
       roll: voter.identifierRaw,
       mobile: voter.mobile,
       email: voter.email || studentDetails?.email,
-      photoUrl: voter.photoUrl || studentDetails?.photo,
+      photoUrl: photoUrl,
       hasVoted: voter.hasVoted,
       verifiedAt: voter.verifiedAt,
       createdAt: voter.createdAt,
@@ -143,6 +150,22 @@ router.post('/request-otp', async (req, res) => {
       await voter.save();
     }
     
+    // Auto-sync photo from Student record if voter has no photo
+    if (!voter.photoUrl && identifier) {
+      try {
+        const r = String(identifier).trim();
+        const escRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const student = await Student.findOne({ roll: { $regex: `^${escRegExp(r)}$`, $options: 'i' } }).select('photo').lean();
+        if (student && student.photo) {
+          voter.photoUrl = student.photo;
+          await voter.save();
+          console.log(`[PHOTO-SYNC] Auto-synced photo for voter ${identifier}`);
+        }
+      } catch (photoErr) {
+        console.error('[PHOTO-SYNC] Error syncing photo:', photoErr.message);
+      }
+    }
+    
     // Determine contact based on channel preference
     const contact = channel === 'whatsapp' ? mobile : (channel === 'email' ? email : (mobile || email));
     const result = await requestOTP(identifier, contact, channel);
@@ -200,6 +223,22 @@ router.post('/verify-otp', async (req, res) => {
     const voter = await Voter.findOne({ aadhaarHash: idHash });
     if (!voter) return res.status(404).json({ message: 'Voter record missing' });
     voter.verifiedAt = new Date();
+    
+    // Auto-sync photo from Student record on every login if voter has no photo
+    if (!voter.photoUrl && identifier) {
+      try {
+        const r = String(identifier).trim();
+        const escRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const student = await Student.findOne({ roll: { $regex: `^${escRegExp(r)}$`, $options: 'i' } }).select('photo').lean();
+        if (student && student.photo) {
+          voter.photoUrl = student.photo;
+          console.log(`[PHOTO-SYNC] Auto-synced photo for voter ${identifier} on login`);
+        }
+      } catch (photoErr) {
+        console.error('[PHOTO-SYNC] Error syncing photo on login:', photoErr.message);
+      }
+    }
+    
     await voter.save();
     const token = jwt.sign({ vid: voter._id, identifierHash: idHash }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '2h' });
     res.json({ token, voter: { id: voter._id, name: voter.name, hasVoted: voter.hasVoted } });

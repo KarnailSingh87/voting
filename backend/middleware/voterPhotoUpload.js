@@ -5,7 +5,7 @@ import fs from 'fs';
 // Storage config for voter photos
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadPath = path.join(process.cwd(), 'backend', 'public', 'uploads', 'voters');
+    const uploadPath = path.join(process.cwd(), 'public', 'uploads', 'voters');
     fs.mkdirSync(uploadPath, { recursive: true });
     cb(null, uploadPath);
   },

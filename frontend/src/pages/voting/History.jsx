@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
+import VoterNavbar from '../../components/VoterNavbar';
 
 const History = () => {
   const navigate = useNavigate();
@@ -39,56 +40,9 @@ const History = () => {
     navigate(`/Voting/verify/${confirmationId}`);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('voterToken');
-    navigate('/login');
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-cyan-700">SecureVote</h1>
-              </div>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Dashboard
-                </button>
-                <button
-                  onClick={() => navigate('/history')}
-                  className="border-cyan-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Voting History
-                </button>
-                <button
-                  onClick={() => navigate('/public')}
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Public Dashboard
-                </button>
-              </div>
-            </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center">
-              <button
-                onClick={handleLogout}
-                className="ml-2 bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-              >
-                <span className="sr-only">Logout</span>
-                <span className="h-8 w-8 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-800 font-medium">
-                  Logout
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <VoterNavbar />
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">

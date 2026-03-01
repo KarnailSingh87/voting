@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import axios from '../../utils/axios';
+import VoterNavbar from '../../components/VoterNavbar';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 
 // Helper to get full image URL (handles both absolute and relative URLs)
 const getImageUrl = (url) => {
   if (!url) return null;
+  if (url.startsWith('data:')) return url;
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   return `${backendUrl}${url}`;
 };
@@ -196,29 +198,7 @@ const Ballot = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-cyan-700">SecureVote</h1>
-              </div>
-            </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="ml-2 bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-              >
-                <span className="sr-only">Back to Dashboard</span>
-                <span className="h-8 w-8 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-800 font-medium">
-                  Back
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <VoterNavbar />
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">

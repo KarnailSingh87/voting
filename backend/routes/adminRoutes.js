@@ -12,6 +12,7 @@ import Admin from '../models/Admin.js';
 import Election from '../models/Election.js';
 import Candidate from '../models/Candidate.js';
 import Student from '../models/Student.js';
+import Voter from '../models/Voter.js';
 import AdminAction from '../models/AdminAction.js';
 import { requestOTP, getOTPEntry, getWhatsAppStatus, isWhatsAppConnected, disconnectWhatsApp, initWhatsApp } from '../config/otpService.js';
 import { parseFile } from '../config/aiParser.js';
@@ -2081,6 +2082,55 @@ router.post('/whatsapp-reconnect', async (req, res) => {
   } catch (e) {
     console.error('WhatsApp reconnect error:', e);
     res.status(500).json({ success: false, message: 'Failed to reconnect WhatsApp' });
+  }
+});
+
+// Batch sync voter photos from Student records
+// Updates all voters who have no photoUrl but have a matching student with a photo
+router.post('/sync-voter-photos', adminAuth, async (req, res) => {
+  try {
+    // Find all voters without a photo who have a roll number (identifierRaw)
+    const voters = await Voter.find({ 
+      $or: [{ photoUrl: null }, { photoUrl: '' }, { photoUrl: { $exists: false } }],
+      identifierRaw: { $exists: true, $ne: null, $ne: '' }
+    });
+    
+    let synced = 0;
+    let skipped = 0;
+    let noPhoto = 0;
+    
+    for (const voter of voters) {
+      try {
+        const r = String(voter.identifierRaw).trim();
+        const escRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const student = await Student.findOne({ 
+          roll: { $regex: `^${escRegExp(r)}$`, $options: 'i' } 
+        }).select('photo').lean();
+        
+        if (student && student.photo) {
+          voter.photoUrl = student.photo;
+          await voter.save();
+          synced++;
+        } else {
+          noPhoto++;
+        }
+      } catch (e) {
+        skipped++;
+      }
+    }
+    
+    console.log(`[PHOTO-SYNC] Batch sync complete: ${synced} synced, ${noPhoto} no photo found, ${skipped} errors`);
+    res.json({ 
+      success: true, 
+      message: `Photo sync complete`, 
+      total: voters.length,
+      synced, 
+      noPhoto, 
+      skipped 
+    });
+  } catch (e) {
+    console.error('PHOTO SYNC ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
