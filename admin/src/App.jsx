@@ -13,6 +13,7 @@ import ElectionDetail from './pages/voting/ElectionDetail';
 import Monitoring from './pages/voting/Monitoring';
 import SimpleImport from './pages/voting/SimpleImport';
 import AdminVoters from './pages/voting/AdminVoters';
+import WhatsAppSettings from './pages/voting/WhatsAppSettings';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 
@@ -96,6 +97,13 @@ const App = () => {
           <Route path='/voters' element={
             <ProtectedRoute>
               <AdminVoters token={token} />
+            </ProtectedRoute>
+          }/>
+          <Route path='/whatsapp' element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <WhatsAppSettings token={token} />
+              </ErrorBoundary>
             </ProtectedRoute>
           }/>
           {/* Audit page removed */}

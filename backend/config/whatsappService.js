@@ -13,7 +13,7 @@ let isConnected = false;
 let connectionPromise = null;
 let qrCode = null;
 let retryCount = 0;
-const MAX_RETRIES = 2;
+const MAX_RETRIES = 3;
 
 // Auth state folder
 const AUTH_FOLDER = path.join(__dirname, '..', 'baileys_auth');
@@ -24,7 +24,7 @@ if (!fs.existsSync(AUTH_FOLDER)) {
 }
 
 // Create a silent logger to reduce noise
-const logger = pino({ level: 'warn' });
+const logger = pino({ level: 'silent' });
 
 // Initialize WhatsApp connection
 export async function initWhatsApp() {
@@ -36,17 +36,26 @@ export async function initWhatsApp() {
   connectionPromise = new Promise(async (resolve) => {
     try {
       const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-      const { version } = await fetchLatestBaileysVersion();
       
-      console.log('[WhatsApp] Using Baileys version:', version);
+      // Fetch latest version from WhatsApp (required to avoid 405 errors)
+      let version;
+      try {
+        const versionInfo = await fetchLatestBaileysVersion();
+        version = versionInfo.version;
+        console.log('[WhatsApp] Using version:', version);
+      } catch (e) {
+        // Fallback version if fetch fails
+        version = [2, 2413, 1];
+        console.log('[WhatsApp] Using fallback version:', version);
+      }
       
       sock = makeWASocket({
         auth: state,
         logger,
         version,
-        browser: ['Voting System', 'Chrome', '120.0.0'],
+        browser: ['Ubuntu', 'Chrome', '114.0.0'],
         connectTimeoutMs: 60000,
-        qrTimeout: 120000,
+        defaultQueryTimeoutMs: 0,
       });
 
       sock.ev.on('creds.update', saveCreds);
@@ -56,11 +65,12 @@ export async function initWhatsApp() {
         
         if (qr) {
           qrCode = qr;
-          console.log('[WhatsApp] ✅ QR Code ready! Visit http://localhost:5005/qr.html to scan');
+          console.log('[WhatsApp] ✅ QR Code ready! Scan from admin panel');
         }
 
         if (connection === 'close') {
           isConnected = false;
+          sock = null;
           
           const statusCode = lastDisconnect?.error?.output?.statusCode;
           const shouldReconnect = statusCode !== DisconnectReason.loggedOut && retryCount < MAX_RETRIES;
@@ -71,7 +81,7 @@ export async function initWhatsApp() {
             retryCount++;
             connectionPromise = null;
             console.log(`[WhatsApp] Reconnecting (${retryCount}/${MAX_RETRIES})...`);
-            setTimeout(() => initWhatsApp(), 5000);
+            setTimeout(() => initWhatsApp(), 3000);
           } else {
             connectionPromise = null;
             resolve(false);
@@ -151,11 +161,35 @@ export function isWhatsAppConnected() {
 
 // Disconnect WhatsApp
 export async function disconnectWhatsApp() {
-  if (sock) {
-    await sock.logout();
-    sock = null;
+  try {
+    if (sock) {
+      try {
+        await sock.logout();
+      } catch (e) {
+        console.log('[WhatsApp] Logout error (may already be disconnected):', e.message);
+      }
+      sock = null;
+    }
     isConnected = false;
     qrCode = null;
     connectionPromise = null;
+    retryCount = 0;
+    
+    // Clear auth folder to force new QR code on next connection
+    if (fs.existsSync(AUTH_FOLDER)) {
+      const files = fs.readdirSync(AUTH_FOLDER);
+      for (const file of files) {
+        fs.unlinkSync(path.join(AUTH_FOLDER, file));
+      }
+      console.log('[WhatsApp] Auth folder cleared');
+    }
+    
+    // Reinitialize to get new QR code
+    setTimeout(() => {
+      initWhatsApp();
+    }, 1000);
+  } catch (e) {
+    console.error('[WhatsApp] Disconnect error:', e.message);
+    throw e;
   }
 }

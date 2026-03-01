@@ -13,7 +13,7 @@ import Election from '../models/Election.js';
 import Candidate from '../models/Candidate.js';
 import Student from '../models/Student.js';
 import AdminAction from '../models/AdminAction.js';
-import { requestOTP, getOTPEntry, getWhatsAppStatus, isWhatsAppConnected } from '../config/otpService.js';
+import { requestOTP, getOTPEntry, getWhatsAppStatus, isWhatsAppConnected, disconnectWhatsApp, initWhatsApp } from '../config/otpService.js';
 import { parseFile } from '../config/aiParser.js';
 import QRCode from 'qrcode';
 
@@ -2051,5 +2051,37 @@ router.get('/whatsapp-qr', async (req, res) => {
   }
 });
 
-export default router;
+// Disconnect WhatsApp (remove connected device)
+router.post('/whatsapp-disconnect', async (req, res) => {
+  try {
+    await disconnectWhatsApp();
+    res.json({ 
+      success: true, 
+      message: 'WhatsApp disconnected successfully. You can now scan a new QR code to reconnect.' 
+    });
+  } catch (e) {
+    console.error('WhatsApp disconnect error:', e);
+    res.status(500).json({ success: false, message: 'Failed to disconnect WhatsApp' });
+  }
+});
 
+// Reconnect/reinitialize WhatsApp
+router.post('/whatsapp-reconnect', async (req, res) => {
+  try {
+    await initWhatsApp();
+    const status = getWhatsAppStatus();
+    res.json({ 
+      success: true, 
+      connected: status.connected,
+      hasQR: !!status.qrCode,
+      message: status.connected 
+        ? 'WhatsApp reconnected successfully' 
+        : 'WhatsApp reinitializing. Check for QR code.'
+    });
+  } catch (e) {
+    console.error('WhatsApp reconnect error:', e);
+    res.status(500).json({ success: false, message: 'Failed to reconnect WhatsApp' });
+  }
+});
+
+export default router;
