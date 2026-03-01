@@ -21,9 +21,11 @@ const AdminDashboard = () => {
         if (err.response?.status === 401) {
           // Token expired or invalid, redirect to login
           localStorage.removeItem('adminToken');
-          window.location.href = '/admin/login';
+          window.location.href = '/login';
+        } else if (err.code === 'ERR_NETWORK') {
+          setError('Cannot connect to server. Make sure backend is running.');
         } else {
-          setError('Failed to fetch dashboard data');
+          setError(err.response?.data?.message || 'Failed to fetch dashboard data');
         }
       } finally {
         setLoading(false);

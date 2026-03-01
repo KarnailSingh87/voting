@@ -56,7 +56,14 @@ const PublicDashboard = () => {
   const [elections, setElections] = useState([]);
   const [electionFilter, setElectionFilter] = useState('all');
   const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   // retry UI states removed — retries now run silently in background
+
+  // Check if user is logged in
+  useEffect(() => {
+    const token = localStorage.getItem('voterToken');
+    setIsLoggedIn(!!token);
+  }, []);
 
   useEffect(() => {
     // Initialize WebSocket connection (stats updates only)
@@ -211,6 +218,15 @@ const PublicDashboard = () => {
     navigate('/login');
   };
 
+  const handleGoToDashboard = () => {
+    navigate('/dashboard');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('voterToken');
+    setIsLoggedIn(false);
+    navigate('/login');
+  };
   if (loading && !stats) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -248,16 +264,33 @@ const PublicDashboard = () => {
                 </button>
               </div>
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center">
-              <button
-                onClick={handleLogin}
-                className="ml-2 bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-              >
-                <span className="sr-only">Login</span>
-                <span className="h-8 w-8 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-800 font-medium">
-                  Login
-                </span>
-              </button>
+            <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-2">
+              {isLoggedIn ? (
+                <>
+                  <button
+                    onClick={handleGoToDashboard}
+                    className="bg-cyan-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                  >
+                    Dashboard
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="bg-white text-gray-700 px-4 py-2 rounded-md text-sm font-medium border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleLogin}
+                  className="ml-2 bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                >
+                  <span className="sr-only">Login</span>
+                  <span className="h-8 w-8 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-800 font-medium">
+                    Login
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </div>

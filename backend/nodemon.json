@@ -1,0 +1,5 @@
+{
+  "watch": ["server.js", "routes", "middleware", "models", "config"],
+  "ignore": ["baileys_auth/*", "logs/*", "public/*", "tests/*", "node_modules/*"],
+  "ext": "js,json"
+}

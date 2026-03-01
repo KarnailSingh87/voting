@@ -16,16 +16,16 @@ let isEthereal = false;
 
 // Initialize OTP service (call during app startup so transporter is ready before requests)
 export async function initOTPService() {
-  // Initialize WhatsApp connection for OTP delivery (non-blocking)
-  console.log('[OTP] Initializing WhatsApp service in background...');
+  // Initialize WhatsApp connection for OTP delivery
+  console.log('[OTP] Starting WhatsApp initialization...');
   initWhatsApp().then(connected => {
     if (connected) {
-      console.log('[OTP] WhatsApp ready for OTP delivery');
+      console.log('[OTP] ✅ WhatsApp connected for OTP delivery');
     } else {
-      console.log('[OTP] WhatsApp not connected - OTPs will be logged to console');
+      console.log('[OTP] ⚠️  WhatsApp not connected - visit http://localhost:5005/qr.html to scan QR');
     }
   }).catch(err => {
-    console.error('[OTP] WhatsApp init error:', err && err.message ? err.message : err);
+    console.error('[OTP] WhatsApp init error:', err.message);
   });
 
   // If explicit SMTP creds are provided, use them (as fallback)
@@ -62,7 +62,6 @@ export async function initOTPService() {
         },
       });
       isEthereal = true;
-      if (process.env.NODE_ENV !== 'test') console.log('[OTP] Ethereal test account created for development:', testAccount.user);
       return;
     } catch (err) {
       console.error('[OTP] Failed to create Ethereal test account:', err && err.message ? err.message : err);

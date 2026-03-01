@@ -121,7 +121,16 @@ router.post('/request-otp', async (req, res) => {
       if (contactType === 'email' || sentContact.includes('@')) maskedContact = maskEmail(String(sentContact));
       else maskedContact = maskPhone(String(sentContact)); // handles both 'whatsapp' and 'sms' types
     }
-    return res.json({ message: 'OTP sent', identifierHash: idHash, sentTo: maskedContact, contactType });
+    
+    // In development mode, include OTP in response for testing
+    const isDev = process.env.NODE_ENV !== 'production';
+    const response = { message: 'OTP sent', identifierHash: idHash, sentTo: maskedContact, contactType };
+    if (isDev) {
+      const { getOTPEntry } = await import('../config/otpService.js');
+      const entry = getOTPEntry(identifier);
+      if (entry) response.devOTP = entry.otp;
+    }
+    return res.json(response);
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });

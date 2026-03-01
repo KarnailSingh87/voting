@@ -64,8 +64,7 @@ const io = new Server(server, { cors: { origin: process.env.CORS_ORIGIN?.split('
 app.set('io', io);
 
 io.on('connection', (socket) => {
-  console.log('Socket connected', socket.id);
-  socket.on('disconnect', () => console.log('Socket disconnected', socket.id));
+  socket.on('disconnect', () => {});
 });
 
 const PORT = Number(process.env.PORT) || 5005;
@@ -92,10 +91,9 @@ async function startServer() {
         try {
           const updated = await Election.findByIdAndUpdate(e._id, { status: 'ongoing' }, { new: true });
           if (updated) {
-            console.log('Auto-started election', updated._id.toString());
             try { io.emit('election_status', { id: updated._id.toString(), status: updated.status }); } catch(_){}
           }
-        } catch (err) { console.warn('Failed to auto-start election', e._id.toString(), err && err.message ? err.message : err); }
+        } catch (err) { /* silent */ }
       }
 
       // End elections that are ongoing and whose endTime <= now
@@ -104,49 +102,42 @@ async function startServer() {
         try {
           const updated = await Election.findByIdAndUpdate(e._id, { status: 'ended' }, { new: true });
           if (updated) {
-            console.log('Auto-ended election', updated._id.toString());
             try { io.emit('election_status', { id: updated._id.toString(), status: updated.status }); } catch(_){}
           }
-        } catch (err) { console.warn('Failed to auto-end election', e._id.toString(), err && err.message ? err.message : err); }
+        } catch (err) { /* silent */ }
       }
     } catch (err) {
-      console.warn('Election scheduler error', err && err.message ? err.message : err);
+      /* silent */
     }
   };
 
   // Start periodic scheduler
   try {
     setInterval(runScheduler, scheduleIntervalMs);
-    // Run once at startup
     runScheduler().catch(() => {});
-    console.log('Election scheduler started (interval ms):', scheduleIntervalMs);
   } catch (err) {
-    console.warn('Failed to start election scheduler', err && err.message ? err.message : err);
+    /* silent */
   }
 
-  const maxAttempts = 5; // try this port + up to maxAttempts-1 additional ports
+  const maxAttempts = 5;
   const tryListen = (port, attemptsLeft) => {
-    // Attach a one-time error handler for this listen attempt
     server.once('error', (err) => {
       if (err && err.code === 'EADDRINUSE') {
-        console.warn(`Port ${port} is in use.`);
         if (attemptsLeft > 0) {
           const nextPort = port + 1;
-          console.log(`Attempting to listen on port ${nextPort} (${attemptsLeft - 1} attempts left)...`);
-          // small delay before retrying to avoid tight loop
           setTimeout(() => tryListen(nextPort, attemptsLeft - 1), 100);
         } else {
-          console.error(`All ${maxAttempts} port attempts failed. Please free a port or set PORT env variable to an available port.`);
+          console.error('All port attempts failed. Set PORT env variable to an available port.');
           process.exit(1);
         }
       } else {
-        console.error('Server error during listen:', err);
+        console.error('Server error:', err);
         process.exit(1);
       }
     });
 
     server.listen(port, () => {
-      console.log(`Voting backend running on :${port}`);
+      console.log(`🚀 Server running on http://localhost:${port}`);
     });
   };
 

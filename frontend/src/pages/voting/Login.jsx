@@ -54,10 +54,17 @@ const Login = () => {
     setMessage('');
     try {
       // Send OTP via WhatsApp (mobile number) instead of email
-      await axios.post('/api/voter/request-otp', { roll, name, mobile, channel: 'whatsapp' });
+      const res = await axios.post('/api/voter/request-otp', { roll, name, mobile, channel: 'whatsapp' });
       setStage('otp');
-      setMessage(`OTP sent to WhatsApp: ${maskMobile(mobile)}`);
-      toast.success('OTP sent via WhatsApp');
+      // In dev mode, show the OTP directly if available
+      const devOtp = res.data?.devOTP;
+      if (devOtp) {
+        setMessage(`OTP sent to WhatsApp: ${maskMobile(mobile)} | Dev OTP: ${devOtp}`);
+        toast.success(`OTP: ${devOtp}`);
+      } else {
+        setMessage(`OTP sent to WhatsApp: ${maskMobile(mobile)}`);
+        toast.success('OTP sent via WhatsApp');
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to request OTP';
       setError(msg);
@@ -75,8 +82,15 @@ const Login = () => {
     try {
       // Send OTP via WhatsApp
       const mobileToUse = providedMobile || mobile;
-      await axios.post('/api/voter/request-otp', { roll, name, mobile: mobileToUse, channel: 'whatsapp' });
-      setMessage(`OTP sent to WhatsApp: ${maskMobile(mobileToUse)}. Preparing OTP entry...`);
+      const res = await axios.post('/api/voter/request-otp', { roll, name, mobile: mobileToUse, channel: 'whatsapp' });
+      // In dev mode, show the OTP directly if available
+      const devOtp = res.data?.devOTP;
+      if (devOtp) {
+        setMessage(`OTP sent to WhatsApp: ${maskMobile(mobileToUse)} | Dev OTP: ${devOtp}`);
+        toast.success(`OTP: ${devOtp}`);
+      } else {
+        setMessage(`OTP sent to WhatsApp: ${maskMobile(mobileToUse)}. Preparing OTP entry...`);
+      }
       // delay briefly so user sees the confirmation
       if (pendingStageTimer.current) clearTimeout(pendingStageTimer.current);
       pendingStageTimer.current = setTimeout(() => setStage('otp'), 800);

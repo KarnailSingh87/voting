@@ -24,17 +24,21 @@ if (!fs.existsSync(AUTH_FOLDER)) {
 }
 
 // Create a silent logger to reduce noise
-const logger = pino({ level: 'silent' });
+const logger = pino({ level: 'warn' });
 
 // Initialize WhatsApp connection
 export async function initWhatsApp() {
   if (connectionPromise) return connectionPromise;
   if (isConnected) return true;
   
+  console.log('[WhatsApp] Initializing connection...');
+  
   connectionPromise = new Promise(async (resolve) => {
     try {
       const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
       const { version } = await fetchLatestBaileysVersion();
+      
+      console.log('[WhatsApp] Using Baileys version:', version);
       
       sock = makeWASocket({
         auth: state,
@@ -42,7 +46,7 @@ export async function initWhatsApp() {
         version,
         browser: ['Voting System', 'Chrome', '120.0.0'],
         connectTimeoutMs: 60000,
-        qrTimeout: 60000,
+        qrTimeout: 120000,
       });
 
       sock.ev.on('creds.update', saveCreds);
@@ -52,13 +56,7 @@ export async function initWhatsApp() {
         
         if (qr) {
           qrCode = qr;
-          console.log('\n[WhatsApp] ========================================');
-          console.log('[WhatsApp] 📱 QR CODE READY! Scan with WhatsApp:');
-          console.log('[WhatsApp] 1. Open WhatsApp on your phone');
-          console.log('[WhatsApp] 2. Go to Settings → Linked Devices');
-          console.log('[WhatsApp] 3. Tap "Link a Device"');
-          console.log('[WhatsApp] 4. Scan this QR or visit: /api/admin/whatsapp-qr');
-          console.log('[WhatsApp] ========================================\n');
+          console.log('[WhatsApp] ✅ QR Code ready! Visit http://localhost:5005/qr.html to scan');
         }
 
         if (connection === 'close') {
@@ -72,10 +70,9 @@ export async function initWhatsApp() {
           if (shouldReconnect) {
             retryCount++;
             connectionPromise = null;
-            console.log(`[WhatsApp] Will retry (${retryCount}/${MAX_RETRIES}) in 10 seconds...`);
-            setTimeout(() => initWhatsApp(), 10000);
+            console.log(`[WhatsApp] Reconnecting (${retryCount}/${MAX_RETRIES})...`);
+            setTimeout(() => initWhatsApp(), 5000);
           } else {
-            console.log('[WhatsApp] ⚠️  Not connected - OTPs will be logged to console');
             connectionPromise = null;
             resolve(false);
           }
@@ -83,7 +80,7 @@ export async function initWhatsApp() {
           isConnected = true;
           qrCode = null;
           retryCount = 0;
-          console.log('[WhatsApp] ✅ Connected! Ready to send OTPs via WhatsApp.');
+          console.log('[WhatsApp] ✅ Connected successfully!');
           resolve(true);
         }
       });
