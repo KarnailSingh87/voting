@@ -943,38 +943,149 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
 
     // continue processing when not preview or when parsing succeeded
 
-    // attempt to load with exceljs to extract embedded images (best-effort)
-    let imagesMap = {}; // key: `${sheetName}:${row}:${col}` -> { buffer, extension }
+    // ── Extract embedded images from xlsx (best-effort) ─────────────────
+    // Strategy:
+    //  1. Use ExcelJS getImages() to map images to cell positions
+    //  2. Fallback: directly parse the xlsx ZIP to find xl/media/* images
+    //     and xl/drawings/drawing*.xml to map image→cell anchor positions
+    //  3. Build imagesMap keyed by row number (1-based, matching sheet rows)
+    //     so that each data row can look up its embedded photo.
+    let imagesMap = {}; // key: row number (1-based) -> { buffer, extension }
+    let imagesRowMap = {}; // key: row number (1-based) -> { buffer, extension }
     try {
-      // dynamic import so tests / env without exceljs still run
-      let ExcelJS;
-      try { ExcelJS = (await import('exceljs')).default || (await import('exceljs')); } catch (ie) { ExcelJS = null; }
+      const ExcelJS = (await import('exceljs')).default || (await import('exceljs'));
       if (ExcelJS) {
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(req.file.buffer);
         const worksheet = workbook.getWorksheet(sheetName);
+
+        // Approach 1: ExcelJS getImages() API
         if (worksheet && typeof worksheet.getImages === 'function') {
           const imgEntries = worksheet.getImages();
+          const media = workbook.model?.media || [];
+          console.log(`[IMAGE-EXTRACT] ExcelJS found ${imgEntries.length} images, ${media.length} media entries`);
           for (const img of imgEntries) {
             try {
               const range = img.range;
-              const tl = range.tl || range.topLeft || range;
-              const row = tl.nativeRow || tl.row || (tl.r != null ? tl.r : null);
-              const col = tl.nativeCol || tl.col || (tl.c != null ? tl.c : null);
-              const r = row != null ? Number(row) : null;
-              const c = col != null ? Number(col) : null;
-              const image = workbook.model.media.find(m => m.index === img.imageId || m.id === img.imageId || m.index === img.imageId+1);
-              if (image && r && c) {
-                const ext = (image.type || image.extension || '').replace(/\./g,'') || (image.extension || 'png');
-                imagesMap[`${sheetName}:${r}:${c}`] = { buffer: image.buffer || image._buffer || null, extension: ext };
+              // ExcelJS stores coordinates in range.tl (top-left)
+              // nativeRow/nativeCol are 0-based sheet coordinates
+              const tl = range?.tl || range;
+              let row = null;
+              if (tl.nativeRow != null) row = Number(tl.nativeRow);
+              else if (tl.row != null) row = Number(tl.row);
+              
+              // Find the media buffer — try multiple ID matching strategies
+              const imgId = img.imageId;
+              let image = media.find(m => m.index === imgId);
+              if (!image) image = media.find(m => m.index === imgId + 1);
+              if (!image) image = media.find(m => m.id === imgId);
+              if (!image && media[imgId]) image = media[imgId];
+              
+              if (image && row != null) {
+                const buf = image.buffer || image._buffer;
+                if (buf) {
+                  const ext = (image.extension || image.type || 'png').replace(/\./g, '');
+                  // nativeRow is 0-based; store as 1-based sheet row
+                  const sheetRow = row + 1;
+                  imagesRowMap[sheetRow] = { buffer: buf, extension: ext };
+                }
               }
-            } catch (ie) { /* ignore image mapping errors */ }
+            } catch (ie) { /* skip this image */ }
+          }
+          console.log(`[IMAGE-EXTRACT] Mapped ${Object.keys(imagesRowMap).length} images to rows via ExcelJS`);
+        }
+
+        // Approach 2: Direct ZIP parsing fallback if ExcelJS didn't find images
+        if (Object.keys(imagesRowMap).length === 0) {
+          try {
+            const zip = await JSZip.loadAsync(req.file.buffer);
+            
+            // 1. Extract all media files from xl/media/
+            const mediaFiles = {}; // e.g. { 'image1': { buffer, ext } }
+            for (const [filename, file] of Object.entries(zip.files)) {
+              if (filename.startsWith('xl/media/') && !file.dir) {
+                const buf = await file.async('nodebuffer');
+                const base = path.basename(filename);
+                const extMatch = base.match(/\.(\w+)$/);
+                const ext = extMatch ? extMatch[1] : 'png';
+                const nameNoExt = base.replace(/\.\w+$/, '');
+                mediaFiles[nameNoExt] = { buffer: buf, extension: ext };
+              }
+            }
+            console.log(`[IMAGE-EXTRACT] ZIP: found ${Object.keys(mediaFiles).length} media files`);
+            
+            // 2. Parse drawing relationships to map rId -> media filename
+            const rIdToMedia = {}; // { 'rId1': 'image1' }
+            for (const [filename, file] of Object.entries(zip.files)) {
+              if (filename.match(/xl\/drawings\/_rels\/drawing\d*\.xml\.rels$/)) {
+                const xml = await file.async('string');
+                // Extract <Relationship Id="rId1" Target="../media/image1.png"/>
+                const relRegex = /Id="(rId\d+)"[^>]*Target="[^"]*\/media\/([^"]+)"/g;
+                let m;
+                while ((m = relRegex.exec(xml)) !== null) {
+                  const rId = m[1];
+                  const mediaFile = m[2].replace(/\.\w+$/, '');
+                  rIdToMedia[rId] = mediaFile;
+                }
+              }
+            }
+            
+            // 3. Parse drawing XML to map images to row anchors
+            for (const [filename, file] of Object.entries(zip.files)) {
+              if (filename.match(/xl\/drawings\/drawing\d*\.xml$/)) {
+                const xml = await file.async('string');
+                // Two-cell anchors: <xdr:twoCellAnchor>...<xdr:from><xdr:row>N</xdr:row>...<a:blip r:embed="rIdN"/>
+                // One-cell anchors: <xdr:oneCellAnchor>...<xdr:from><xdr:row>N</xdr:row>...
+                const anchorRegex = /<xdr:(?:twoCellAnchor|oneCellAnchor)[^>]*>([\s\S]*?)<\/xdr:(?:twoCellAnchor|oneCellAnchor)>/g;
+                let anchor;
+                while ((anchor = anchorRegex.exec(xml)) !== null) {
+                  const block = anchor[1];
+                  // Get row from <xdr:from><xdr:row>N</xdr:row>
+                  const rowMatch = block.match(/<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/);
+                  // Get rId from r:embed="rIdN"
+                  const embedMatch = block.match(/r:embed="(rId\d+)"/);
+                  if (rowMatch && embedMatch) {
+                    const anchorRow = parseInt(rowMatch[1], 10); // 0-based
+                    const rId = embedMatch[1];
+                    const mediaName = rIdToMedia[rId];
+                    if (mediaName && mediaFiles[mediaName]) {
+                      const sheetRow = anchorRow + 1; // convert to 1-based
+                      imagesRowMap[sheetRow] = mediaFiles[mediaName];
+                    }
+                  }
+                }
+              }
+            }
+            console.log(`[IMAGE-EXTRACT] ZIP drawing parse: mapped ${Object.keys(imagesRowMap).length} images to rows`);
+            
+            // 4. Ultimate fallback: if we have images but no drawing anchors,
+            //    assume images are in order, one per data row (skip header row)
+            if (Object.keys(imagesRowMap).length === 0 && Object.keys(mediaFiles).length > 0) {
+              const sorted = Object.keys(mediaFiles).sort((a, b) => {
+                const na = parseInt(a.replace(/\D/g, ''), 10) || 0;
+                const nb = parseInt(b.replace(/\D/g, ''), 10) || 0;
+                return na - nb;
+              });
+              console.log(`[IMAGE-EXTRACT] Fallback: assigning ${sorted.length} images sequentially to rows`);
+              for (let idx = 0; idx < sorted.length; idx++) {
+                // row 1 is header, so first data row is 2
+                imagesRowMap[idx + 2] = mediaFiles[sorted[idx]];
+              }
+            }
+          } catch (zipErr) {
+            console.warn('[IMAGE-EXTRACT] ZIP fallback failed:', zipErr.message || zipErr);
           }
         }
       }
     } catch (e) {
-      console.warn('ExcelJS image extraction failed (optional):', e && e.message ? e.message : e);
+      console.warn('[IMAGE-EXTRACT] Image extraction failed (optional):', e?.message || e);
     }
+    // Build legacy imagesMap format for backward compatibility
+    // Convert row-based map to sheet:row:col format (use col=0 as wildcard)
+    for (const [row, img] of Object.entries(imagesRowMap)) {
+      imagesMap[`${sheetName}:${row}:0`] = img;
+    }
+    console.log(`[IMAGE-EXTRACT] Total images mapped: ${Object.keys(imagesRowMap).length}`);
 
   // compute roll column index if provided
     let rollColIndex = null;
@@ -1121,9 +1232,13 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
     }
   }
 
+  // Track how many leading rows were skipped so image row mapping stays accurate
+  let headerRowOffset = 0;
+
   // If the best header row is NOT the first row, rebuild rawRows and data
   if (bestHeaderIdx > 0 && bestHeaderHits >= 2) {
     console.log(`Header row auto-detected at rawRows[${bestHeaderIdx}] (${bestHeaderHits} keyword hits). Discarding ${bestHeaderIdx} leading row(s).`);
+    headerRowOffset = bestHeaderIdx;
     rawRows = rawRows.slice(bestHeaderIdx); // header row is now rawRows[0]
     // rebuild data from corrected rawRows
     data = [];
@@ -1376,18 +1491,28 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
             if (/^https?:\/\/.+\.(jpg|jpeg|png|gif|svg)(\?.*)?$/i.test(v)) { photo = v; break; }
           }
         }
-        // embedded images: check imagesMap for this sheet row/col (best-effort)
-        if (!photo && imagesMap) {
-          const sheetRow = i + 1; // rawRows index i corresponds to sheet row i+1
-          for (let j = 0; j < arrRow.length; j++) {
-            const key = `${sheetName}:${sheetRow}:${j+1}`;
-            const img = imagesMap[key];
-            if (img && img.buffer) {
-              try {
-                const b64 = Buffer.from(img.buffer).toString('base64');
-                photo = `data:image/${img.extension};base64,${b64}`;
-                break;
-              } catch (e) { /* ignore */ }
+        // embedded images: check imagesRowMap for this sheet row (best-effort)
+        if (!photo && imagesRowMap) {
+          const sheetRow = i + 1 + headerRowOffset; // rawRows index i -> original sheet row (1-based)
+          const img = imagesRowMap[sheetRow];
+          if (img && img.buffer) {
+            try {
+              const b64 = Buffer.from(img.buffer).toString('base64');
+              photo = `data:image/${img.extension};base64,${b64}`;
+            } catch (e) { /* ignore */ }
+          }
+          // Also try legacy column-based lookup
+          if (!photo) {
+            for (let j = 0; j < arrRow.length; j++) {
+              const key = `${sheetName}:${sheetRow}:${j+1}`;
+              const colImg = imagesMap[key];
+              if (colImg && colImg.buffer) {
+                try {
+                  const b64 = Buffer.from(colImg.buffer).toString('base64');
+                  photo = `data:image/${colImg.extension};base64,${b64}`;
+                  break;
+                } catch (e) { /* ignore */ }
+              }
             }
           }
         }
@@ -1547,18 +1672,28 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
             if (/^https?:\/\/.+\.(jpg|jpeg|png|gif|svg)(\?.*)?$/i.test(v)) { photo = v; break; }
           }
         }
-        // embedded images: check imagesMap for this sheet row/col (best-effort)
-        if (!photo && imagesMap) {
-          const sheetRow = i + 2; // headered rows start at sheet row 2
-          for (let j = 0; j < arrRow.length; j++) {
-            const key = `${sheetName}:${sheetRow}:${j+1}`;
-            const img = imagesMap[key];
-            if (img && img.buffer) {
-              try {
-                const b64 = Buffer.from(img.buffer).toString('base64');
-                photo = `data:image/${img.extension};base64,${b64}`;
-                break;
-              } catch (e) { /* ignore */ }
+        // embedded images: check imagesRowMap for this sheet row (best-effort)
+        if (!photo && imagesRowMap) {
+          const sheetRow = i + 2 + headerRowOffset; // data[i] -> rawRows[i+1] -> original sheet row (1-based)
+          const img = imagesRowMap[sheetRow];
+          if (img && img.buffer) {
+            try {
+              const b64 = Buffer.from(img.buffer).toString('base64');
+              photo = `data:image/${img.extension};base64,${b64}`;
+            } catch (e) { /* ignore */ }
+          }
+          // Also try legacy column-based lookup
+          if (!photo) {
+            for (let j = 0; j < arrRow.length; j++) {
+              const key = `${sheetName}:${sheetRow}:${j+1}`;
+              const colImg = imagesMap[key];
+              if (colImg && colImg.buffer) {
+                try {
+                  const b64 = Buffer.from(colImg.buffer).toString('base64');
+                  photo = `data:image/${colImg.extension};base64,${b64}`;
+                  break;
+                } catch (e) { /* ignore */ }
+              }
             }
           }
         }
@@ -1711,8 +1846,33 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
       if (io) io.emit('master_list_updated', { imported, skipped, at: new Date().toISOString() });
     } catch (e) { console.warn('Failed to emit master_list_updated', e.message || e); }
 
+    // Auto-sync photos to existing voter records after import
+    let photosSynced = 0;
     try {
-      res.json({ success: true, imported, skipped, skippedRows: skippedRows.length > 0 ? skippedRows.slice(0, 10) : [] });
+      const voters = await Voter.find({
+        identifierRaw: { $exists: true, $ne: null, $ne: '' }
+      });
+      for (const voter of voters) {
+        try {
+          const r = String(voter.identifierRaw).trim();
+          const escRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const student = await Student.findOne({
+            roll: { $regex: `^${escRegExp(r)}$`, $options: 'i' }
+          }).select('photo').lean();
+          if (student && student.photo && student.photo !== voter.photoUrl) {
+            voter.photoUrl = student.photo;
+            await voter.save();
+            photosSynced++;
+          }
+        } catch (_) { /* skip individual voter errors */ }
+      }
+      if (photosSynced > 0) console.log(`[PHOTO-SYNC] Auto-synced ${photosSynced} voter photos after import`);
+    } catch (syncErr) {
+      console.warn('[PHOTO-SYNC] Auto-sync after import failed:', syncErr.message || syncErr);
+    }
+
+    try {
+      res.json({ success: true, imported, skipped, photosSynced, skippedRows: skippedRows.length > 0 ? skippedRows.slice(0, 10) : [] });
     } catch (jsonErr) {
       console.error('Failed to serialize import response:', jsonErr.message || jsonErr);
       // Fallback: return without skippedRows detail
@@ -2086,14 +2246,17 @@ router.post('/whatsapp-reconnect', async (req, res) => {
 });
 
 // Batch sync voter photos from Student records
-// Updates all voters who have no photoUrl but have a matching student with a photo
+// Updates voters from matching student photo. Use force=true to overwrite existing voter photos.
 router.post('/sync-voter-photos', adminAuth, async (req, res) => {
   try {
-    // Find all voters without a photo who have a roll number (identifierRaw)
-    const voters = await Voter.find({ 
-      $or: [{ photoUrl: null }, { photoUrl: '' }, { photoUrl: { $exists: false } }],
-      identifierRaw: { $exists: true, $ne: null, $ne: '' }
-    });
+    const force = req.body.force === true || req.body.force === 'true';
+    
+    // Find voters — if force, get ALL voters with a roll; otherwise only those without photo
+    const query = { identifierRaw: { $exists: true, $ne: null, $ne: '' } };
+    if (!force) {
+      query.$or = [{ photoUrl: null }, { photoUrl: '' }, { photoUrl: { $exists: false } }];
+    }
+    const voters = await Voter.find(query);
     
     let synced = 0;
     let skipped = 0;
@@ -2119,7 +2282,7 @@ router.post('/sync-voter-photos', adminAuth, async (req, res) => {
       }
     }
     
-    console.log(`[PHOTO-SYNC] Batch sync complete: ${synced} synced, ${noPhoto} no photo found, ${skipped} errors`);
+    console.log(`[PHOTO-SYNC] Batch sync complete: ${synced} synced, ${noPhoto} no photo found, ${skipped} errors (force=${force})`);
     res.json({ 
       success: true, 
       message: `Photo sync complete`, 
