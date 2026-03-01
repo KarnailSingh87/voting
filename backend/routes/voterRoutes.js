@@ -38,6 +38,7 @@ router.get('/history', voterAuth, async (req, res) => {
       confirmationId: h.voteHash, 
       voteHash: h.voteHash,
       timestamp: h.timestamp,
+      electionId: h.electionId?._id || h.electionId,
       election: h.electionId ? { title: h.electionId.title } : { title: 'Unknown Election' }
     }));
     
