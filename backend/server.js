@@ -18,10 +18,23 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(helmet({ 
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+    }
+  }
+}));
 
 // Serve uploaded files (candidate photos etc.) from public/uploads at /uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
+
+// Serve static HTML files from public folder
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 // Routes
 app.use('/api/voter', voterRoutes);

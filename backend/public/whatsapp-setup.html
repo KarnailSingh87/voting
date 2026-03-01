@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Setup - Voting System</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 {
+            color: #128C7E;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        #qr-container {
+            margin: 20px 0;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #qr-image {
+            max-width: 300px;
+            border-radius: 10px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.waiting {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .instructions {
+            text-align: left;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .instructions ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 10px 0;
+            color: #333;
+        }
+        .refresh-btn {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .refresh-btn:hover {
+            background: #128C7E;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #25D366;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 WhatsApp Setup</h1>
+        <p class="subtitle">Connect WhatsApp to send OTPs</p>
+        
+        <div id="status" class="status waiting">Checking connection...</div>
+        
+        <div id="qr-container">
+            <div class="loader"></div>
+        </div>
+        
+        <div class="instructions" id="instructions">
+            <strong>How to connect:</strong>
+            <ol>
+                <li>Open <strong>WhatsApp</strong> on your phone</li>
+                <li>Go to <strong>Settings → Linked Devices</strong></li>
+                <li>Tap <strong>"Link a Device"</strong></li>
+                <li>Scan the QR code above</li>
+            </ol>
+        </div>
+        
+        <button class="refresh-btn" onclick="checkStatus()">🔄 Refresh</button>
+    </div>
+
+    <script>
+        async function checkStatus() {
+            const statusEl = document.getElementById('status');
+            const qrContainer = document.getElementById('qr-container');
+            const instructions = document.getElementById('instructions');
+            
+            console.log('Fetching QR...');
+            
+            try {
+                const response = await fetch('/api/admin/whatsapp-qr', {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store'
+                });
+                
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Data:', data);
+                
+                if (data.connected) {
+                    statusEl.className = 'status connected';
+                    statusEl.innerHTML = '✅ WhatsApp Connected! OTPs will be sent via WhatsApp.';
+                    qrContainer.innerHTML = '<div style="font-size: 80px;">✅</div>';
+                    instructions.style.display = 'none';
+                } else if (data.qrCode) {
+                    statusEl.className = 'status waiting';
+                    statusEl.innerHTML = '📱 Scan QR code with WhatsApp';
+                    qrContainer.innerHTML = '<img id="qr-image" src="' + data.qrCode + '" alt="WhatsApp QR Code">';
+                    instructions.style.display = 'block';
+                } else {
+                    statusEl.className = 'status waiting';
+                    statusEl.innerHTML = '⏳ ' + (data.message || 'Waiting for QR code...');
+                    qrContainer.innerHTML = '<div class="loader"></div>';
+                    instructions.style.display = 'block';
+                    // Auto-retry after 3 seconds
+                    setTimeout(checkStatus, 3000);
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                statusEl.className = 'status error';
+                statusEl.innerHTML = '❌ Error: ' + error.message;
+                qrContainer.innerHTML = '<div style="font-size: 60px;">⚠️</div>';
+            }
+        }
+        
+        // Check status on load
+        window.onload = checkStatus;
+        
+        // Auto-refresh every 8 seconds
+        setInterval(checkStatus, 8000);
+    </script>
+</body>
+</html>

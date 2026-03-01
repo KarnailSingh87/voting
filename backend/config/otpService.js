@@ -1,7 +1,8 @@
-// Aadhaar & OTP service with Twilio SMS
+// Aadhaar & OTP service with WhatsApp (primary) and Twilio SMS fallback
 import crypto from 'crypto';
 import twilio from 'twilio';
 import nodemailer from 'nodemailer';
+import { sendWhatsAppOTP, initWhatsApp, isWhatsAppConnected, getWhatsAppStatus } from './whatsappService.js';
 
 // Twilio setup (set env vars: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)
 const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
@@ -15,7 +16,19 @@ let isEthereal = false;
 
 // Initialize OTP service (call during app startup so transporter is ready before requests)
 export async function initOTPService() {
-  // If explicit SMTP creds are provided, use them
+  // Initialize WhatsApp connection for OTP delivery (non-blocking)
+  console.log('[OTP] Initializing WhatsApp service in background...');
+  initWhatsApp().then(connected => {
+    if (connected) {
+      console.log('[OTP] WhatsApp ready for OTP delivery');
+    } else {
+      console.log('[OTP] WhatsApp not connected - OTPs will be logged to console');
+    }
+  }).catch(err => {
+    console.error('[OTP] WhatsApp init error:', err && err.message ? err.message : err);
+  });
+
+  // If explicit SMTP creds are provided, use them (as fallback)
   if (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS) {
     try {
       mailTransporter = nodemailer.createTransport({
@@ -70,14 +83,49 @@ export function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-export async function requestOTP(aadhaarNumber, contact) {
+export async function requestOTP(aadhaarNumber, contact, channel = 'whatsapp') {
   // contact may be a phone number (string of digits) or an email address
   const otp = generateOTP();
   const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
   const key = hashAadhaar(aadhaarNumber);
   const isEmail = typeof contact === 'string' && contact.includes('@');
-  const storeEntry = { otp, expiresAt, contact, contactType: isEmail ? 'email' : 'sms' };
+  const contactType = channel === 'whatsapp' ? 'whatsapp' : (isEmail ? 'email' : 'sms');
+  const storeEntry = { otp, expiresAt, contact, contactType };
   otpStore.set(key, storeEntry);
+
+  // Primary: Send via WhatsApp if channel is whatsapp and contact is a phone number
+  if (channel === 'whatsapp' && !isEmail) {
+    try {
+      const result = await sendWhatsAppOTP(contact, otp);
+      if (result.success && !result.mock) {
+        console.log(`[OTP] Sent ${otp} to ${contact} via WhatsApp`);
+        return { success: true, message: 'OTP sent via WhatsApp', expiresAt, contact, contactType: 'whatsapp' };
+      }
+      // If WhatsApp failed or is mock, log but continue
+      console.log(`[OTP] WhatsApp delivery: ${result.message}. OTP: ${otp}`);
+    } catch (err) {
+      console.error('[OTP] WhatsApp error:', err.message);
+    }
+    
+    // Fallback to Twilio SMS if WhatsApp fails
+    if (twilioClient && process.env.TWILIO_PHONE_NUMBER) {
+      try {
+        await twilioClient.messages.create({
+          body: `Your Voting OTP is: ${otp}. Valid for 5 minutes.`,
+          from: process.env.TWILIO_PHONE_NUMBER,
+          to: `+91${contact}` // Assuming Indian numbers
+        });
+        console.log(`[OTP] Sent ${otp} to +91${contact} via Twilio SMS (WhatsApp fallback)`);
+        return { success: true, message: 'OTP sent via SMS', expiresAt, contact, contactType: 'sms' };
+      } catch (err) {
+        console.error('[OTP] Twilio error:', err.message);
+      }
+    }
+    
+    // Final fallback: console mock
+    console.log(`[OTP] Mock mode - OTP ${otp} for WhatsApp ${contact} (Identifier: ${aadhaarNumber})`);
+    return { success: true, message: 'OTP sent', expiresAt, contact, contactType: 'whatsapp' };
+  }
 
   // If email requested and transporter configured, send email
   if (isEmail) {
@@ -103,7 +151,7 @@ export async function requestOTP(aadhaarNumber, contact) {
       console.log(`[OTP] Mail transporter not configured. Mock OTP ${otp} for email ${contact} (Aadhaar: ${aadhaarNumber})`);
     }
   } else {
-    // Send via Twilio if configured
+    // Send via Twilio if configured (non-WhatsApp channel)
     if (twilioClient && process.env.TWILIO_PHONE_NUMBER) {
       try {
         await twilioClient.messages.create({
@@ -122,7 +170,7 @@ export async function requestOTP(aadhaarNumber, contact) {
     }
   }
 
-  return { success: true, message: 'OTP sent', expiresAt, contact, contactType: isEmail ? 'email' : 'sms' };
+  return { success: true, message: 'OTP sent', expiresAt, contact, contactType };
 }
 
 export function verifyOTP(aadhaarNumber, otp) {
@@ -143,3 +191,6 @@ export function getOTPEntry(aadhaarNumber) {
   const key = hashAadhaar(aadhaarNumber);
   return otpStore.get(key);
 }
+
+// Re-export WhatsApp status functions for admin routes
+export { getWhatsAppStatus, isWhatsAppConnected } from './whatsappService.js';

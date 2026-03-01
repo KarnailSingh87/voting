@@ -39,18 +39,25 @@ const Login = () => {
   // simple roll number format validation (alphanumeric, 4-20 chars)
   const isValidRoll = (v) => /^[A-Za-z0-9_-]{4,20}$/.test(v);
 
+  // Helper function to mask mobile number (show only last 3 digits)
+  const maskMobile = (num) => {
+    if (!num) return '';
+    const digits = num.replace(/\D/g, '');
+    if (digits.length <= 3) return digits;
+    return '*'.repeat(digits.length - 3) + digits.slice(-3);
+  };
+
   const requestOtp = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     setLoading(true);
     setError('');
     setMessage('');
     try {
-  const resp = await axios.post('/api/voter/request-otp', { roll, name, mobile, email });
-  const sentTo = resp.data?.sentTo;
+      // Send OTP via WhatsApp (mobile number) instead of email
+      await axios.post('/api/voter/request-otp', { roll, name, mobile, channel: 'whatsapp' });
       setStage('otp');
-      if (sentTo) setMessage(`OTP sent to ${sentTo}`);
-      else setMessage('OTP sent. Enter it below.');
-      toast.success('OTP requested');
+      setMessage(`OTP sent to WhatsApp: ${maskMobile(mobile)}`);
+      toast.success('OTP sent via WhatsApp');
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to request OTP';
       setError(msg);
@@ -60,22 +67,23 @@ const Login = () => {
     }
   };
 
-  // Attempt to request OTP programmatically when we have aadhaar+name and no explicit submit
+  // Attempt to request OTP programmatically when we have roll+name and mobile
   const tryRequestOtp = async (providedMobile) => {
     setLoading(true);
     setError('');
     setMessage('');
     try {
-      const resp = await axios.post('/api/voter/request-otp', { roll, name, mobile: providedMobile || mobile });
-      const sentTo = resp.data?.sentTo;
-      setMessage(sentTo ? `OTP sent to ${sentTo}. Preparing OTP entry...` : 'OTP sent. Preparing OTP entry...');
+      // Send OTP via WhatsApp
+      const mobileToUse = providedMobile || mobile;
+      await axios.post('/api/voter/request-otp', { roll, name, mobile: mobileToUse, channel: 'whatsapp' });
+      setMessage(`OTP sent to WhatsApp: ${maskMobile(mobileToUse)}. Preparing OTP entry...`);
       // delay briefly so user sees the confirmation
       if (pendingStageTimer.current) clearTimeout(pendingStageTimer.current);
       pendingStageTimer.current = setTimeout(() => setStage('otp'), 800);
       setNeedsContact(false);
     } catch (err) {
       const msg = err.response?.data?.message || '';
-      if (msg && /mobile|email/i.test(msg)) {
+      if (msg && /mobile/i.test(msg)) {
         // Backend requires contact info - ask user
         setNeedsContact(true);
       } else {
@@ -176,7 +184,12 @@ const Login = () => {
                   className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 focus:z-10 sm:text-sm"
                   placeholder="Enter OTP"
                 />
-                <p className="mt-2 text-sm text-gray-500">Check console for mock OTP value.</p>
+                <p className="mt-2 text-sm text-gray-500 flex items-center">
+                  <svg className="w-4 h-4 mr-1 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                  </svg>
+                  Check your WhatsApp for the OTP
+                </p>
               </div>
             </div>
 
@@ -269,8 +282,8 @@ const Login = () => {
                             if (Array.isArray(s.originalArr)) setOriginalArrDetected(s.originalArr);
                             if (Array.isArray(s.originalHeaders)) setOriginalHeadersDetected(s.originalHeaders);
                             setStudentData(s);
-                            // Prompt user to confirm identity before sending OTP
-                            setMessage('Please confirm your contact and request OTP.');
+                            // Prompt user to confirm identity before sending OTP via WhatsApp
+                            setMessage('Please confirm your identity to receive OTP via WhatsApp.');
                             // mark as verified (roll exists) but DO NOT auto-request OTP; wait for user confirmation
                             setVerifiedRoll(true);
                             setIsMe(null);
@@ -358,7 +371,8 @@ const Login = () => {
                             const checked = e.target.checked;
                             setIsMe(checked);
                             if (checked) {
-                              // prefill email from lookup and clear query
+                              // prefill mobile from lookup for WhatsApp OTP and clear query
+                              setMobile(studentData?.mobile || '');
                               setEmail(studentData?.email || '');
                               setMessage('');
                               setQueryRaised(false);
@@ -451,7 +465,14 @@ const Login = () => {
 
               {needsContact && (
                 <div>
-                  <label htmlFor="mobile" className="block text-sm font-medium text-gray-700">Mobile Number (required)</label>
+                  <label htmlFor="mobile" className="block text-sm font-medium text-gray-700">
+                    <span className="flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                      </svg>
+                      WhatsApp Number (required)
+                    </span>
+                  </label>
                   <input
                     id="mobile"
                     name="mobile"
@@ -459,17 +480,21 @@ const Login = () => {
                     required
                     value={mobile}
                     onChange={(e)=>setMobile(e.target.value.replace(/\D/g, ''))}
-                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 focus:z-10 sm:text-sm"
-                    placeholder="10-digit mobile"
+                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                    placeholder="10-digit WhatsApp number"
                   />
+                  <p className="mt-1 text-sm text-gray-500">Enter your WhatsApp-enabled mobile number</p>
                   <div className="mt-3">
                     <button
                       type="button"
                       onClick={() => tryRequestOtp(mobile)}
-                      disabled={loading}
-                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700"
+                      disabled={loading || mobile.length < 10}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {loading ? 'Requesting...' : 'Submit mobile & request OTP'}
+                      <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                      </svg>
+                      {loading ? 'Requesting...' : 'Send OTP via WhatsApp'}
                     </button>
                   </div>
                 </div>
@@ -478,25 +503,48 @@ const Login = () => {
               {verifiedRoll ? (
                 isMe === true ? (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Email for OTP</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      <span className="flex items-center">
+                        <svg className="w-5 h-5 mr-2 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                        </svg>
+                        WhatsApp Number for OTP
+                      </span>
+                    </label>
                     <div className="mt-2 flex items-center space-x-2">
                       <input
-                        id="email"
-                        name="email"
-                        type="email"
+                        id="mobile"
+                        name="mobile"
+                        type="text"
                         readOnly
-                        value={email}
+                        value={maskMobile(mobile)}
                         className="appearance-none relative block w-full px-3 py-2 border border-gray-200 bg-gray-100 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm"
                       />
                       <button
                         type="button"
                         onClick={() => requestOtp()}
-                        disabled={loading || !email}
-                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700"
+                        disabled={loading || !mobile}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
                       >
-                        {loading ? 'Sending...' : 'Send OTP'}
+                        {loading ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                            </svg>
+                            Send OTP via WhatsApp
+                          </>
+                        )}
                       </button>
                     </div>
+                    <p className="mt-2 text-sm text-gray-500">OTP will be sent to your registered WhatsApp number</p>
                   </div>
                 ) : isMe === false ? (
                   <div className="rounded-md bg-yellow-50 p-4">

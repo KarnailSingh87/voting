@@ -13,8 +13,9 @@ import Election from '../models/Election.js';
 import Candidate from '../models/Candidate.js';
 import Student from '../models/Student.js';
 import AdminAction from '../models/AdminAction.js';
-import { requestOTP, getOTPEntry } from '../config/otpService.js';
+import { requestOTP, getOTPEntry, getWhatsAppStatus, isWhatsAppConnected } from '../config/otpService.js';
 import { parseFile } from '../config/aiParser.js';
+import QRCode from 'qrcode';
 
 const router = express.Router();
 
@@ -1985,6 +1986,68 @@ router.get('/students/export', adminAuth, async (req, res) => {
   } catch (e) {
     console.error('Export error', e);
     res.status(500).json({ success: false, message: 'Export failed' });
+  }
+});
+
+// WhatsApp connection status endpoint (for admin dashboard)
+router.get('/whatsapp-status', async (req, res) => {
+  try {
+    const status = getWhatsAppStatus();
+    res.json({
+      success: true,
+      connected: status.connected,
+      hasQR: !!status.qrCode,
+      message: status.connected 
+        ? 'WhatsApp is connected and ready to send OTPs' 
+        : (status.qrCode ? 'Scan QR code to connect WhatsApp' : 'WhatsApp initializing or not available')
+    });
+  } catch (e) {
+    console.error('WhatsApp status error:', e);
+    res.status(500).json({ success: false, message: 'Failed to get WhatsApp status' });
+  }
+});
+
+// WhatsApp QR code image endpoint (for admin to scan)
+router.get('/whatsapp-qr', async (req, res) => {
+  try {
+    const status = getWhatsAppStatus();
+    
+    if (status.connected) {
+      return res.status(200).json({ 
+        success: true, 
+        connected: true, 
+        message: 'WhatsApp already connected! No QR needed.' 
+      });
+    }
+    
+    if (!status.qrCode) {
+      return res.status(202).json({ 
+        success: false, 
+        connected: false,
+        message: 'QR code not yet available. Please wait and refresh in a few seconds.' 
+      });
+    }
+    
+    // Generate QR code as base64 data URL
+    const qrDataUrl = await QRCode.toDataURL(status.qrCode, {
+      width: 300,
+      margin: 2,
+      color: {
+        dark: '#25D366', // WhatsApp green
+        light: '#FFFFFF'
+      }
+    });
+    
+    res.json({
+      success: true,
+      connected: false,
+      qrCode: qrDataUrl,
+      qrRaw: status.qrCode,
+      message: 'Scan this QR code with WhatsApp to connect'
+    });
+  } catch (e) {
+    console.error('WhatsApp QR error:', e);
+    res.status(500).json({ success: false, message: 'Failed to generate QR code' });
   }
 });
 

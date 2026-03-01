@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WhatsApp QR Code</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            padding: 40px;
+            background: #25D366;
+        }
+        .box {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            display: inline-block;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 { color: #128C7E; }
+        #qr { margin: 20px 0; }
+        #status { 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .waiting { background: #fff3cd; color: #856404; }
+        .connected { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 10px 30px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>📱 WhatsApp Setup</h1>
+        <div id="status" class="waiting">Loading...</div>
+        <div id="qr"></div>
+        <p>Open WhatsApp → Settings → Linked Devices → Link a Device</p>
+        <button onclick="load()">🔄 Refresh</button>
+    </div>
+    <script>
+        function load() {
+            document.getElementById('status').innerText = 'Loading...';
+            document.getElementById('status').className = 'waiting';
+            
+            fetch('/api/admin/whatsapp-qr')
+                .then(r => r.json())
+                .then(d => {
+                    console.log('Response:', d);
+                    if (d.connected) {
+                        document.getElementById('status').innerText = '✅ Connected!';
+                        document.getElementById('status').className = 'connected';
+                        document.getElementById('qr').innerHTML = '<div style="font-size:100px">✅</div>';
+                    } else if (d.qrCode) {
+                        document.getElementById('status').innerText = '📱 Scan this QR code';
+                        document.getElementById('status').className = 'waiting';
+                        document.getElementById('qr').innerHTML = '<img src="' + d.qrCode + '" width="300">';
+                    } else {
+                        document.getElementById('status').innerText = '⏳ ' + (d.message || 'Waiting...');
+                        document.getElementById('status').className = 'waiting';
+                        setTimeout(load, 3000);
+                    }
+                })
+                .catch(e => {
+                    console.error('Error:', e);
+                    document.getElementById('status').innerText = '❌ ' + e.message;
+                    document.getElementById('status').className = 'error';
+                });
+        }
+        load();
+        setInterval(load, 10000);
+    </script>
+</body>
+</html>

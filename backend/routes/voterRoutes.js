@@ -52,11 +52,26 @@ router.get('/history', voterAuth, async (req, res) => {
 router.post('/request-otp', async (req, res) => {
   try {
     // Support both aadhaar and roll as identifier
-    const { aadhaar, roll, name, mobile, email } = req.body;
+    // channel: 'whatsapp' (default) or 'email' or 'sms'
+    const { aadhaar, roll, name, mobile, email, channel = 'whatsapp' } = req.body;
     const identifier = aadhaar || roll;
-    if (!identifier || !name || (!mobile && !email)) {
-      return res.status(400).json({ message: 'identifier (aadhaar or roll), name and (mobile or email) required' });
+    
+    // For WhatsApp channel, mobile is required; for email channel, email is required
+    if (!identifier || !name) {
+      return res.status(400).json({ message: 'identifier (aadhaar or roll) and name required' });
     }
+    
+    // Validate contact based on channel
+    if (channel === 'whatsapp' && !mobile) {
+      return res.status(400).json({ message: 'mobile number required for WhatsApp OTP' });
+    }
+    if (channel === 'email' && !email) {
+      return res.status(400).json({ message: 'email required for email OTP' });
+    }
+    if (!mobile && !email) {
+      return res.status(400).json({ message: 'mobile or email required' });
+    }
+    
     // If this is a roll-based login, enforce that the roll exists in Master List
     if (roll) {
       const r = roll.trim();
@@ -76,10 +91,12 @@ router.post('/request-otp', async (req, res) => {
       voter.identifierRaw = identifier;
       await voter.save();
     }
-    const contact = email || mobile;
-    const result = await requestOTP(identifier, contact);
+    
+    // Determine contact based on channel preference
+    const contact = channel === 'whatsapp' ? mobile : (channel === 'email' ? email : (mobile || email));
+    const result = await requestOTP(identifier, contact, channel);
     if (!result.success) return res.status(429).json({ message: 'OTP request throttled or failed' });
-    // result may contain contact and contactType (email|sms)
+    // result may contain contact and contactType (whatsapp|email|sms)
     const { contact: sentContact, contactType } = result || {};
     // mask the contact before returning to client
     const maskEmail = (em) => {
@@ -102,7 +119,7 @@ router.post('/request-otp', async (req, res) => {
     let maskedContact = undefined;
     if (sentContact) {
       if (contactType === 'email' || sentContact.includes('@')) maskedContact = maskEmail(String(sentContact));
-      else maskedContact = maskPhone(String(sentContact));
+      else maskedContact = maskPhone(String(sentContact)); // handles both 'whatsapp' and 'sms' types
     }
     return res.json({ message: 'OTP sent', identifierHash: idHash, sentTo: maskedContact, contactType });
   } catch (e) {
