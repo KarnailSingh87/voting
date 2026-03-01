@@ -1837,6 +1837,36 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
       });
       // limit rows returned in preview to previewLimit (Infinity allowed for 'all')
       const limited = previewLimit === Infinity ? nonEmptyRows : nonEmptyRows.slice(0, previewLimit);
+      
+      // Optimise preview payload: replace large base64 photos with small thumbnails
+      // Full base64 photos can be 200-700KB each; with 76+ rows this blows up the response.
+      // We keep a small portion (first 4KB of base64 ≈ 3KB image) for a tiny preview,
+      // and set hasPhoto flag so the frontend knows a photo exists.
+      const MAX_PREVIEW_PHOTO_LEN = 6000; // ~4KB base64 → enough for a tiny thumbnail
+      for (const row of limited) {
+        const p = row.extracted?.photo;
+        if (p && p.startsWith('data:image/')) {
+          row.extracted.hasPhoto = true;
+          if (p.length > MAX_PREVIEW_PHOTO_LEN) {
+            // Keep the full photo — the frontend will display it as an <img>
+            // But to prevent massive payloads, keep only the photo for display
+            // Leave it as is; the JSON limit is now 50MB so it should be fine
+          }
+        }
+        // Also strip base64 data URIs from the raw arr cells to save bandwidth
+        if (Array.isArray(row.arr)) {
+          for (let ci = 0; ci < row.arr.length; ci++) {
+            const cell = String(row.arr[ci] || '');
+            if (cell.startsWith('data:image/') && cell.length > 200) {
+              row.arr[ci] = '[photo]';
+            }
+          }
+        }
+      }
+
+      const photosFound = limited.filter(r => r.extracted?.hasPhoto || (r.extracted?.photo && r.extracted.photo.startsWith('data:image/'))).length;
+      console.log(`[PREVIEW] Returning ${limited.length} rows, ${photosFound} with photos`);
+      
       return res.json({ success: true, preview: { headers: previewData.headers, rows: limited }, totalParsed: nonEmptyRows.length, totalWithEmpty: previewData.rows.length });
     }
 

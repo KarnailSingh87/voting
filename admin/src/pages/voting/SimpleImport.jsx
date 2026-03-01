@@ -302,8 +302,10 @@ const SimpleImport = () => {
               <h3 className="text-sm font-medium text-gray-700">
                 Preview ({previewData.rows.length} rows with data)
               </h3>
-              <div className="text-xs text-gray-600">
-                Showing {previewData.rows.length} rows with data · Total parsed: {previewData.totalParsed}
+              <div className="flex items-center gap-3 text-xs text-gray-600">
+                <span>📷 {previewData.rows.filter(r => r.extracted?.photo || r.extracted?.hasPhoto).length} with photos</span>
+                <span>·</span>
+                <span>Showing {previewData.rows.length} rows · Total parsed: {previewData.totalParsed}</span>
               </div>
             </div>
             <div className="overflow-x-auto border rounded-lg max-h-64">
@@ -335,6 +337,7 @@ const SimpleImport = () => {
                   {previewData.rows.map((row, idx) => {
                     // Resolve photo: prefer extracted.photo, fallback to scanning arr cells for image URLs/data URIs
                     let photoSrc = row.extracted?.photo || '';
+                    const hasPhoto = row.extracted?.hasPhoto || false;
                     if (!photoSrc) {
                       for (let ci = 0; ci < (row.arr || []).length; ci++) {
                         const s = String(row.arr[ci] || '');
@@ -348,14 +351,28 @@ const SimpleImport = () => {
                     <tr key={idx} className={row.valid ? '' : 'bg-red-50'}>
                       {/* Dedicated photo column */}
                       <td className="px-3 py-2">
-                        {photoSrc ? (
+                        {photoSrc && photoSrc.startsWith('data:image/') ? (
                           <img
                             src={photoSrc}
                             alt="photo"
-                            className="h-8 w-8 rounded-full object-cover border border-gray-200"
+                            className="h-9 w-9 rounded-full object-cover border-2 border-cyan-200 shadow-sm"
+                            onError={(e) => { e.target.style.display = 'none'; if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex'; }}
                           />
+                        ) : photoSrc && /^https?:\/\//.test(photoSrc) ? (
+                          <img
+                            src={photoSrc}
+                            alt="photo"
+                            className="h-9 w-9 rounded-full object-cover border-2 border-cyan-200 shadow-sm"
+                            onError={(e) => { e.target.style.display = 'none'; if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex'; }}
+                          />
+                        ) : hasPhoto ? (
+                          <div className="h-9 w-9 rounded-full bg-green-100 flex items-center justify-center text-green-600 border-2 border-green-200" title="Photo detected">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
                         ) : (
-                          <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                          <div className="h-9 w-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 border border-gray-200">
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
@@ -367,8 +384,8 @@ const SimpleImport = () => {
                         const headerName = (previewData.headers[ci] || '').trim().toLowerCase();
                         if (/^(photo|photo[_ ]?url|image|image[_ ]?url|avatar|picture|pic)$/.test(headerName)) return null;
                         const s = String(cell || '');
-                        // Also skip cells that are data URIs or image URLs (shown in photo column)
-                        if (/^data:image\/.+;base64,/.test(s) || /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(s)) {
+                        // Skip cells that are data URIs, image URLs, or [photo] placeholder
+                        if (/^data:image\/.+;base64,/.test(s) || /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(s) || s === '[photo]') {
                           return <td key={ci} className="px-3 py-2 text-gray-400 text-xs italic">📷 photo</td>;
                         }
                         return (

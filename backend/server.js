@@ -16,7 +16,8 @@ import { initOTPService } from './config/otpService.js';
 dotenv.config();
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
 app.use(helmet({ 
   crossOriginResourcePolicy: { policy: 'cross-origin' },
