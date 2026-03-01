@@ -49,6 +49,56 @@ router.get('/history', voterAuth, async (req, res) => {
   }
 });
 
+// Get voter profile with student details
+router.get('/profile', voterAuth, async (req, res) => {
+  try {
+    const voter = await Voter.findById(req.voter.id).populate('history.electionId', 'title');
+    if (!voter) return res.status(404).json({ success: false, message: 'Voter not found' });
+    
+    // Try to get additional details from Student collection using identifierRaw (roll number)
+    let studentDetails = null;
+    if (voter.identifierRaw) {
+      const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      studentDetails = await Student.findOne({ 
+        roll: { $regex: `^${escapeRegExp(voter.identifierRaw)}$`, $options: 'i' } 
+      }).lean();
+    }
+    
+    // Build profile response
+    const profile = {
+      id: voter._id,
+      name: voter.name,
+      roll: voter.identifierRaw,
+      mobile: voter.mobile,
+      email: voter.email || studentDetails?.email,
+      photoUrl: voter.photoUrl || studentDetails?.photo,
+      hasVoted: voter.hasVoted,
+      verifiedAt: voter.verifiedAt,
+      createdAt: voter.createdAt,
+      // Additional student details if available
+      fatherName: studentDetails?.fatherName,
+      program: studentDetails?.program,
+      batch: studentDetails?.batch,
+      bloodGroup: studentDetails?.bloodGroup,
+      address: studentDetails?.address,
+      category: studentDetails?.category,
+      // Voting statistics
+      totalVotes: voter.history?.length || 0,
+      votingHistory: (voter.history || []).map(h => ({
+        electionId: h.electionId?._id || h.electionId,
+        electionTitle: h.electionId?.title || 'Unknown Election',
+        timestamp: h.timestamp,
+        voteHash: h.voteHash
+      }))
+    };
+    
+    res.json({ success: true, profile });
+  } catch (e) {
+    console.error('PROFILE ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Request OTP for Aadhaar
 router.post('/request-otp', async (req, res) => {
   try {
