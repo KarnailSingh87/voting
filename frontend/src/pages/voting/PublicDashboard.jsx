@@ -58,7 +58,28 @@ const PublicDashboard = () => {
   const [electionFilter, setElectionFilter] = useState('all');
   const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [theme, setTheme] = useState('light');
   // retry UI states removed — retries now run silently in background
+
+  // Theme initialization
+  useEffect(() => {
+    const stored = localStorage.getItem('voterTheme');
+    if (stored) {
+      setTheme(stored);
+      document.documentElement.classList.toggle('dark', stored === 'dark');
+    } else {
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(prefersDark ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', prefersDark);
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    localStorage.setItem('voterTheme', next);
+    document.documentElement.classList.toggle('dark', next === 'dark');
+  };
 
   // Check if user is logged in
   useEffect(() => {
@@ -266,6 +287,24 @@ const PublicDashboard = () => {
               </div>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-2">
+              {/* Theme toggle */}
+              <button
+                onClick={toggleTheme}
+                aria-label="Toggle theme"
+                title="Toggle theme"
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36 }}
+                className="rounded-lg border border-gray-200 bg-gray-50 text-gray-600 hover:text-cyan-600 hover:bg-cyan-50 hover:border-cyan-300 transition-all duration-200"
+              >
+                {theme === 'dark' ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 4.5a1 1 0 011 1V7a1 1 0 11-2 0V5.5a1 1 0 011-1zM6.22 6.22a1 1 0 011.415 0L8.64 7.225a1 1 0 11-1.415 1.414L6.22 7.636a1 1 0 010-1.415zM4.5 12a1 1 0 011-1H7a1 1 0 110 2H5.5a1 1 0 01-1-1zM6.22 17.78a1 1 0 010-1.415l1.005-1.005a1 1 0 111.415 1.415L7.636 18.8a1 1 0 01-1.415 0zM12 18.5a1 1 0 011 1V20a1 1 0 11-2 0v-.5a1 1 0 011-1zM17.78 17.78a1 1 0 011.415 0l1.005 1.005a1 1 0 11-1.415 1.415L17.78 19.2a1 1 0 010-1.415zM18.5 12a1 1 0 011-1H20a1 1 0 110 2h-.5a1 1 0 01-1-1zM17.78 6.22a1 1 0 00-1.415-1.415L15.36 6.225a1 1 0 001.415 1.414l1.005-1.005zM12 8a4 4 0 100 8 4 4 0 000-8z" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                  </svg>
+                )}
+              </button>
               {isLoggedIn ? (
                 <>
                   <button
@@ -292,6 +331,25 @@ const PublicDashboard = () => {
                   </span>
                 </button>
               )}
+            </div>
+            {/* Mobile theme toggle (visible only on small screens) */}
+            <div className="flex items-center sm:hidden">
+              <button
+                onClick={toggleTheme}
+                aria-label="Toggle theme"
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36 }}
+                className="rounded-md border border-gray-200 bg-gray-50 text-gray-600 hover:text-cyan-600 hover:bg-cyan-50 transition-all"
+              >
+                {theme === 'dark' ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 4.5a1 1 0 011 1V7a1 1 0 11-2 0V5.5a1 1 0 011-1zM6.22 6.22a1 1 0 011.415 0L8.64 7.225a1 1 0 11-1.415 1.414L6.22 7.636a1 1 0 010-1.415zM4.5 12a1 1 0 011-1H7a1 1 0 110 2H5.5a1 1 0 01-1-1zM6.22 17.78a1 1 0 010-1.415l1.005-1.005a1 1 0 111.415 1.415L7.636 18.8a1 1 0 01-1.415 0zM12 18.5a1 1 0 011 1V20a1 1 0 11-2 0v-.5a1 1 0 011-1zM17.78 17.78a1 1 0 011.415 0l1.005 1.005a1 1 0 11-1.415 1.415L17.78 19.2a1 1 0 010-1.415zM18.5 12a1 1 0 011-1H20a1 1 0 110 2h-.5a1 1 0 01-1-1zM17.78 6.22a1 1 0 00-1.415-1.415L15.36 6.225a1 1 0 001.415 1.414l1.005-1.005zM12 8a4 4 0 100 8 4 4 0 000-8z" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                  </svg>
+                )}
+              </button>
             </div>
           </div>
         </div>

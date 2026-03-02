@@ -5,6 +5,20 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
+// Initialize theme globally so pages render with the correct theme instantly
+(() => {
+  try {
+    const stored = localStorage.getItem('voterTheme');
+    if (stored) {
+      document.documentElement.classList.toggle('dark', stored === 'dark');
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    }
+  } catch (e) {
+    // ignore
+  }
+})();
+
 const router = createBrowserRouter([
   { path: '*', element: <App /> }
 ], {

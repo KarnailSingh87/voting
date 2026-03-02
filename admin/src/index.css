@@ -25,6 +25,256 @@ h1, h2, h3, h4, h5, h6 {
     }
 }
 
+/* ===== DARK MODE ===== */
+/* Comprehensive dark overrides when `.dark` class is on <html>.
+   Covers: body, cards, inputs, selects, textareas, tables, badges,
+   modals, progress bars, borders, stat-cards, etc.  */
+
+/* --- Body & root backgrounds --- */
+.dark body {
+    background: #0b1120 !important;
+    color: #d1d9e6;
+}
+
+.dark .bg-gray-50,
+.dark .bg-white {
+    background-color: #111827 !important;
+}
+
+.dark .bg-gradient-to-br {
+    background: #0b1120 !important;
+}
+
+/* --- Text colors --- */
+.dark .text-gray-900 { color: #e6eef8 !important; }
+.dark .text-gray-800 { color: #d1d9e6 !important; }
+.dark .text-gray-700 { color: #b0bdd0 !important; }
+.dark .text-gray-600 { color: #94a3b8 !important; }
+.dark .text-gray-500 { color: #7e8da0 !important; }
+.dark .text-gray-400 { color: #64748b !important; }
+
+/* --- Cards & panels --- */
+.dark .card,
+.dark .bg-white.shadow,
+.dark .bg-white.rounded-lg,
+.dark .bg-white.rounded-xl,
+.dark .bg-white.overflow-hidden,
+.dark div[class*="bg-white"][class*="shadow"],
+.dark div[class*="bg-white"][class*="rounded"] {
+    background-color: #1a2236 !important;
+    border-color: rgba(255,255,255,0.06) !important;
+}
+
+.dark .stat-card {
+    background: linear-gradient(135deg, #1a2236 0%, #151d2e 100%) !important;
+    border-color: rgba(255,255,255,0.06) !important;
+}
+
+/* --- Inputs, selects, textareas --- */
+.dark input,
+.dark select,
+.dark textarea {
+    background-color: #0f172a !important;
+    border-color: rgba(255,255,255,0.1) !important;
+    color: #e6eef8 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+    color: #64748b !important;
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15) !important;
+}
+
+.dark .input-field {
+    background: #0f172a !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    color: #e6eef8 !important;
+}
+
+/* --- Borders --- */
+.dark .border-gray-200,
+.dark .border-gray-100,
+.dark .border-gray-300 {
+    border-color: rgba(255,255,255,0.06) !important;
+}
+
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: rgba(255,255,255,0.06) !important;
+}
+
+.dark .border-t {
+    border-color: rgba(255,255,255,0.06) !important;
+}
+
+.dark .border-b {
+    border-color: rgba(255,255,255,0.06) !important;
+}
+
+/* --- Tables --- */
+.dark thead,
+.dark .bg-gray-100 {
+    background-color: #151d2e !important;
+}
+
+.dark th {
+    color: #94a3b8 !important;
+    border-bottom-color: rgba(255,255,255,0.08) !important;
+    background: transparent !important;
+}
+
+.dark td {
+    color: #b0bdd0 !important;
+    border-bottom-color: rgba(255,255,255,0.04) !important;
+}
+
+.dark tr:hover,
+.dark tbody tr:hover {
+    background-color: rgba(99,102,241,0.06) !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* --- Alternating rows in definition lists --- */
+.dark .bg-gray-50 {
+    background-color: #151d2e !important;
+}
+
+/* --- Badges – keep their colors but darken background slightly --- */
+.dark .bg-green-100 { background-color: rgba(34,197,94,0.15) !important; }
+.dark .bg-yellow-100 { background-color: rgba(234,179,8,0.15) !important; }
+.dark .bg-red-100 { background-color: rgba(239,68,68,0.15) !important; }
+.dark .bg-blue-100 { background-color: rgba(59,130,246,0.15) !important; }
+.dark .bg-orange-100 { background-color: rgba(249,115,22,0.15) !important; }
+.dark .bg-purple-100 { background-color: rgba(139,92,246,0.15) !important; }
+.dark .bg-cyan-100 { background-color: rgba(6,182,212,0.15) !important; }
+
+.dark .text-green-800 { color: #4ade80 !important; }
+.dark .text-yellow-800 { color: #facc15 !important; }
+.dark .text-red-800 { color: #f87171 !important; }
+.dark .text-blue-800 { color: #60a5fa !important; }
+.dark .text-orange-800 { color: #fb923c !important; }
+
+/* --- Error / alert boxes --- */
+.dark .bg-red-50 {
+    background-color: rgba(239,68,68,0.1) !important;
+}
+.dark .text-red-700 { color: #fca5a5 !important; }
+
+.dark .bg-green-50 {
+    background-color: rgba(34,197,94,0.1) !important;
+}
+.dark .text-green-700,
+.dark .text-green-800 { color: #4ade80 !important; }
+
+.dark .bg-yellow-50 {
+    background-color: rgba(234,179,8,0.1) !important;
+}
+.dark .text-yellow-700,
+.dark .text-yellow-800 { color: #fde047 !important; }
+
+.dark .bg-blue-50 {
+    background-color: rgba(59,130,246,0.1) !important;
+}
+.dark .text-blue-700,
+.dark .text-blue-900 { color: #93c5fd !important; }
+
+/* --- Progress bars --- */
+.dark .bg-gray-200 {
+    background-color: #1e293b !important;
+}
+
+/* --- Modals --- */
+.dark .bg-black.opacity-40 {
+    opacity: 0.6 !important;
+}
+
+.dark div[role="dialog"],
+.dark .fixed .bg-white.rounded {
+    background-color: #1a2236 !important;
+    color: #d1d9e6 !important;
+}
+
+/* --- Buttons --- */
+.dark .btn-primary {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+}
+
+.dark .btn-secondary {
+    background-color: #1a2236 !important;
+    color: #d1d9e6 !important;
+    border-color: rgba(255,255,255,0.1) !important;
+}
+
+.dark .hover\:bg-gray-50:hover {
+    background-color: #1e293b !important;
+}
+
+.dark .hover\:bg-gray-100:hover {
+    background-color: #1e293b !important;
+}
+
+/* --- Dashed upload area --- */
+.dark .border-dashed {
+    border-color: rgba(255,255,255,0.12) !important;
+}
+
+/* --- Links --- */
+.dark .text-cyan-600 { color: #22d3ee !important; }
+.dark .text-cyan-700 { color: #06b6d4 !important; }
+.dark .text-indigo-600 { color: #818cf8 !important; }
+
+/* --- Glass --- */
+.dark .glass {
+    background: rgba(10,15,30,0.7) !important;
+    border-color: rgba(255,255,255,0.04) !important;
+}
+
+/* --- Scrollbar --- */
+.dark ::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, #4f46e5, #6d28d9);
+    border-color: #0f172a;
+}
+
+/* --- Login page gradient background --- */
+.dark .bg-gradient-to-br.from-indigo-50 {
+    background: #0b1120 !important;
+}
+
+/* --- Shadow overrides --- */
+.dark .shadow,
+.dark .shadow-sm,
+.dark .shadow-lg,
+.dark .shadow-xl,
+.dark .shadow-2xl {
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4) !important;
+}
+
+/* --- Label text --- */
+.dark label {
+    color: #b0bdd0 !important;
+}
+
+/* --- Legend / fieldset text --- */
+.dark legend,
+.dark fieldset {
+    color: #b0bdd0 !important;
+}
+
+/* smooth transition when switching themes */
+body, .navbar, .sidebar, main, .bg-white, .bg-gray-50, input, select, textarea, .card, .stat-card {
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
 @layer components {
     .btn-primary {
         @apply px-6 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 active:scale-95 hover:from-indigo-700 hover:to-purple-700;

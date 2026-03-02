@@ -179,3 +179,15 @@
 .sidebar-logout:hover {
     transform: translateY(-2px);
 }
+
+/* Dark mode sidebar – slightly deeper background */
+.dark .sidebar {
+    background: linear-gradient(180deg, #0d1117 0%, #060a10 100%);
+    border-right-color: rgba(255,255,255,0.04);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+}
+
+.dark .sidebar-header {
+    background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(59,130,246,0.08) 100%);
+    border-color: rgba(99,102,241,0.1);
+}
