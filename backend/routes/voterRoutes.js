@@ -7,6 +7,7 @@ import Student from '../models/Student.js';
 import voterAuth from '../middleware/voterAuth.js';
 import jwt from 'jsonwebtoken';
 import upload from '../middleware/voterPhotoUpload.js';
+import Vote from '../models/Vote.js';
 
 const router = express.Router();
 
@@ -34,12 +35,27 @@ router.get('/history', voterAuth, async (req, res) => {
     const voter = await Voter.findById(req.voter.id).populate('history.electionId', 'title');
     if (!voter) return res.status(404).json({ message: 'Voter not found' });
     
-    const history = (voter.history || []).map(h => ({
-      confirmationId: h.voteHash, 
-      voteHash: h.voteHash,
-      timestamp: h.timestamp,
-      electionId: h.electionId?._id || h.electionId,
-      election: h.electionId ? { title: h.electionId.title } : { title: 'Unknown Election' }
+    const history = await Promise.all((voter.history || []).map(async (h) => {
+      let candidateName = h.candidateName || null;
+
+      // For older votes that don't have candidateName stored, look it up from Vote model
+      if (!candidateName && h.voteHash) {
+        try {
+          const voteRecord = await Vote.findOne({ voteHash: h.voteHash }).populate('candidate', 'name');
+          if (voteRecord?.candidate?.name) {
+            candidateName = voteRecord.candidate.name;
+          }
+        } catch (_) { /* ignore lookup errors */ }
+      }
+
+      return {
+        confirmationId: h.voteHash, 
+        voteHash: h.voteHash,
+        timestamp: h.timestamp,
+        electionId: h.electionId?._id || h.electionId,
+        election: h.electionId ? { title: h.electionId.title } : { title: 'Unknown Election' },
+        candidateName: candidateName || 'N/A'
+      };
     }));
     
     res.json({ success: true, voteHistory: history });
@@ -94,6 +110,7 @@ router.get('/profile', voterAuth, async (req, res) => {
       votingHistory: (voter.history || []).map(h => ({
         electionId: h.electionId?._id || h.electionId,
         electionTitle: h.electionId?.title || 'Unknown Election',
+        candidateName: h.candidateName || 'N/A',
         timestamp: h.timestamp,
         voteHash: h.voteHash
       }))

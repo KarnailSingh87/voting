@@ -36,10 +36,6 @@ const History = () => {
     fetchVoteHistory();
   }, [navigate]);
 
-  const handleVerifyVote = (confirmationId) => {
-    navigate(`/Voting/verify/${confirmationId}`);
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <VoterNavbar />
@@ -97,30 +93,24 @@ const History = () => {
                             <h3 className="text-lg font-medium text-gray-900 truncate">
                               {vote.election.title}
                             </h3>
-                            <p className="mt-1 text-sm text-gray-500">
-                              Voted on {new Date(vote.timestamp).toLocaleDateString()} at {new Date(vote.timestamp).toLocaleTimeString()}
-                            </p>
-                            <div className="mt-2 flex items-center text-sm text-gray-500">
-                              <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                            <div className="mt-2 flex items-center text-sm text-gray-700">
+                              <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-cyan-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                               </svg>
-                              <span>Confirmation ID: {vote.confirmationId.substring(0, 8)}...</span>
+                              <span>You voted for: <strong className="text-gray-900">{vote.candidateName}</strong></span>
                             </div>
+                            <p className="mt-1 text-sm text-gray-500">
+                              {new Date(vote.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} at {new Date(vote.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
                           </div>
-                          <div className="ml-4 flex-shrink-0 flex space-x-2">
-                            <button
-                              onClick={() => handleVerifyVote(vote.confirmationId)}
-                              className="inline-flex items-center px-3 py-1 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-                            >
-                              Verify
-                            </button>
+                          <div className="ml-4 flex-shrink-0">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <svg className="-ml-0.5 mr-1.5 h-3 w-3 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                              Voted
+                            </span>
                           </div>
-                        </div>
-                        <div className="mt-2 flex items-center text-xs text-gray-500">
-                          <svg className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
-                          </svg>
-                          <span>Vote Hash: {vote.voteHash.substring(0, 16)}...</span>
                         </div>
                       </div>
                     </li>

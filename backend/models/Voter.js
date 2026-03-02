@@ -11,6 +11,7 @@ const voterSchema = new mongoose.Schema({
   photoUrl: { type: String }, // Path or URL to the voter's photo
   history: [{
     electionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Election' },
+    candidateName: { type: String },
     voteHash: { type: String },
     timestamp: { type: Date }
   }],

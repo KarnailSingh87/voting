@@ -69,6 +69,7 @@ router.post('/cast', voterAuth, async (req, res) => {
     // Add to voter history
     voter.history.push({
       electionId: election._id,
+      candidateName: candidate.name,
       voteHash: voteHash,
       timestamp: now
     });
