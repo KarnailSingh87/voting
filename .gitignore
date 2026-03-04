@@ -6,6 +6,10 @@ node_modules
 frontend/dist
 admin/dist
 
+# Lock files — regenerated on each platform to get correct native binaries
+frontend/package-lock.json
+admin/package-lock.json
+
 # Logs
 logs
 *.log
