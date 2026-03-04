@@ -112,15 +112,15 @@ const PublicElection = () => {
   if (!election) return <div className="p-6">Election not found</div>;
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">{election.title}</h2>
+    <div className="max-w-5xl mx-auto px-4 py-6 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-2xl font-bold break-words">{election.title}</h2>
           <p className="text-sm text-gray-600">{election.description}</p>
           <div className="mt-2 text-sm text-gray-700">Status: <strong>{election.status}</strong></div>
         </div>
-        <div className="text-right">
-          <Link to="/public" className="px-3 py-2 bg-gray-100 rounded">Back to list</Link>
+        <div className="flex-shrink-0">
+          <Link to="/public" className="px-3 py-2 bg-gray-100 rounded text-sm">Back to list</Link>
         </div>
       </div>
 
@@ -140,13 +140,13 @@ const PublicElection = () => {
         ) : (
           <div className="space-y-4">
             {/* compact summary header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
               <div className="text-sm text-gray-600">Showing {paged.length} of {candidates.length} candidates</div>
               <div className="text-sm font-semibold">Total votes: {totalVotes}</div>
             </div>
 
             {/* candidate list */}
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
               {paged.map(c => {
                 const count = c.voteCount || 0;
                 const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 1000) / 10 : 0;
@@ -154,20 +154,20 @@ const PublicElection = () => {
                 return (
                   <div key={c.id} className={`p-3 rounded border ${isWinner ? 'bg-green-50 border-green-300' : 'bg-white'}`}>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center">
+                      <div className="flex items-center min-w-0">
                         {c.photoUrl ? (
                           <img 
                             src={getImageUrl(c.photoUrl)} 
                             alt={c.name} 
-                            className="w-12 h-12 rounded-full object-cover mr-3 cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
+                            className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover mr-3 flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
                             onClick={() => setPhotoModal({ show: true, url: getImageUrl(c.photoUrl), name: c.name })}
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-full bg-gray-200 mr-3 flex items-center justify-center text-sm text-gray-600">{(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}</div>
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 mr-3 flex-shrink-0 flex items-center justify-center text-sm text-gray-600">{(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}</div>
                         )}
-                        <div>
-                          <div className="font-medium text-lg">{c.name} {isWinner && <span className="text-sm text-green-700 ml-2">(Leading)</span>}</div>
-                          <div className="text-xs text-gray-500">{c.party}</div>
+                        <div className="min-w-0">
+                          <div className="font-medium text-base sm:text-lg truncate">{c.name} {isWinner && <span className="text-sm text-green-700 ml-2">(Leading)</span>}</div>
+                          <div className="text-xs text-gray-500 truncate">{c.party}</div>
                         </div>
                       </div>
                       <div className="text-2xl font-bold">{count}</div>

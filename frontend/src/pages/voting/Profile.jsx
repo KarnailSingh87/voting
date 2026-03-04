@@ -127,8 +127,8 @@ const Profile = () => {
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Profile Header */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-8">
-            <div className="flex items-center">
+          <div className="bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-6 sm:px-6 sm:py-8">
+            <div className="flex flex-col items-center sm:flex-row sm:items-center text-center sm:text-left">
               {/* Avatar with upload overlay */}
               <div className="relative group">
                 {profile?.photoUrl ? (
@@ -177,8 +177,8 @@ const Profile = () => {
                   onChange={handlePhotoUpload}
                 />
               </div>
-              <div className="ml-6 text-white">
-                <h1 className="text-2xl font-bold">{profile?.name}</h1>
+              <div className="mt-4 sm:mt-0 sm:ml-6 text-white">
+                <h1 className="text-xl sm:text-2xl font-bold">{profile?.name}</h1>
                 <p className="text-cyan-100 mt-1">Roll No: {profile?.roll}</p>
                 {profile?.program && (
                   <p className="text-cyan-100 text-sm mt-1">{profile.program} {profile.batch && `• Batch ${profile.batch}`}</p>
@@ -196,7 +196,7 @@ const Profile = () => {
           </div>
 
           {/* Voting Status Badge */}
-          <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+          <div className="px-4 py-3 sm:px-6 sm:py-4 bg-gray-50 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center">
               <span className="text-sm text-gray-500">Voting Status:</span>
               {profile?.totalVotes > 0 ? (
@@ -220,7 +220,7 @@ const Profile = () => {
           </div>
 
           {/* Profile Details */}
-          <div className="px-6 py-6">
+          <div className="px-4 py-4 sm:px-6 sm:py-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>

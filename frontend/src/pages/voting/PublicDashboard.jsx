@@ -333,7 +333,7 @@ const PublicDashboard = () => {
               )}
             </div>
             {/* Mobile theme toggle (visible only on small screens) */}
-            <div className="flex items-center sm:hidden">
+            <div className="flex items-center sm:hidden space-x-2">
               <button
                 onClick={toggleTheme}
                 aria-label="Toggle theme"
@@ -350,6 +350,21 @@ const PublicDashboard = () => {
                   </svg>
                 )}
               </button>
+              {isLoggedIn ? (
+                <button
+                  onClick={handleGoToDashboard}
+                  className="bg-cyan-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-cyan-700"
+                >
+                  Dashboard
+                </button>
+              ) : (
+                <button
+                  onClick={handleLogin}
+                  className="bg-cyan-100 text-cyan-800 px-3 py-1.5 rounded-md text-xs font-medium hover:bg-cyan-200"
+                >
+                  Login
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -359,17 +374,33 @@ const PublicDashboard = () => {
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Public Transparency Dashboard</h1>
-                <p className="mt-1 text-sm text-gray-500">Real-time view of Voting system activity and immutable ledger</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Public Transparency Dashboard</h1>
+                <p className="mt-1 text-xs sm:text-sm text-gray-500">Real-time view of Voting system activity and immutable ledger</p>
                 <p className="mt-2 text-xs text-gray-400">Official record published by SecureVote — Independent, auditable, and privacy preserving.</p>
               </div>
-              <div className="text-right text-sm text-gray-500">
+              <div className="text-left sm:text-right text-xs sm:text-sm text-gray-500">
                 <div>Last updated:</div>
                 <div className="font-mono last-updated-digital">{lastUpdated ? formatLastUpdated(lastUpdated) : '—'}</div>
                 {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
               </div>
+            </div>
+
+            {/* Mobile tabs (visible only on small screens) */}
+            <div className="flex sm:hidden mt-4 border-b">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`flex-1 py-2 text-center text-sm font-medium border-b-2 ${activeTab === 'overview' ? 'border-cyan-500 text-gray-900' : 'border-transparent text-gray-500'}`}
+              >
+                Elections
+              </button>
+              <button
+                onClick={() => setActiveTab('elections')}
+                className={`flex-1 py-2 text-center text-sm font-medium border-b-2 ${activeTab === 'elections' ? 'border-cyan-500 text-gray-900' : 'border-transparent text-gray-500'}`}
+              >
+                Overview
+              </button>
             </div>
           </div>
 
@@ -469,7 +500,7 @@ const PublicDashboard = () => {
 
               <div className="bg-white shadow rounded-lg p-4">
                 <h3 className="text-lg font-medium mb-3">Elections</h3>
-                <div className="mb-3 flex items-center justify-between">
+                <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex items-center space-x-2">
                     <label className="text-sm text-gray-600">Filter:</label>
                     <select value={electionFilter} onChange={e => setElectionFilter(e.target.value)} className="border rounded px-2 py-1 text-sm">
@@ -499,10 +530,10 @@ const PublicDashboard = () => {
                       if (electionFilter === 'completed') return (ev.status === 'completed' || ev.status === 'ended');
                       return true;
                     }).map(ev => (
-                      <div key={ev._id} className="border rounded p-3 flex justify-between items-center">
-                        <div>
-                          <div className="flex items-center space-x-3">
-                            <div className="font-semibold text-gray-900">{ev.title}</div>
+                      <div key={ev._id} className="border rounded p-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="font-semibold text-gray-900 break-words">{ev.title}</div>
                             <div>
                               {ev.status === 'active' || ev.status === 'ongoing' ? (
                                 <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">Active</span>

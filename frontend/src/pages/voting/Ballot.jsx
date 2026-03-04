@@ -201,10 +201,10 @@ const Ballot = () => {
       <VoterNavbar />
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+      <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div className="py-6 sm:px-0">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Cast Your Vote</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Cast Your Vote</h1>
             <p className="mt-1 text-sm text-gray-500">
               Select a candidate and confirm your vote
             </p>
@@ -239,17 +239,17 @@ const Ballot = () => {
                   </div>
                 </dl>
               </div>
-              <div className="px-4 py-4 bg-gray-50 sm:px-6 flex justify-end space-x-3">
+              <div className="px-4 py-4 bg-gray-50 sm:px-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
                 <button
                   onClick={() => setShowConfirmation(false)}
-                  className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                  className="w-full sm:w-auto inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleVote}
                   disabled={Voting}
-                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50"
+                  className="w-full sm:w-auto inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50"
                 >
                   {Voting ? (
                     <>
@@ -299,19 +299,19 @@ const Ballot = () => {
                               onChange={() => setSelectedCandidate(candidate.id)}
                               className="focus:ring-cyan-500 h-4 w-4 text-cyan-600 border-gray-300"
                             />
-                            <div className="ml-3 flex items-center flex-1">
+                            <div className="ml-3 flex items-center flex-1 min-w-0">
                               {candidate.photoUrl ? (
                                 <img 
                                   src={getImageUrl(candidate.photoUrl)} 
                                   alt={candidate.name} 
-                                  className="w-12 h-12 rounded-full object-cover mr-4 cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
+                                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover mr-3 sm:mr-4 flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setPhotoModal({ show: true, url: getImageUrl(candidate.photoUrl), name: candidate.name });
                                   }}
                                 />
                               ) : (
-                                <div className="w-12 h-12 rounded-full bg-gray-200 mr-4 flex items-center justify-center text-gray-500 text-sm font-medium">
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 mr-3 sm:mr-4 flex-shrink-0 flex items-center justify-center text-gray-500 text-sm font-medium">
                                   {(candidate.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
                                 </div>
                               )}
@@ -343,11 +343,11 @@ const Ballot = () => {
                   </div>
                 </dl>
               </div>
-              <div className="px-4 py-4 bg-gray-50 sm:px-6 flex justify-end">
+              <div className="px-4 py-4 bg-gray-50 sm:px-6">
                 <button
                   onClick={handleConfirmVote}
                   disabled={!selectedCandidate || Voting}
-                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50"
+                  className="w-full sm:w-auto sm:float-right inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50"
                 >
                   Review & Confirm Vote
                 </button>
