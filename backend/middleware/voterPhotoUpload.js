@@ -1,11 +1,15 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Storage config for voter photos
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadPath = path.join(process.cwd(), 'public', 'uploads', 'voters');
+    const uploadPath = path.join(__dirname, '..', 'public', 'uploads', 'voters');
     fs.mkdirSync(uploadPath, { recursive: true });
     cb(null, uploadPath);
   },

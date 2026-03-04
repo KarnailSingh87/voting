@@ -5,19 +5,25 @@ services:
   - type: web
     name: securevote
     runtime: node
-    plan: free            # change to "starter" / "standard" for production
-    region: oregon        # closest to your users
+    plan: free
+    region: oregon
     buildCommand: npm run render:build
-    startCommand: npm run render:start
+    startCommand: node backend/server.js
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: "10000"         # Render default
       - key: MONGO_URI
-        sync: false            # set manually in Render dashboard
+        sync: false
       - key: JWT_SECRET
-        generateValue: true    # Render generates a random 256-bit secret
+        generateValue: true
       - key: CORS_ORIGIN
-        sync: false            # set to your domain, e.g. https://securevote.onrender.com
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: ADMIN_URL
+        sync: false
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
     healthCheckPath: /health

@@ -7,10 +7,10 @@
     "build:frontend": "cd frontend && npm run build",
     "build:admin": "cd admin && npm run build",
     "build": "npm run build:frontend && npm run build:admin",
-    "start": "cd backend && node server.js",
+    "start": "node backend/server.js",
     "dev": "cd backend && npm run dev",
     "render:build": "npm run install:all && npm run build",
-    "render:start": "NODE_ENV=production npm start"
+    "render:start": "node backend/server.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc.9",

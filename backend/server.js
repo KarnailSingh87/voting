@@ -14,10 +14,10 @@ import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import { initOTPService } from './config/otpService.js';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -40,10 +40,10 @@ app.use(helmet({
 }));
 
 // Serve uploaded files (candidate photos etc.) from public/uploads at /uploads
-app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // Serve static HTML files from public folder
-app.use(express.static(path.join(process.cwd(), 'public')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Routes
 app.use('/api/voter', voterRoutes);

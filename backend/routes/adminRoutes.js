@@ -17,7 +17,10 @@ import AdminAction from '../models/AdminAction.js';
 import { requestOTP, getOTPEntry, getWhatsAppStatus, isWhatsAppConnected, disconnectWhatsApp, initWhatsApp } from '../config/otpService.js';
 import { parseFile } from '../config/aiParser.js';
 import QRCode from 'qrcode';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 // limit file size to 50MB and accept common spreadsheet/zip types (reject plain text uploads)
@@ -42,7 +45,7 @@ const upload = multer({
 const imageUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      const dest = path.join(process.cwd(), 'public', 'uploads', 'candidates');
+      const dest = path.join(__dirname, '..', 'public', 'uploads', 'candidates');
       try { fs.mkdirSync(dest, { recursive: true }); } catch (e) {}
       cb(null, dest);
     },
