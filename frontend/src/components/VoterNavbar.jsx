@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from '../utils/axios';
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:5005');
+const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 
 const getImageUrl = (url) => {
   if (!url) return null;

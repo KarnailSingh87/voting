@@ -7,7 +7,7 @@ import Sidebar from '../../components/Sidebar';
 import { toast } from 'react-toastify';
 import Modal from '../../components/Modal';
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:5005');
+const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 
 // Helper to get full image URL (handles both absolute and relative URLs)
 const getImageUrl = (url) => {
@@ -186,7 +186,7 @@ const ElectionDetail = () => {
 
   // realtime updates
   useEffect(() => {
-    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.PROD ? undefined : 'http://localhost:5005'));
+    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
     const onVote = (payload) => {
       try {
         const { candidateId, voteCount } = payload || {};

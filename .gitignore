@@ -2,13 +2,16 @@ node_modules
 .env
 *.env.local
 
-# Build output (generated on Render, not committed)
+# Build output
 frontend/dist
 admin/dist
 
-# Lock files — regenerated on each platform to get correct native binaries
+# Lock files — regenerated per platform
 frontend/package-lock.json
 admin/package-lock.json
+
+# WhatsApp auth state (runtime, not source)
+backend/baileys_auth
 
 # Logs
 logs

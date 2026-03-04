@@ -113,7 +113,7 @@ const ImportStudents = () => {
       const clientMsg = err.message || 'Preview failed';
       const composed = bodyMsg ? `${bodyMsg}` : `${clientMsg}`;
       if (!err.response) {
-        setError(`${composed} — no response from server. Is the backend running at ${import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:5005')}?`);
+        setError(`${composed} — no response from server. Is the backend running at ${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005'}?`);
       } else {
         setError(composed + (status ? ` (HTTP ${status})` : ''));
       }

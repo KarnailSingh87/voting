@@ -14,15 +14,12 @@ import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import { initOTPService } from './config/otpService.js';
 
-import fs from 'fs';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
-const isProduction = process.env.NODE_ENV === 'production';
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -30,23 +27,11 @@ app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: 
 app.use(helmet({ 
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   crossOriginEmbedderPolicy: false,
-  contentSecurityPolicy: isProduction ? {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'", "wss:", "ws:"],
-    }
-  } : false
+  contentSecurityPolicy: false
 }));
 
-// Serve uploaded files (candidate photos etc.) from public/uploads at /uploads
+// Serve uploaded files (candidate photos etc.)
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
-
-// Serve static HTML files from public folder
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Routes
 app.use('/api/voter', voterRoutes);
@@ -55,39 +40,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api', publicRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
-
-// ── Serve built frontend & admin SPAs if dist folders exist ──
-const adminDist = path.join(__dirname, '..', 'admin', 'dist');
-const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
-const hasAdminDist = fs.existsSync(path.join(adminDist, 'index.html'));
-const hasFrontendDist = fs.existsSync(path.join(frontendDist, 'index.html'));
-
-console.log(`[Static] adminDist=${adminDist} exists=${hasAdminDist}`);
-console.log(`[Static] frontendDist=${frontendDist} exists=${hasFrontendDist}`);
-
-const staticOpts = {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
-    else if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
-  }
-};
-
-if (hasAdminDist) {
-  app.use('/admin', express.static(adminDist, staticOpts));
-  app.get('/admin/*', (req, res) => {
-    res.sendFile(path.join(adminDist, 'index.html'));
-  });
-}
-
-if (hasFrontendDist) {
-  app.use(express.static(frontendDist, staticOpts));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health') || req.path.startsWith('/admin')) {
-      return next();
-    }
-    res.sendFile(path.join(frontendDist, 'index.html'));
-  });
-}
 
 // Global error handler to return JSON for Multer and common errors
 app.use((err, req, res, next) => {
@@ -164,36 +116,9 @@ async function startServer() {
     /* silent */
   }
 
-  if (isProduction) {
-    // In production (Render), just listen on the assigned PORT
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running in production on port ${PORT}`);
-    });
-  } else {
-    const maxAttempts = 5;
-    const tryListen = (port, attemptsLeft) => {
-      server.once('error', (err) => {
-        if (err && err.code === 'EADDRINUSE') {
-          if (attemptsLeft > 0) {
-            const nextPort = port + 1;
-            setTimeout(() => tryListen(nextPort, attemptsLeft - 1), 100);
-          } else {
-            console.error('All port attempts failed. Set PORT env variable to an available port.');
-            process.exit(1);
-          }
-        } else {
-          console.error('Server error:', err);
-          process.exit(1);
-        }
-      });
-
-      server.listen(port, () => {
-        console.log(`🚀 Server running on http://localhost:${port}`);
-      });
-    };
-
-    tryListen(PORT, maxAttempts - 1);
-  }
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
 }
 
 // export app for testing and programmatic use

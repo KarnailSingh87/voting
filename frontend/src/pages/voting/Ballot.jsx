@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import axios from '../../utils/axios';
 import VoterNavbar from '../../components/VoterNavbar';
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:5005');
+const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 
 // Helper to get full image URL (handles both absolute and relative URLs)
 const getImageUrl = (url) => {

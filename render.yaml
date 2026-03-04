@@ -1,14 +1,17 @@
-# Render Blueprint – single Web Service hosting backend + both SPAs
+# Render Blueprint – 3 separate services
+# Backend = Web Service, Frontend + Admin = Static Sites
 # Docs: https://docs.render.com/blueprint-spec
 
 services:
+  # ── Backend API ──
   - type: web
-    name: securevote
+    name: voting-backend
     runtime: node
     plan: free
     region: oregon
-    buildCommand: npm run render:build
-    startCommand: node backend/server.js
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
     envVars:
       - key: NODE_ENV
         value: production
@@ -17,13 +20,55 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        value: https://voting-xr9p.onrender.com
-      - key: FRONTEND_URL
-        value: https://voting-xr9p.onrender.com
-      - key: ADMIN_URL
-        value: https://voting-xr9p.onrender.com/admin
+        sync: false
       - key: ADMIN_USERNAME
         value: admin
       - key: ADMIN_PASSWORD
         sync: false
     healthCheckPath: /health
+
+  # ── Voter Frontend (Static Site) ──
+  - type: web
+    name: voting-frontend
+    runtime: static
+    plan: free
+    region: oregon
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_BACKEND_URL
+        sync: false
+      - key: VITE_SOCKET_URL
+        sync: false
+
+  # ── Admin Panel (Static Site) ──
+  - type: web
+    name: voting-admin
+    runtime: static
+    plan: free
+    region: oregon
+    rootDir: admin
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_BACKEND_URL
+        sync: false
+      - key: VITE_SOCKET_URL
+        sync: false
