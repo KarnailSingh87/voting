@@ -333,10 +333,7 @@ const Login = () => {
                               const respMsg = res.data?.message || 'Student lookup failed';
                               // If backend explicitly indicates Not found, show a neutral message and allow reporting
                               if (respMsg === 'Not found') {
-                                const friendly = 'No student record found for that roll. Check formatting (4–20 alphanumeric). If this is correct, contact your election admin.';
-                                setMessage(friendly);
                                 setMissingRecord(true);
-                                toast.info(friendly);
                               } else {
                                 setError(respMsg);
                                 toast.error(respMsg);
@@ -346,11 +343,7 @@ const Login = () => {
                             let msg = err.response?.data?.message || 'Student lookup failed';
                             // "Not found" is the raw 404 message from backend; show a friendly hint
               if (err.response?.status === 404 || msg === 'Not found') {
-                // Provide a clearer, actionable message for users when lookup fails
-                msg = 'No student record found for that roll. Check formatting (4–20 alphanumeric). If this is correct, contact your election admin.';
-                setMessage(msg);
                 setMissingRecord(true);
-                toast.info(msg);
               } else {
                 setError(msg);
                 toast.error(msg);

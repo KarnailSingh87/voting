@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import cors from 'cors';
+import compression from 'compression';
 import http from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
@@ -20,6 +21,9 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
+
+// Enable gzip/brotli compression for all responses
+app.use(compression());
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -48,8 +52,12 @@ app.use(helmet({
   contentSecurityPolicy: false
 }));
 
-// Serve uploaded files (candidate photos etc.)
-app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
+// Serve uploaded files (candidate photos etc.) with caching
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads'), {
+  maxAge: '7d',
+  etag: true,
+  lastModified: true,
+}));
 
 // Routes
 app.use('/api/voter', voterRoutes);

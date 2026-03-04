@@ -88,7 +88,7 @@ const Ballot = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      if (response.data.success) {
+      if (response.data.message || response.data.voteHash) {
         setShowConfirmation(false);
         setShowSuccess(true);
       }

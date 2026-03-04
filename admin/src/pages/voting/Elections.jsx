@@ -44,7 +44,7 @@ const Elections = () => {
         if (err.response?.status === 401) {
           // Token expired or invalid, redirect to login
           localStorage.removeItem('adminToken');
-          window.location.href = '/admin/login';
+          window.location.href = '/';
         } else {
           setError('Failed to fetch elections');
         }
@@ -58,7 +58,7 @@ const Elections = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
-    window.location.href = '/admin/login';
+    window.location.href = '/';
   };
 
   const handleChange = (e) => {

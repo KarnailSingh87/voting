@@ -60,7 +60,7 @@ const Monitoring = () => {
         if (err.response?.status === 401) {
           // Token expired or invalid, redirect to login
           localStorage.removeItem('adminToken');
-          window.location.href = '/admin/login';
+          window.location.href = '/';
         } else {
           setError('Failed to fetch system health data');
         }
@@ -79,7 +79,7 @@ const Monitoring = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
-    window.location.href = '/admin/login';
+    window.location.href = '/';
   };
 
   const formatBytes = (bytes, decimals = 2) => {

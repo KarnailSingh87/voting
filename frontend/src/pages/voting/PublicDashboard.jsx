@@ -45,8 +45,6 @@ PhotoModal.propTypes = {
   onClose: PropTypes.func.isRequired,
 };
 
-let socket;
-
 const PublicDashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
@@ -89,7 +87,7 @@ const PublicDashboard = () => {
 
   useEffect(() => {
     // Initialize WebSocket connection (stats updates only)
-    socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
+    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
 
     socket.on('connect', () => {
       console.log('Connected to WebSocket server');
@@ -153,7 +151,6 @@ const PublicDashboard = () => {
   }, []);
 
   const fetchLatest = useCallback(async ({tries = 3} = {}) => {
-    let isMounted = true;
     try {
       setError('');
 
@@ -161,8 +158,6 @@ const PublicDashboard = () => {
   fetchWithRetries('/api/stats', tries),
   fetchWithRetries('/api/election', tries)
       ]);
-
-      if (!isMounted) return;
 
       if (statsResponse?.data?.success) setStats(statsResponse.data.statistics);
       if (electionsResponse?.data?.success) {
@@ -184,14 +179,12 @@ const PublicDashboard = () => {
     } catch (err) {
       // Log and notify via toast; retry/backoff will attempt again in background
       console.error('PublicDashboard fetch error', err?.message || err);
-      if (!isMounted) return;
       // show a non-blocking toast notification instead of a persistent banner
       try { toast.warn('Unable to reach public API — retrying in background'); } catch (e) { console.warn('Toast failed', e); }
       setError('');
     } finally {
-      if (isMounted) setLoading(false);
+      setLoading(false);
     }
-    return () => { isMounted = false; };
   }, [fetchWithRetries]);
 
   useEffect(() => {

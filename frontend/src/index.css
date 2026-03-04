@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Poppins:wght@100..900&family=Playfair+Display:wght@400..900&display=swap');
-/* Note: removed additional Google font imports per request to keep the project's default fonts */
+/* Fonts loaded via <link> in index.html for non-blocking fetch */
 
 @tailwind base;
 @tailwind components;

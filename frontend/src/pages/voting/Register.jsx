@@ -57,7 +57,7 @@ const Register = () => {
     setRollLoading(true);
     setRollValid(null);
     try {
-      const res = await axios.post('/student-lookup', { roll });
+      const res = await axios.post('/api/student-lookup', { roll });
       const name = res?.data?.name || '';
       if (name) {
         setRollValid(true);
@@ -119,7 +119,7 @@ const Register = () => {
         email: formData.email,
         mobile: formData.mobile
       };
-      const res = await axios.post('/voter/request-otp', payload);
+      const res = await axios.post('/api/voter/request-otp', payload);
       if (res?.data?.message) {
         setSuccess(true);
         // optionally redirect after a delay

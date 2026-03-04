@@ -78,7 +78,8 @@ router.post('/cast', voterAuth, async (req, res) => {
     try {
       if (voter.identifierRaw) {
         const r = voter.identifierRaw.trim();
-        await Student.updateOne({ roll: { $regex: `^${r}$`, $options: 'i' } }, { $set: { voted: true } }).session(session);
+        const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        await Student.updateOne({ roll: { $regex: `^${escapeRegExp(r)}$`, $options: 'i' } }, { $set: { voted: true } }).session(session);
       }
     } catch (err) {
       console.warn('Failed to mark Student.voted', err.message || err);
