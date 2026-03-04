@@ -462,12 +462,15 @@ const ElectionDetail = () => {
                               alt={c.name} 
                               className="w-14 h-14 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
                               onClick={() => setPhotoModal({ show: true, url: getImageUrl(c.photoUrl), name: c.name })}
+                              onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }}
                             />
-                          ) : (
-                            <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-sm text-gray-600">
-                              {(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
-                            </div>
-                          )}
+                          ) : null}
+                          <div 
+                            className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-sm text-gray-600"
+                            style={c.photoUrl ? { display: 'none' } : {}}
+                          >
+                            {(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
+                          </div>
                           {/* Photo upload overlay */}
                           <label 
                             htmlFor={`file-${c.id}`} 

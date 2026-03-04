@@ -218,12 +218,15 @@ const Dashboard = () => {
                                       alt={candidate.name} 
                                       className="w-10 h-10 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
                                       onClick={() => setPhotoModal({ show: true, url: getImageUrl(candidate.photoUrl), name: candidate.name })}
+                                      onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }}
                                     />
-                                  ) : (
-                                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-medium">
-                                      {(candidate.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
-                                    </div>
-                                  )}
+                                  ) : null}
+                                  <div 
+                                    className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-medium"
+                                    style={candidate.photoUrl ? { display: 'none' } : {}}
+                                  >
+                                    {(candidate.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
+                                  </div>
                                   <div className="ml-3 text-sm">
                                     <p className="font-medium text-gray-900">{candidate.name}</p>
                                     {candidate.party && (
