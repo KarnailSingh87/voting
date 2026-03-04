@@ -27,6 +27,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
 app.use(helmet({ 
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginEmbedderPolicy: false,
   contentSecurityPolicy: isProduction ? {
     directives: {
       defaultSrc: ["'self'"],
@@ -58,14 +59,21 @@ if (isProduction) {
   const adminDist = path.join(__dirname, '..', 'admin', 'dist');
   const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
 
+  const staticOpts = {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
+      else if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
+    }
+  };
+
   // Admin SPA at /admin
-  app.use('/admin', express.static(adminDist));
+  app.use('/admin', express.static(adminDist, staticOpts));
   app.get('/admin/*', (req, res) => {
     res.sendFile(path.join(adminDist, 'index.html'));
   });
 
   // Voter frontend SPA (catch-all — must be last)
-  app.use(express.static(frontendDist));
+  app.use(express.static(frontendDist, staticOpts));
   app.get('*', (req, res, next) => {
     // Don't catch API or upload routes
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health')) {
