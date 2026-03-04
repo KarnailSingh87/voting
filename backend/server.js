@@ -14,6 +14,8 @@ import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import { initOTPService } from './config/otpService.js';
 
+import fs from 'fs';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -54,29 +56,33 @@ app.use('/api', publicRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// ── Production: serve built frontend & admin SPAs ──
-if (isProduction) {
-  const adminDist = path.join(__dirname, '..', 'admin', 'dist');
-  const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
+// ── Serve built frontend & admin SPAs if dist folders exist ──
+const adminDist = path.join(__dirname, '..', 'admin', 'dist');
+const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
+const hasAdminDist = fs.existsSync(path.join(adminDist, 'index.html'));
+const hasFrontendDist = fs.existsSync(path.join(frontendDist, 'index.html'));
 
-  const staticOpts = {
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
-      else if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
-    }
-  };
+console.log(`[Static] adminDist=${adminDist} exists=${hasAdminDist}`);
+console.log(`[Static] frontendDist=${frontendDist} exists=${hasFrontendDist}`);
 
-  // Admin SPA at /admin
+const staticOpts = {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
+    else if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
+  }
+};
+
+if (hasAdminDist) {
   app.use('/admin', express.static(adminDist, staticOpts));
   app.get('/admin/*', (req, res) => {
     res.sendFile(path.join(adminDist, 'index.html'));
   });
+}
 
-  // Voter frontend SPA (catch-all — must be last)
+if (hasFrontendDist) {
   app.use(express.static(frontendDist, staticOpts));
   app.get('*', (req, res, next) => {
-    // Don't catch API or upload routes
-    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health')) {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health') || req.path.startsWith('/admin')) {
       return next();
     }
     res.sendFile(path.join(frontendDist, 'index.html'));
