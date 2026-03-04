@@ -326,7 +326,6 @@ const Login = () => {
                             setVerifiedRoll(true);
                             setIsMe(null);
                             setQueryRaised(false);
-                            toast.success('Student found');
                             // show a link to full details page
                             // (Login remains the primary flow; details page is for inspection/printing)
                             } else {
