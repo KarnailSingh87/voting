@@ -23,7 +23,25 @@ const app = express();
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
+
+// CORS: allow origins from env, plus any *.onrender.com for Render deployments
+const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : [];
+app.use(cors({
+  origin: (origin, cb) => {
+    // allow requests with no origin (curl, mobile apps, server-to-server)
+    if (!origin) return cb(null, true);
+    // allow if in explicit list
+    if (allowedOrigins.length && allowedOrigins.includes(origin)) return cb(null, true);
+    // allow any *.onrender.com origin (all Render static sites)
+    if (origin.endsWith('.onrender.com')) return cb(null, true);
+    // allow localhost for development
+    if (origin.match(/^https?:\/\/localhost(:\d+)?$/)) return cb(null, true);
+    // if no explicit list was provided, allow everything
+    if (!allowedOrigins.length) return cb(null, true);
+    cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
 app.use(helmet({ 
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   crossOriginEmbedderPolicy: false,
@@ -57,7 +75,19 @@ app.use((err, req, res, next) => {
 });
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: process.env.CORS_ORIGIN?.split(',') || '*'} });
+const io = new Server(server, {
+  cors: {
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.length && allowedOrigins.includes(origin)) return cb(null, true);
+      if (origin.endsWith('.onrender.com')) return cb(null, true);
+      if (origin.match(/^https?:\/\/localhost(:\d+)?$/)) return cb(null, true);
+      if (!allowedOrigins.length) return cb(null, true);
+      cb(new Error('Not allowed by CORS'));
+    },
+    credentials: true
+  }
+});
 app.set('io', io);
 
 io.on('connection', (socket) => {
