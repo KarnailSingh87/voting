@@ -1,0 +1,23 @@
+# Render Blueprint – single Web Service hosting backend + both SPAs
+# Docs: https://docs.render.com/blueprint-spec
+
+services:
+  - type: web
+    name: securevote
+    runtime: node
+    plan: free            # change to "starter" / "standard" for production
+    region: oregon        # closest to your users
+    buildCommand: npm run render:build
+    startCommand: npm run render:start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"         # Render default
+      - key: MONGO_URI
+        sync: false            # set manually in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true    # Render generates a random 256-bit secret
+      - key: CORS_ORIGIN
+        sync: false            # set to your domain, e.g. https://securevote.onrender.com
+    healthCheckPath: /health

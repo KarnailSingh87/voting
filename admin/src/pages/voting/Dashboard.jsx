@@ -33,7 +33,7 @@ const AdminDashboard = () => {
     };
 
     fetchDashboardData();
-    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
+    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.PROD ? undefined : 'http://localhost:5005'));
     socket.on('vote_cast', (_payload) => {
       // Could trigger a refetch or update a local tally widget in future
       // For now just log

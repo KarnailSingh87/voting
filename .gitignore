@@ -1,1 +1,15 @@
 node_modules
+.env
+*.env.local
+
+# Build output (generated on Render, not committed)
+frontend/dist
+admin/dist
+
+# Logs
+logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

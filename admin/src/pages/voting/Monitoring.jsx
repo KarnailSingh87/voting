@@ -14,7 +14,7 @@ const Monitoring = () => {
 
   useEffect(() => {
     // Initialize WebSocket connection
-    socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
+    socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.PROD ? undefined : 'http://localhost:5005'));
     
     socket.on('connect', () => {
       console.log('Connected to WebSocket server');

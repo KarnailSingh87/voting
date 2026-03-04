@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { useParams, Link } from 'react-router-dom';
 import axios from '../../utils/axios';
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
+const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:5005');
 
 // Helper to get full image URL (handles both absolute and relative URLs)
 const getImageUrl = (url) => {
@@ -86,7 +86,7 @@ const PublicElection = () => {
   // live updates when election is ongoing
   useEffect(() => {
     if (!election || election.status !== 'ongoing') return;
-    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
+    const socket = io(import.meta.env.VITE_SOCKET_URL || (import.meta.env.PROD ? undefined : 'http://localhost:5005'));
     const onVote = (payload) => {
       try {
         const { candidateId, voteCount } = payload || {};

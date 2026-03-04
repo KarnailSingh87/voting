@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import axios from '../../utils/axios';
 import Modal from '../../components/Modal';
 
-const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
+const BACKEND = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:5005');
 
 const AdminVoters = () => {
   const [q, setQ] = useState('');
@@ -38,7 +38,7 @@ const AdminVoters = () => {
     } catch (e) {
       if (!e.response) {
         setBackendHealthy(false);
-        setError(`Network error: could not reach backend at ${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005'}`);
+        setError(`Network error: could not reach backend at ${import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:5005')}`);
       } else {
         setError(e.response?.data?.message || e.message || 'Failed to fetch');
       }

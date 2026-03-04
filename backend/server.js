@@ -5,6 +5,7 @@ import cors from 'cors';
 import http from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { connectDB } from './config/db.js';
 import Election from './models/Election.js';
 import voterRoutes from './routes/voterRoutes.js';
@@ -15,20 +16,27 @@ import { initOTPService } from './config/otpService.js';
 
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
+const isProduction = process.env.NODE_ENV === 'production';
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
 app.use(helmet({ 
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: {
+  contentSecurityPolicy: isProduction ? {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'", "wss:", "ws:"],
     }
-  }
+  } : false
 }));
 
 // Serve uploaded files (candidate photos etc.) from public/uploads at /uploads
@@ -44,6 +52,28 @@ app.use('/api/admin', adminRoutes);
 app.use('/api', publicRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+// ── Production: serve built frontend & admin SPAs ──
+if (isProduction) {
+  const adminDist = path.join(__dirname, '..', 'admin', 'dist');
+  const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
+
+  // Admin SPA at /admin
+  app.use('/admin', express.static(adminDist));
+  app.get('/admin/*', (req, res) => {
+    res.sendFile(path.join(adminDist, 'index.html'));
+  });
+
+  // Voter frontend SPA (catch-all — must be last)
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res, next) => {
+    // Don't catch API or upload routes
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 // Global error handler to return JSON for Multer and common errors
 app.use((err, req, res, next) => {
@@ -120,29 +150,36 @@ async function startServer() {
     /* silent */
   }
 
-  const maxAttempts = 5;
-  const tryListen = (port, attemptsLeft) => {
-    server.once('error', (err) => {
-      if (err && err.code === 'EADDRINUSE') {
-        if (attemptsLeft > 0) {
-          const nextPort = port + 1;
-          setTimeout(() => tryListen(nextPort, attemptsLeft - 1), 100);
+  if (isProduction) {
+    // In production (Render), just listen on the assigned PORT
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running in production on port ${PORT}`);
+    });
+  } else {
+    const maxAttempts = 5;
+    const tryListen = (port, attemptsLeft) => {
+      server.once('error', (err) => {
+        if (err && err.code === 'EADDRINUSE') {
+          if (attemptsLeft > 0) {
+            const nextPort = port + 1;
+            setTimeout(() => tryListen(nextPort, attemptsLeft - 1), 100);
+          } else {
+            console.error('All port attempts failed. Set PORT env variable to an available port.');
+            process.exit(1);
+          }
         } else {
-          console.error('All port attempts failed. Set PORT env variable to an available port.');
+          console.error('Server error:', err);
           process.exit(1);
         }
-      } else {
-        console.error('Server error:', err);
-        process.exit(1);
-      }
-    });
+      });
 
-    server.listen(port, () => {
-      console.log(`🚀 Server running on http://localhost:${port}`);
-    });
-  };
+      server.listen(port, () => {
+        console.log(`🚀 Server running on http://localhost:${port}`);
+      });
+    };
 
-  tryListen(PORT, maxAttempts - 1);
+    tryListen(PORT, maxAttempts - 1);
+  }
 }
 
 // export app for testing and programmatic use
