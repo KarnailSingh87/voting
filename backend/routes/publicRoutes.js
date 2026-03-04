@@ -115,7 +115,7 @@ router.get('/election', async (req, res) => {
       status: e.status === 'ongoing' ? 'active' : (e.status === 'scheduled' ? 'draft' : (e.status === 'ended' ? 'completed' : e.status)),
       startDate: e.startTime,
       endDate: e.endTime,
-      candidates: (candidateMap[e._id]||[]).map(c => ({ id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount, photoUrl: c.photoUrl ? `${req.protocol}://${req.get('host')}${c.photoUrl}` : null }))
+      candidates: (candidateMap[e._id]||[]).map(c => ({ id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount, photoUrl: c.photoUrl || null }))
     }));
     // Sort so live/active elections appear first; among live ones, most recently started first
     const rank = (s) => (s === 'active' || s === 'ongoing') ? 0 : (s === 'scheduled' || s === 'draft') ? 1 : 2;
@@ -146,7 +146,7 @@ router.get('/election/:id', async (req, res) => {
     if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
     const candidates = await Candidate.find({ election: election._id }).sort({ voteCount: -1 });
     const totalVotes = candidates.reduce((s, c) => s + (c.voteCount || 0), 0);
-  res.json({ success: true, election: { _id: election._id, title: election.title, description: election.description, status: election.status, startDate: election.startTime, endDate: election.endTime }, candidates: candidates.map(c => ({ id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount, photoUrl: c.photoUrl ? `${req.protocol}://${req.get('host')}${c.photoUrl}` : null })), totalVotes });
+  res.json({ success: true, election: { _id: election._id, title: election.title, description: election.description, status: election.status, startDate: election.startTime, endDate: election.endTime }, candidates: candidates.map(c => ({ id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount, photoUrl: c.photoUrl || null })), totalVotes });
   } catch (e) {
     console.error('public election detail error', e);
     res.status(500).json({ success: false, message: 'Server error' });

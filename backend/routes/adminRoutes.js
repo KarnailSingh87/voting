@@ -62,10 +62,10 @@ const imageUpload = multer({
   }
 });
 
-// helper to build absolute URL for returned photo paths
-function absoluteUrl(req, url) {
+// helper to normalise photo paths – return relative paths and let the frontend prepend the backend URL
+function absoluteUrl(_req, url) {
   if (!url) return null;
-  try { return `${req.protocol}://${req.get('host')}${url}`; } catch (e) { return url; }
+  return url;
 }
 
 // Seed super admin if none exists (dev convenience)

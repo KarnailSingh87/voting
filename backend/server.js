@@ -22,6 +22,9 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 
+// Trust proxy (Render, Heroku, etc.) so req.protocol reflects the actual client protocol
+app.set('trust proxy', 1);
+
 // Enable gzip/brotli compression for all responses
 app.use(compression());
 
