@@ -66,7 +66,7 @@ const AdminDashboard = () => {
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Welcome, {dashboardData?.admin?.firstName} {dashboardData?.admin?.lastName}
+              Welcome, {dashboardData?.admin?.username || 'Admin'}
             </p>
           </div>
 
@@ -190,8 +190,12 @@ const AdminDashboard = () => {
                   <div className="border-t border-gray-200">
                     <ul className="divide-y divide-gray-200">
                       {dashboardData.recentActivity.length === 0 ? (
-                        <li className="px-6 py-4 text-center">
-                          <p className="text-gray-500">No recent activity</p>
+                        <li className="px-6 py-12 text-center">
+                          <svg className="mx-auto h-10 w-10 text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <p className="mt-2 text-sm font-medium text-gray-500">No recent activity</p>
+                          <p className="mt-1 text-xs text-gray-400">Activity will appear here as elections are created, started, and votes are cast.</p>
                         </li>
                       ) : (
                         dashboardData.recentActivity.map((activity, index) => (

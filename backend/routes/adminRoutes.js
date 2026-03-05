@@ -127,6 +127,8 @@ router.post('/login', async (req, res) => {
     const ok = await admin.comparePassword(password);
     if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
     const token = jwt.sign({ aid: admin._id, role: admin.role }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '4h' });
+    // Log login action
+    try { await AdminAction.create({ admin: admin._id, action: 'Admin Login', details: { description: `${admin.username} logged in`, severity: 'low' }, ip: req.ip }); } catch (_) {}
     res.json({ token, admin: { id: admin._id, role: admin.role, username: admin.username } });
   } catch(e) {
     console.error(e);
@@ -201,6 +203,8 @@ router.post('/election', adminAuth, async (req, res) => {
     }
 
     res.json({ success: true, election, candidates: createdCandidates.map(c => ({ id: c._id.toString(), name: c.name, party: c.party, manifesto: c.manifesto, photoUrl: absoluteUrl(req, c.photoUrl) })) });
+    // Log election creation
+    try { await AdminAction.create({ admin: req.admin?.aid, action: 'Election Created', details: { description: `Created election "${title}"`, severity: 'medium', electionId: election._id }, ip: req.ip }); } catch (_) {}
   } catch(e) {
     console.error(e);
     res.status(500).json({ success: false, message: 'Server error: ' + e.message });
@@ -432,6 +436,8 @@ router.post('/election/:id/start', adminAuth, async (req, res) => {
     if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
     const io = req.app.get('io');
     if (io) io.emit('election_status', { id: election._id.toString(), status: election.status });
+    // Log action
+    try { await AdminAction.create({ admin: req.admin?.aid, action: 'Election Started', details: { description: `Started election "${election.title}"`, severity: 'high', electionId: id }, ip: req.ip }); } catch (_) {}
     return res.json({ success: true, election });
   } catch (e) {
     console.error('start election error', e);
@@ -447,6 +453,8 @@ router.post('/election/:id/pause', adminAuth, async (req, res) => {
     if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
     const io = req.app.get('io');
     if (io) io.emit('election_status', { id: election._id.toString(), status: election.status });
+    // Log action
+    try { await AdminAction.create({ admin: req.admin?.aid, action: 'Election Paused', details: { description: `Paused election "${election.title}"`, severity: 'medium', electionId: id }, ip: req.ip }); } catch (_) {}
     return res.json({ success: true, election });
   } catch (e) {
     console.error('pause election error', e);
@@ -461,6 +469,8 @@ router.post('/election/:id/end', adminAuth, async (req, res) => {
     if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
     const io = req.app.get('io');
     if (io) io.emit('election_status', { id: election._id.toString(), status: election.status });
+    // Log action
+    try { await AdminAction.create({ admin: req.admin?.aid, action: 'Election Ended', details: { description: `Ended election "${election.title}"`, severity: 'high', electionId: id }, ip: req.ip }); } catch (_) {}
     return res.json({ success: true, election });
   } catch (e) {
     console.error('end election error', e);
@@ -501,8 +511,10 @@ router.delete('/election/:id', adminAuth, async (req, res) => {
     try {
       await AdminAction.create({
         admin: req.admin?.aid,
-        action: 'delete-election',
+        action: 'Election Deleted',
         details: { 
+          description: `Deleted election "${election.title}"`,
+          severity: 'critical',
           electionId: id, 
           title: election.title,
           deletedCandidates: deletedCandidates.deletedCount,
@@ -606,13 +618,74 @@ router.post('/candidate/:id/photo', adminAuth, imageUpload.single('photo'), asyn
 // Admin dashboard summary
 router.get('/dashboard', adminAuth, async (req, res) => {
   try {
-    const elections = await Election.find();
+    const elections = await Election.find().lean();
     const totalElections = elections.length;
     const activeElections = elections.filter(e => e.status === 'ongoing').length;
     const upcomingElections = elections.filter(e => e.status === 'scheduled').length;
     const completedElections = elections.filter(e => e.status === 'ended').length;
-    const admin = await Admin.findById(req.admin.aid).select('username role updatedAt');
-    res.json({ success: true, dashboard: { admin, statistics: { totalElections, activeElections, upcomingElections, completedElections }, recentActivity: [] } });
+    const admin = await Admin.findById(req.admin.aid).select('username role updatedAt').lean();
+
+    // ── Build recent activity from real data ──
+    const recentActivity = [];
+
+    // 1. Recent votes (last 20)
+    const recentVotes = await Vote.find()
+      .sort({ timestamp: -1 })
+      .limit(20)
+      .populate('election', 'title')
+      .lean();
+    for (const v of recentVotes) {
+      recentActivity.push({
+        action: 'Vote Cast',
+        description: `A vote was cast in "${v.election?.title || 'Unknown Election'}"`,
+        timestamp: v.timestamp || v.createdAt,
+        severity: 'low',
+      });
+    }
+
+    // 2. Recent election changes (created / status changes)
+    const recentElections = await Election.find()
+      .sort({ updatedAt: -1 })
+      .limit(10)
+      .lean();
+    for (const el of recentElections) {
+      const statusLabel = el.status === 'ongoing' ? 'Started' : el.status === 'ended' ? 'Ended' : 'Scheduled';
+      const severity = el.status === 'ongoing' ? 'high' : el.status === 'ended' ? 'medium' : 'low';
+      recentActivity.push({
+        action: `Election ${statusLabel}`,
+        description: `"${el.title}" is ${el.status}`,
+        timestamp: el.updatedAt,
+        severity,
+      });
+    }
+
+    // 3. Admin actions (if any exist)
+    const adminActions = await AdminAction.find()
+      .sort({ createdAt: -1 })
+      .limit(15)
+      .populate('admin', 'username')
+      .lean();
+    for (const aa of adminActions) {
+      recentActivity.push({
+        action: aa.action,
+        description: aa.details?.description || `by ${aa.admin?.username || 'system'}`,
+        timestamp: aa.createdAt,
+        severity: aa.details?.severity || 'low',
+      });
+    }
+
+    // Sort all combined activities by timestamp descending, take top 15
+    recentActivity.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const topActivity = recentActivity.slice(0, 15);
+
+    res.json({
+      success: true,
+      dashboard: {
+        admin,
+        statistics: { totalElections, activeElections, upcomingElections, completedElections },
+        recentActivity: topActivity,
+      },
+    });
   } catch(e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
