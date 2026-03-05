@@ -161,10 +161,19 @@ const PublicElection = () => {
                             alt={c.name} 
                             className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover mr-3 flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
                             onClick={() => setPhotoModal({ show: true, url: getImageUrl(c.photoUrl), name: c.name })}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.style.display = 'none';
+                              if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                            }}
                           />
-                        ) : (
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 mr-3 flex-shrink-0 flex items-center justify-center text-sm text-gray-600">{(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}</div>
-                        )}
+                        ) : null}
+                        <div 
+                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 mr-3 flex-shrink-0 flex items-center justify-center text-sm text-gray-600"
+                          style={c.photoUrl ? { display: 'none' } : {}}
+                        >
+                          {(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
+                        </div>
                         <div className="min-w-0">
                           <div className="font-medium text-base sm:text-lg truncate">{c.name} {isWinner && <span className="text-sm text-green-700 ml-2">(Leading)</span>}</div>
                           <div className="text-xs text-gray-500 truncate">{c.party}</div>
@@ -181,10 +190,6 @@ const PublicElection = () => {
                       </svg>
                       <div className="mt-1 text-xs text-gray-600">{pct}% of votes</div>
                     </div>
-
-                    <div className="mt-3 text-right">
-                      <Link to={`/public/election/${id}/ledger?candidate=${c.id}`} className="text-sm text-indigo-600">View candidate ledger</Link>
-                    </div>
                   </div>
                 );
               })}
@@ -198,10 +203,6 @@ const PublicElection = () => {
                 <button className="px-3 py-1 border rounded disabled:opacity-50" onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}>Next</button>
               </div>
             )}
-
-            <div className="text-right mt-2">
-              <Link to={`/public/election/${id}/ledger`} className="text-sm text-indigo-600">View full vote ledger & audit trail</Link>
-            </div>
           </div>
         )}
       </div>

@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { requestOTP, verifyOTP, hashAadhaar } from '../config/otpService.js';
 import Voter from '../models/Voter.js';
 import Student from '../models/Student.js';
+import Candidate from '../models/Candidate.js';
 import voterAuth from '../middleware/voterAuth.js';
 import jwt from 'jsonwebtoken';
 import upload from '../middleware/voterPhotoUpload.js';
@@ -37,15 +38,34 @@ router.get('/history', voterAuth, async (req, res) => {
     
     const history = await Promise.all((voter.history || []).map(async (h) => {
       let candidateName = h.candidateName || null;
+      let candidatePhotoUrl = null;
 
-      // For older votes that don't have candidateName stored, look it up from Vote model
-      if (!candidateName && h.voteHash) {
+      // Look up candidate details from Vote model
+      if (h.voteHash) {
         try {
-          const voteRecord = await Vote.findOne({ voteHash: h.voteHash }).populate('candidate', 'name');
-          if (voteRecord?.candidate?.name) {
-            candidateName = voteRecord.candidate.name;
+          const voteRecord = await Vote.findOne({ voteHash: h.voteHash }).populate('candidate', 'name photoUrl');
+          if (voteRecord?.candidate) {
+            if (!candidateName && voteRecord.candidate.name) {
+              candidateName = voteRecord.candidate.name;
+            }
+            if (voteRecord.candidate.photoUrl) {
+              candidatePhotoUrl = voteRecord.candidate.photoUrl;
+            }
           }
         } catch (_) { /* ignore lookup errors */ }
+      }
+
+      // If we still don't have photo, try finding candidate by name + election
+      if (!candidatePhotoUrl && candidateName && (h.electionId?._id || h.electionId)) {
+        try {
+          const candidate = await Candidate.findOne({ 
+            name: candidateName, 
+            election: h.electionId?._id || h.electionId 
+          }).select('photoUrl');
+          if (candidate?.photoUrl) {
+            candidatePhotoUrl = candidate.photoUrl;
+          }
+        } catch (_) { /* ignore */ }
       }
 
       return {
@@ -54,9 +74,13 @@ router.get('/history', voterAuth, async (req, res) => {
         timestamp: h.timestamp,
         electionId: h.electionId?._id || h.electionId,
         election: h.electionId ? { title: h.electionId.title } : { title: 'Unknown Election' },
-        candidateName: candidateName || 'N/A'
+        candidateName: candidateName || 'N/A',
+        candidatePhotoUrl: candidatePhotoUrl || null
       };
     }));
+
+    // Sort by timestamp descending — latest vote on top
+    history.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
     
     res.json({ success: true, voteHistory: history });
   } catch (e) {
