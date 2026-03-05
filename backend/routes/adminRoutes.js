@@ -13,6 +13,7 @@ import Election from '../models/Election.js';
 import Candidate from '../models/Candidate.js';
 import Student from '../models/Student.js';
 import Voter from '../models/Voter.js';
+import Vote from '../models/Vote.js';
 import AdminAction from '../models/AdminAction.js';
 import { requestOTP, getOTPEntry, getWhatsAppStatus, isWhatsAppConnected, disconnectWhatsApp, initWhatsApp } from '../config/otpService.js';
 import { parseFile } from '../config/aiParser.js';
@@ -293,6 +294,112 @@ router.get('/election/:id', adminAuth, async (req, res) => {
   } catch (e) {
     console.error('election detail error', e);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get voters grouped by candidate for an election
+router.get('/election/:id/candidate-voters', adminAuth, async (req, res) => {
+  try {
+    const electionId = req.params.id;
+    if (!electionId || !mongoose.isValidObjectId(electionId)) {
+      return res.status(400).json({ success: false, message: 'Valid election id required' });
+    }
+
+    const electionOid = new mongoose.Types.ObjectId(electionId);
+
+    const election = await Election.findById(electionOid);
+    if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
+
+    const candidates = await Candidate.find({ election: electionOid }).sort({ voteCount: -1 }).lean();
+
+    // Use Vote model to find which candidate each vote went to, then map to Voter via voteHash
+    const votes = await Vote.find({ election: electionOid }).lean();
+
+    // Build candidateId → candidate name map
+    const candidateIdToName = {};
+    for (const c of candidates) {
+      candidateIdToName[c._id.toString()] = c.name;
+    }
+
+    // Build voteHash → candidateName map from Vote records
+    const hashToCandidateName = {};
+    for (const vote of votes) {
+      if (vote.candidate) {
+        hashToCandidateName[vote.voteHash] = candidateIdToName[vote.candidate.toString()] || 'Unknown';
+      }
+    }
+
+    // Find all voters who have a history entry for this election
+    // Try both ObjectId and string match for robustness
+    let voters = await Voter.find({ 'history.electionId': electionOid }).lean();
+    if (voters.length === 0) {
+      // Fallback: try string comparison in case electionId was stored as string
+      voters = await Voter.find({ 'history.electionId': electionId }).lean();
+    }
+
+    // Batch-fetch student records for all voter identifiers at once
+    const rollNumbers = voters.map(v => (v.identifierRaw || '').trim()).filter(Boolean);
+    let studentMap = {};
+    if (rollNumbers.length > 0) {
+      try {
+        const orConditions = rollNumbers.map(r => ({
+          roll: { $regex: `^${r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' }
+        }));
+        const students = await Student.find({ $or: orConditions }).lean();
+        for (const s of students) {
+          studentMap[(s.roll || '').toLowerCase()] = s;
+        }
+      } catch (e) { /* ignore student lookup errors */ }
+    }
+
+    // Build a map: candidateName → list of voter info
+    const candidateVotersMap = {};
+    for (const c of candidates) {
+      candidateVotersMap[c.name] = [];
+    }
+
+    for (const v of voters) {
+      // Find the history entry for this election
+      const entry = v.history.find(h => {
+        const hId = h.electionId ? h.electionId.toString() : '';
+        return hId === electionId;
+      });
+      if (!entry) continue;
+
+      // Determine candidate name: prefer Vote-based lookup, fallback to history.candidateName
+      const candidateName = hashToCandidateName[entry.voteHash] || entry.candidateName || 'Unknown';
+
+      const raw = (v.identifierRaw || '').trim().toLowerCase();
+      const studentInfo = studentMap[raw] || null;
+
+      const voterInfo = {
+        name: v.name,
+        roll: studentInfo ? studentInfo.roll : (v.identifierRaw || ''),
+        email: v.email || (studentInfo ? studentInfo.email : ''),
+        mobile: v.mobile || (studentInfo ? studentInfo.mobile : ''),
+        votedAt: entry.timestamp,
+      };
+
+      if (candidateVotersMap[candidateName]) {
+        candidateVotersMap[candidateName].push(voterInfo);
+      } else {
+        candidateVotersMap[candidateName] = [voterInfo];
+      }
+    }
+
+    // Build response array matching candidates order
+    const result = candidates.map(c => ({
+      id: c._id.toString(),
+      name: c.name,
+      party: c.party,
+      voteCount: c.voteCount,
+      voters: candidateVotersMap[c.name] || [],
+    }));
+
+    res.json({ success: true, candidateVoters: result });
+  } catch (e) {
+    console.error('candidate-voters error', e);
+    res.status(500).json({ success: false, message: e.message || 'Server error' });
   }
 });
 

@@ -9,9 +9,10 @@ import Modal from '../../components/Modal';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 
-// Helper to get full image URL (handles both absolute and relative URLs)
+// Helper to get full image URL (handles absolute, relative, and data: URLs)
 const getImageUrl = (url) => {
   if (!url) return null;
+  if (url.startsWith('data:')) return url;
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   return `${backendUrl}${url}`;
 };
@@ -235,6 +236,11 @@ const ElectionDetail = () => {
   const [editForm, setEditForm] = useState({ title: '', description: '', startTime: '', endTime: '' });
   const [uploading, setUploading] = useState({}); // track photo uploads per candidate id
 
+  // Voters by candidate state
+  const [candidateVoters, setCandidateVoters] = useState([]); // array of { id, name, party, voteCount, voters: [] }
+  const [expandedCandidate, setExpandedCandidate] = useState(null); // expanded candidate id
+  const [loadingCandidateVoters, setLoadingCandidateVoters] = useState(false);
+
   useEffect(() => {
     if (election && election.importConcepts) setImportSettings(election.importConcepts);
     if (election) {
@@ -264,6 +270,24 @@ const ElectionDetail = () => {
       toast.error(e.response?.data?.message || 'Failed to save import settings');
     } finally { setSavingImportSettings(false); }
   };
+
+  // Fetch voters grouped by candidate
+  const fetchCandidateVoters = useCallback(async () => {
+    setLoadingCandidateVoters(true);
+    try {
+      const res = await axios.get(`/api/admin/election/${id}/candidate-voters`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data && res.data.success) {
+        setCandidateVoters(res.data.candidateVoters || []);
+      } else {
+        toast.error(res.data?.message || 'Failed to load voter data');
+      }
+    } catch (e) {
+      console.error('Failed to fetch candidate voters', e);
+      toast.error(e.response?.data?.message || 'Failed to load voters by candidate');
+    } finally { setLoadingCandidateVoters(false); }
+  }, [id, token]);
+
+  useEffect(() => { fetchCandidateVoters(); }, [fetchCandidateVoters]);
 
   const totalPages = Math.max(1, Math.ceil((voters.total || 0) / limit));
 
@@ -616,6 +640,84 @@ const ElectionDetail = () => {
                     <button disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p+1))} className="px-3 py-1 bg-gray-100 rounded">Next</button>
                   </div>
                 </div>
+              </div>
+
+              {/* Voters by Candidate */}
+              <div className="bg-white p-4 rounded shadow">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-medium">Voters by Candidate</h3>
+                  <button 
+                    onClick={fetchCandidateVoters} 
+                    disabled={loadingCandidateVoters}
+                    className="px-3 py-1 text-sm bg-cyan-50 text-cyan-700 rounded hover:bg-cyan-100 disabled:opacity-50"
+                  >
+                    {loadingCandidateVoters ? 'Loading...' : '↻ Refresh'}
+                  </button>
+                </div>
+
+                {loadingCandidateVoters && candidateVoters.length === 0 ? (
+                  <div className="text-center py-6 text-gray-400">Loading voter data...</div>
+                ) : candidateVoters.length === 0 ? (
+                  <div className="text-center py-6 text-gray-400">No vote data available yet.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {candidateVoters.map(cv => (
+                      <div key={cv.id} className="border rounded overflow-hidden">
+                        {/* Candidate header (click to expand) */}
+                        <button
+                          onClick={() => setExpandedCandidate(expandedCandidate === cv.id ? null : cv.id)}
+                          className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-2 h-2 rounded-full ${cv.voters.length > 0 ? 'bg-green-400' : 'bg-gray-300'}`} />
+                            <div>
+                              <span className="font-medium">{cv.name}</span>
+                              {cv.party && <span className="text-sm text-gray-500 ml-2">({cv.party})</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <span className="text-sm font-medium text-cyan-600">{cv.voters.length} voter{cv.voters.length !== 1 ? 's' : ''}</span>
+                            <span className={`text-gray-400 transition-transform ${expandedCandidate === cv.id ? 'rotate-180' : ''}`}>▼</span>
+                          </div>
+                        </button>
+
+                        {/* Expanded voter list */}
+                        {expandedCandidate === cv.id && (
+                          <div className="border-t bg-gray-50">
+                            {cv.voters.length === 0 ? (
+                              <div className="p-3 text-sm text-gray-400 text-center">No voters yet</div>
+                            ) : (
+                              <div className="overflow-auto max-h-64">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                  <thead className="bg-gray-100">
+                                    <tr>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">#</th>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Roll</th>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Name</th>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Email</th>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Voted At</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {cv.voters.map((v, idx) => (
+                                      <tr key={idx} className="hover:bg-gray-50">
+                                        <td className="px-3 py-2 text-sm text-gray-400">{idx + 1}</td>
+                                        <td className="px-3 py-2 text-sm text-gray-700 font-mono">{v.roll || '—'}</td>
+                                        <td className="px-3 py-2 text-sm text-gray-700">{v.name}</td>
+                                        <td className="px-3 py-2 text-sm text-gray-700">{v.email || '—'}</td>
+                                        <td className="px-3 py-2 text-sm text-gray-500">{v.votedAt ? new Date(v.votedAt).toLocaleString() : '—'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="bg-white p-4 rounded shadow">

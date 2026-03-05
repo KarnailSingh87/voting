@@ -83,6 +83,9 @@ const PublicElection = () => {
   const paged = sorted.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
   const winnerId = sorted[0]?.id;
 
+  // Check if election is completed/ended
+  const isCompleted = election?.status === 'ended' || election?.status === 'completed';
+
   // live updates when election is ongoing
   useEffect(() => {
     if (!election || election.status !== 'ongoing') return;
@@ -124,20 +127,190 @@ const PublicElection = () => {
         </div>
       </div>
 
-      <div className="bg-white shadow rounded p-4 mt-6">
+      <div className="bg-white shadow rounded-lg p-4 sm:p-6 mt-6">
         <h3 className="font-medium mb-4">
           {election.status === 'ongoing' ? (
             <span className="flex items-center space-x-2">
               <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               <span>Live overview {socketConnected ? '(connected)' : '(connecting...)'}</span>
             </span>
+          ) : isCompleted ? (
+            <div className="flex items-center space-x-2">
+              <span className="text-lg font-bold text-gray-900">🏆 Final Results</span>
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Completed</span>
+            </div>
           ) : (
             'Results'
           )}
         </h3>
         {candidates.length === 0 ? (
           <div className="text-sm text-gray-500">No candidates</div>
+        ) : isCompleted ? (
+          /* ─── COMPLETED ELECTION: Ranked list with podium design ─── */
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-4">
+              <div className="text-sm text-gray-600">{sorted.length} candidates</div>
+              <div className="text-sm font-semibold text-gray-700">Total votes cast: {totalVotes}</div>
+            </div>
+
+            {/* Top 3 podium cards */}
+            {sorted.length >= 1 && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                {sorted.slice(0, 3).map((c, idx) => {
+                  const count = c.voteCount || 0;
+                  const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 1000) / 10 : 0;
+                  const rank = idx + 1;
+                  
+                  const rankConfig = {
+                    1: { 
+                      bg: 'bg-gradient-to-br from-yellow-50 to-amber-50', 
+                      border: 'border-yellow-400', 
+                      ring: 'ring-yellow-400',
+                      badge: 'bg-yellow-400 text-yellow-900', 
+                      icon: '🥇',
+                      label: '1st Place — Winner',
+                      barColor: '#f59e0b',
+                      shadow: 'shadow-lg shadow-yellow-200/50'
+                    },
+                    2: { 
+                      bg: 'bg-gradient-to-br from-gray-50 to-slate-100', 
+                      border: 'border-gray-400', 
+                      ring: 'ring-gray-400',
+                      badge: 'bg-gray-400 text-white', 
+                      icon: '🥈',
+                      label: '2nd Place',
+                      barColor: '#9ca3af',
+                      shadow: 'shadow-md shadow-gray-200/50'
+                    },
+                    3: { 
+                      bg: 'bg-gradient-to-br from-orange-50 to-amber-50', 
+                      border: 'border-orange-400', 
+                      ring: 'ring-orange-300',
+                      badge: 'bg-orange-400 text-white', 
+                      icon: '🥉',
+                      label: '3rd Place',
+                      barColor: '#fb923c',
+                      shadow: 'shadow-md shadow-orange-200/50'
+                    },
+                  };
+                  const cfg = rankConfig[rank];
+
+                  return (
+                    <div key={c.id} className={`relative rounded-xl border-2 ${cfg.border} ${cfg.bg} ${cfg.shadow} p-4 flex flex-col items-center text-center`}>
+                      {/* Rank badge */}
+                      <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-xs font-bold ${cfg.badge}`}>
+                        {cfg.icon} {cfg.label}
+                      </div>
+
+                      {/* Candidate photo */}
+                      <div className="mt-4 mb-3">
+                        {c.photoUrl ? (
+                          <img 
+                            src={getImageUrl(c.photoUrl)} 
+                            alt={c.name} 
+                            className={`w-20 h-20 rounded-full object-cover ring-4 ${cfg.ring} cursor-pointer hover:scale-105 transition-transform`}
+                            onClick={() => setPhotoModal({ show: true, url: getImageUrl(c.photoUrl), name: c.name })}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.style.display = 'none';
+                              if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div 
+                          className={`w-20 h-20 rounded-full bg-white ring-4 ${cfg.ring} flex items-center justify-center text-xl font-bold text-gray-500`}
+                          style={c.photoUrl ? { display: 'none' } : {}}
+                        >
+                          {(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
+                        </div>
+                      </div>
+
+                      {/* Name & party */}
+                      <div className="font-bold text-base sm:text-lg text-gray-900 truncate w-full">{c.name}</div>
+                      {c.party && <div className="text-xs text-gray-500 truncate w-full">{c.party}</div>}
+
+                      {/* Vote count */}
+                      <div className="mt-3 text-3xl font-extrabold text-gray-900">{count}</div>
+                      <div className="text-xs text-gray-500">votes ({pct}%)</div>
+
+                      {/* Progress bar */}
+                      <div className="w-full mt-3">
+                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: cfg.barColor }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Remaining candidates as a ranked list */}
+            {sorted.length > 3 && (
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b">
+                  <h4 className="text-sm font-semibold text-gray-700">Other Candidates</h4>
+                </div>
+                <ul className="divide-y divide-gray-100">
+                  {sorted.slice(3).map((c, idx) => {
+                    const rank = idx + 4;
+                    const count = c.voteCount || 0;
+                    const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 1000) / 10 : 0;
+                    return (
+                      <li key={c.id} className="flex items-center px-4 py-3 hover:bg-gray-50 transition-colors">
+                        {/* Rank number */}
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500 mr-3 flex-shrink-0">
+                          {rank}
+                        </div>
+
+                        {/* Photo */}
+                        {c.photoUrl ? (
+                          <img 
+                            src={getImageUrl(c.photoUrl)} 
+                            alt={c.name} 
+                            className="w-10 h-10 rounded-full object-cover mr-3 flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
+                            onClick={() => setPhotoModal({ show: true, url: getImageUrl(c.photoUrl), name: c.name })}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.style.display = 'none';
+                              if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div 
+                          className="w-10 h-10 rounded-full bg-gray-200 mr-3 flex-shrink-0 flex items-center justify-center text-sm text-gray-600"
+                          style={c.photoUrl ? { display: 'none' } : {}}
+                        >
+                          {(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
+                        </div>
+
+                        {/* Name & party */}
+                        <div className="flex-1 min-w-0 mr-3">
+                          <div className="font-medium text-gray-900 truncate">{c.name}</div>
+                          {c.party && <div className="text-xs text-gray-500 truncate">{c.party}</div>}
+                        </div>
+
+                        {/* Vote bar + count */}
+                        <div className="flex items-center space-x-3 flex-shrink-0">
+                          <div className="hidden sm:block w-24">
+                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full bg-indigo-400 transition-all duration-500" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                          <div className="text-right min-w-[60px]">
+                            <div className="font-bold text-gray-900">{count}</div>
+                            <div className="text-[10px] text-gray-500">{pct}%</div>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
         ) : (
+          /* ─── ONGOING / SCHEDULED: Grid card layout (existing) ─── */
           <div className="space-y-4">
             {/* compact summary header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
