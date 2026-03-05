@@ -7,6 +7,7 @@ import Sidebar from '../../components/Sidebar';
 import { toast } from 'react-toastify';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
+const PROD_BACKEND = 'https://voting-xr9p.onrender.com';
 
 // Helper to get full image URL (handles absolute, relative, and data: URLs)
 const getImageUrl = (url) => {
@@ -16,8 +17,22 @@ const getImageUrl = (url) => {
   return `${backendUrl}${url}`;
 };
 
+// Fallback handler: if local image fails, try production URL
+const handleImgError = (e, originalUrl) => {
+  if (!originalUrl) return;
+  const prodSrc = originalUrl.startsWith('/') ? `${PROD_BACKEND}${originalUrl}` : originalUrl;
+  if (e.target.src !== prodSrc) {
+    e.target.src = prodSrc;
+  } else {
+    // Both local and prod failed — hide image, show initials
+    e.target.onerror = null;
+    e.target.style.display = 'none';
+    if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+  }
+};
+
 // Photo Modal Component
-const PhotoModal = ({ photoUrl, name, onClose }) => {
+const PhotoModal = ({ photoUrl, rawUrl, name, onClose }) => {
   if (!photoUrl) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={onClose}>
@@ -33,6 +48,12 @@ const PhotoModal = ({ photoUrl, name, onClose }) => {
           alt={name} 
           className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain"
           onClick={(e) => e.stopPropagation()}
+          onError={(e) => {
+            if (rawUrl && rawUrl.startsWith('/')) {
+              const prodSrc = `${PROD_BACKEND}${rawUrl}`;
+              if (e.target.src !== prodSrc) e.target.src = prodSrc;
+            }
+          }}
         />
         <p className="text-white text-center mt-2 text-lg font-medium">{name}</p>
       </div>
@@ -383,8 +404,8 @@ const ElectionDetail = () => {
                               src={getImageUrl(c.photoUrl)} 
                               alt={c.name} 
                               className="w-14 h-14 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all"
-                              onClick={() => setPhotoModal({ show: true, url: getImageUrl(c.photoUrl), name: c.name })}
-                              onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }}
+                              onClick={() => setPhotoModal({ show: true, url: getImageUrl(c.photoUrl), rawUrl: c.photoUrl, name: c.name })}
+                              onError={(e) => handleImgError(e, c.photoUrl)}
                             />
                           ) : null}
                           <div 
@@ -581,6 +602,7 @@ const ElectionDetail = () => {
       {photoModal.show && (
         <PhotoModal 
           photoUrl={photoModal.url} 
+          rawUrl={photoModal.rawUrl}
           name={photoModal.name} 
           onClose={() => setPhotoModal({ show: false, url: null, name: '' })} 
         />
