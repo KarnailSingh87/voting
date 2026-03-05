@@ -192,4 +192,4 @@ export function getOTPEntry(aadhaarNumber) {
 }
 
 // Re-export WhatsApp status functions for admin routes
-export { getWhatsAppStatus, isWhatsAppConnected, disconnectWhatsApp, initWhatsApp } from './whatsappService.js';
+export { getWhatsAppStatus, isWhatsAppConnected, disconnectWhatsApp, reconnectWhatsApp, initWhatsApp } from './whatsappService.js';

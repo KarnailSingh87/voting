@@ -13,7 +13,8 @@ let isConnected = false;
 let connectionPromise = null;
 let qrCode = null;
 let retryCount = 0;
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 10; // generous retries — WhatsApp should stay connected
+const RETRY_DELAY_MS = 5000; // 5 seconds between retries
 
 // Auth state folder
 const AUTH_FOLDER = path.join(__dirname, '..', 'baileys_auth');
@@ -28,8 +29,10 @@ const logger = pino({ level: 'silent' });
 
 // Initialize WhatsApp connection
 export async function initWhatsApp() {
+  // If already connected, return immediately
+  if (isConnected && sock) return true;
+  // If a connection attempt is already in progress, wait for it
   if (connectionPromise) return connectionPromise;
-  if (isConnected) return true;
   
   console.log('[WhatsApp] Initializing connection...');
   
@@ -71,19 +74,28 @@ export async function initWhatsApp() {
         if (connection === 'close') {
           isConnected = false;
           sock = null;
+          connectionPromise = null;
           
           const statusCode = lastDisconnect?.error?.output?.statusCode;
-          const shouldReconnect = statusCode !== DisconnectReason.loggedOut && retryCount < MAX_RETRIES;
-          
           console.log(`[WhatsApp] Connection closed. Status: ${statusCode}`);
           
-          if (shouldReconnect) {
+          if (statusCode === DisconnectReason.loggedOut) {
+            // Session was logged out from the phone — clear stale auth and generate fresh QR
+            console.log('[WhatsApp] Logged out from phone. Clearing auth and generating new QR...');
+            retryCount = 0;
+            clearAuthFolder();
+            setTimeout(() => initWhatsApp(), 2000);
+            resolve(false);
+          } else if (retryCount < MAX_RETRIES) {
+            // Temporary disconnect — reconnect with existing session
             retryCount++;
-            connectionPromise = null;
             console.log(`[WhatsApp] Reconnecting (${retryCount}/${MAX_RETRIES})...`);
-            setTimeout(() => initWhatsApp(), 3000);
+            setTimeout(() => initWhatsApp(), RETRY_DELAY_MS);
+            resolve(false);
           } else {
-            connectionPromise = null;
+            // Max retries exhausted — wait for manual reconnect
+            console.log('[WhatsApp] Max retries reached. Use admin panel to reconnect.');
+            retryCount = 0;
             resolve(false);
           }
         } else if (connection === 'open') {
@@ -103,6 +115,21 @@ export async function initWhatsApp() {
   });
 
   return connectionPromise;
+}
+
+// Helper to clear auth folder
+function clearAuthFolder() {
+  try {
+    if (fs.existsSync(AUTH_FOLDER)) {
+      const files = fs.readdirSync(AUTH_FOLDER);
+      for (const file of files) {
+        fs.unlinkSync(path.join(AUTH_FOLDER, file));
+      }
+      console.log('[WhatsApp] Auth folder cleared');
+    }
+  } catch (e) {
+    console.error('[WhatsApp] Error clearing auth folder:', e.message);
+  }
 }
 
 // Send OTP via WhatsApp
@@ -159,7 +186,23 @@ export function isWhatsAppConnected() {
   return isConnected;
 }
 
-// Disconnect WhatsApp
+// Force reconnect — resets state and re-initializes (does NOT log out from WA)
+export async function reconnectWhatsApp() {
+  console.log('[WhatsApp] Force reconnect requested...');
+  // Close existing socket gracefully without logging out
+  if (sock) {
+    try { sock.end(undefined); } catch (e) { /* ignore */ }
+    sock = null;
+  }
+  isConnected = false;
+  qrCode = null;
+  connectionPromise = null;
+  retryCount = 0;
+  // Re-initialize — will use existing auth if available
+  return initWhatsApp();
+}
+
+// Disconnect WhatsApp (manual — logs out from WA and clears auth)
 export async function disconnectWhatsApp() {
   try {
     if (sock) {
@@ -176,13 +219,7 @@ export async function disconnectWhatsApp() {
     retryCount = 0;
     
     // Clear auth folder to force new QR code on next connection
-    if (fs.existsSync(AUTH_FOLDER)) {
-      const files = fs.readdirSync(AUTH_FOLDER);
-      for (const file of files) {
-        fs.unlinkSync(path.join(AUTH_FOLDER, file));
-      }
-      console.log('[WhatsApp] Auth folder cleared');
-    }
+    clearAuthFolder();
     
     // Reinitialize to get new QR code
     setTimeout(() => {

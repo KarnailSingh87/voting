@@ -15,7 +15,7 @@ import Student from '../models/Student.js';
 import Voter from '../models/Voter.js';
 import Vote from '../models/Vote.js';
 import AdminAction from '../models/AdminAction.js';
-import { requestOTP, getOTPEntry, getWhatsAppStatus, isWhatsAppConnected, disconnectWhatsApp, initWhatsApp } from '../config/otpService.js';
+import { requestOTP, getOTPEntry, getWhatsAppStatus, isWhatsAppConnected, disconnectWhatsApp, reconnectWhatsApp, initWhatsApp } from '../config/otpService.js';
 import { parseFile } from '../config/aiParser.js';
 import QRCode from 'qrcode';
 import { fileURLToPath } from 'url';
@@ -2374,7 +2374,7 @@ router.post('/whatsapp-disconnect', async (req, res) => {
 // Reconnect/reinitialize WhatsApp
 router.post('/whatsapp-reconnect', async (req, res) => {
   try {
-    await initWhatsApp();
+    await reconnectWhatsApp();
     const status = getWhatsAppStatus();
     res.json({ 
       success: true, 
