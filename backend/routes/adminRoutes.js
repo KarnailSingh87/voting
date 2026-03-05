@@ -674,9 +674,9 @@ router.get('/dashboard', adminAuth, async (req, res) => {
       });
     }
 
-    // Sort all combined activities by timestamp descending, take top 15
+    // Sort all combined activities by timestamp descending, take top 2
     recentActivity.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    const topActivity = recentActivity.slice(0, 15);
+    const topActivity = recentActivity.slice(0, 2);
 
     res.json({
       success: true,
