@@ -5,7 +5,6 @@ import axios from '../../utils/axios';
 import Navbar from '../../components/Navbar';
 import Sidebar from '../../components/Sidebar';
 import { toast } from 'react-toastify';
-import Modal from '../../components/Modal';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 
@@ -49,6 +48,7 @@ const ElectionDetail = () => {
   const [loading, setLoading] = useState(true);
   const [, setError] = useState('');
   const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
+  const [stats, setStats] = useState({ totalVotes: 0, totalVoters: 0, votedCount: 0 });
 
   // Edit candidate state
   const [editingCandidate, setEditingCandidate] = useState(null);
@@ -60,12 +60,6 @@ const ElectionDetail = () => {
   const [newCandidate, setNewCandidate] = useState({ name: '', party: '', manifesto: '' });
   const [addingCandidate, setAddingCandidate] = useState(false);
 
-  // voters pagination
-  const [voters, setVoters] = useState({ total: 0, items: [] });
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
-  const [, setVotersLoading] = useState(false);
-
   const token = localStorage.getItem('adminToken');
 
   const fetchDetail = useCallback(async () => {
@@ -75,6 +69,11 @@ const ElectionDetail = () => {
       if (res.data && res.data.success) {
         setElection(res.data.election);
         setCandidates(res.data.candidates || []);
+        setStats({
+          totalVotes: res.data.totalVotes || 0,
+          totalVoters: res.data.totalVoters || 0,
+          votedCount: res.data.votedCount || 0
+        });
       }
     } catch (e) {
       console.error('Failed to load election', e);
@@ -149,21 +148,7 @@ const ElectionDetail = () => {
     }
   };
 
-  const fetchVoters = useCallback(async (p = page, lim = limit) => {
-    setVotersLoading(true);
-    try {
-      const res = await axios.get('/api/admin/students', { params: { electionId: id, page: p, limit: lim }, headers: { Authorization: `Bearer ${token}` } });
-      if (res.data && res.data.success) {
-        setVoters({ total: res.data.total, items: res.data.items });
-      }
-    } catch (e) {
-      console.error('Failed to fetch voters', e);
-      setError(e.response?.data?.message || 'Failed to fetch voters');
-    } finally { setVotersLoading(false); }
-  }, [id, page, limit, token]);
-
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
-  useEffect(() => { fetchVoters(page, limit); }, [fetchVoters, page, limit]);
 
   // Defensive date formatter that returns a readable datetime when possible.
   const formatDateTime = (d) => {
@@ -201,37 +186,6 @@ const ElectionDetail = () => {
     return () => socket.disconnect();
   }, [fetchDetail]);
 
-  const handleRemoveAssociation = async ({ deleteOrphans = false } = {}) => {
-    // replaced native confirm/alert with modal/toast flow handled via state
-    // actual deletion is handled in confirm modal callback below
-    try {
-      const res = await axios.delete(`/api/admin/students/by-election/${id}`, { params: { mode: 'remove', deleteOrphans: deleteOrphans ? '1' : '0' }, headers: { Authorization: `Bearer ${token}` } });
-      if (res.data && res.data.success) {
-        toast.success(`Updated ${res.data.updated || 0} students, deleted ${res.data.orphanDeleted || 0} orphans`);
-        fetchVoters(1, limit); fetchDetail();
-      }
-    } catch (e) { console.error(e); toast.error(e.response?.data?.message || 'Failed to remove association'); }
-  };
-
-  const handleDeleteByElection = async () => {
-    try {
-      const res = await axios.delete(`/api/admin/students/by-election/${id}`, { params: { mode: 'delete' }, headers: { Authorization: `Bearer ${token}` } });
-      if (res.data && res.data.success) {
-        toast.success(`Deleted ${res.data.deleted || 0} students`);
-        navigate('/elections');
-      }
-    } catch (e) { console.error(e); toast.error(e.response?.data?.message || 'Failed to delete students'); }
-  };
-
-  // modal states
-  const [showRemoveModal, setShowRemoveModal] = useState(false);
-  const [removeDeleteOrphans, setRemoveDeleteOrphans] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-  // importConcepts editing
-  const [importSettings, setImportSettings] = useState(null);
-  const [savingImportSettings, setSavingImportSettings] = useState(false);
-  const [importPanelOpen, setImportPanelOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', description: '', startTime: '', endTime: '' });
   const [uploading, setUploading] = useState({}); // track photo uploads per candidate id
@@ -242,7 +196,6 @@ const ElectionDetail = () => {
   const [loadingCandidateVoters, setLoadingCandidateVoters] = useState(false);
 
   useEffect(() => {
-    if (election && election.importConcepts) setImportSettings(election.importConcepts);
     if (election) {
       setEditForm({
         title: election.title || '',
@@ -252,24 +205,6 @@ const ElectionDetail = () => {
       });
     }
   }, [election]);
-
-  const handleSaveImportSettings = async () => {
-    if (!importSettings) return toast.error('No import settings to save');
-    setSavingImportSettings(true);
-    try {
-      const res = await axios.patch(`/api/admin/election/${id}`, { importConcepts: importSettings }, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.data && res.data.success) {
-        toast.success('Import settings saved');
-        // refresh detail
-        fetchDetail();
-      } else {
-        toast.error(res.data?.message || 'Failed to save import settings');
-      }
-    } catch (e) {
-      console.error('Failed to save import settings', e);
-      toast.error(e.response?.data?.message || 'Failed to save import settings');
-    } finally { setSavingImportSettings(false); }
-  };
 
   // Fetch voters grouped by candidate
   const fetchCandidateVoters = useCallback(async () => {
@@ -288,8 +223,6 @@ const ElectionDetail = () => {
   }, [id, token]);
 
   useEffect(() => { fetchCandidateVoters(); }, [fetchCandidateVoters]);
-
-  const totalPages = Math.max(1, Math.ceil((voters.total || 0) / limit));
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -359,47 +292,12 @@ const ElectionDetail = () => {
                     {election?.status && (
                       <div className="mb-2">Status: <strong>{election.status}</strong></div>
                     )}
-                    <div className="text-sm">Total Votes: {election?.totalVotes || 0}</div>
-                    <div className="text-sm">Total Voters: {election?.totalVoters || 0}</div>
+                    <div className="text-sm">Total Votes: {stats.totalVotes}</div>
+                    <div className="text-sm">Total Voters: {stats.totalVoters}</div>
+                    <div className="text-sm">Voted: {stats.votedCount}</div>
                   </div>
                 </div>
               </div>
-
-                <div className="bg-white p-4 rounded shadow">
-                  <h3 className="font-medium mb-2">Import Settings</h3>
-                  <div className="text-sm text-gray-600 mb-3">These defaults are used by the Import Students flow when this election is selected.</div>
-                  <div className="mb-3">
-                    <button data-testid="toggle-import-settings" onClick={() => setImportPanelOpen(p => !p)} className="px-2 py-1 border rounded text-sm">{importPanelOpen ? 'Hide' : 'Edit'} import settings</button>
-                  </div>
-                  {importPanelOpen && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-sm text-gray-700">Roll field</label>
-                      <input value={importSettings?.rollField || ''} onChange={(e)=> setImportSettings(s => ({ ...(s||{}), rollField: e.target.value }))} className="mt-1 block w-full border rounded px-2 py-1" />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-700">Name field</label>
-                      <input value={importSettings?.nameField || ''} onChange={(e)=> setImportSettings(s => ({ ...(s||{}), nameField: e.target.value }))} className="mt-1 block w-full border rounded px-2 py-1" />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-700">Email field</label>
-                      <input value={importSettings?.emailField || ''} onChange={(e)=> setImportSettings(s => ({ ...(s||{}), emailField: e.target.value }))} className="mt-1 block w-full border rounded px-2 py-1" />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-700">Mobile field</label>
-                      <input value={importSettings?.mobileField || ''} onChange={(e)=> setImportSettings(s => ({ ...(s||{}), mobileField: e.target.value }))} className="mt-1 block w-full border rounded px-2 py-1" />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-700">Photo field (optional)</label>
-                      <input value={importSettings?.photoField || ''} onChange={(e)=> setImportSettings(s => ({ ...(s||{}), photoField: e.target.value }))} className="mt-1 block w-full border rounded px-2 py-1" />
-                    </div>
-                  </div>
-                  )}
-                  <div className="mt-3 space-x-2">
-                    <button data-testid="save-import-settings" onClick={handleSaveImportSettings} disabled={savingImportSettings} className="px-3 py-1 bg-cyan-600 text-white rounded">{savingImportSettings ? 'Saving...' : 'Save Import Settings'}</button>
-                    <button data-testid="import-to-election" onClick={() => navigate(`/import?electionId=${id}`)} className="px-3 py-1 bg-yellow-600 text-white rounded">Import students into this election</button>
-                  </div>
-                </div>
 
               <div className="bg-white p-4 rounded shadow">
                 <div className="flex justify-between items-center mb-3">
@@ -597,51 +495,6 @@ const ElectionDetail = () => {
                 </div>
               </div>
 
-              <div className="bg-white p-4 rounded shadow">
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="font-medium">Voters</h3>
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm">Per page</label>
-                    <select value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }} className="border rounded p-1">
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="overflow-auto max-h-96 border rounded">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Roll</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Name</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Email</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Voted</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {voters.items.map(it => (
-                        <tr key={it._id}>
-                          <td className="px-3 py-2 text-sm text-gray-700">{it.roll}</td>
-                          <td className="px-3 py-2 text-sm text-gray-700">{it.name}</td>
-                          <td className="px-3 py-2 text-sm text-gray-700">{it.email}</td>
-                          <td className="px-3 py-2 text-sm text-gray-700">{it.voted ? 'Yes' : 'No'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between">
-                  <div className="text-sm text-gray-600">Showing page {page} of {totalPages}, {voters.total} voters</div>
-                  <div className="space-x-2">
-                    <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p-1))} className="px-3 py-1 bg-gray-100 rounded">Prev</button>
-                    <button disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p+1))} className="px-3 py-1 bg-gray-100 rounded">Next</button>
-                  </div>
-                </div>
-              </div>
-
               {/* Voters by Candidate */}
               <div className="bg-white p-4 rounded shadow">
                 <div className="flex justify-between items-center mb-3">
@@ -719,23 +572,6 @@ const ElectionDetail = () => {
                   </div>
                 )}
               </div>
-
-              <div className="bg-white p-4 rounded shadow">
-                <h3 className="font-medium mb-2">Manage Voters</h3>
-                <div className="space-x-2">
-                  <button onClick={() => { setRemoveDeleteOrphans(false); setShowRemoveModal(true); }} className="px-3 py-1 bg-yellow-100 rounded">Remove association</button>
-                  <button onClick={() => { setRemoveDeleteOrphans(true); setShowRemoveModal(true); }} className="px-3 py-1 bg-red-100 rounded">Remove & delete orphans</button>
-                  <button onClick={() => setShowDeleteModal(true)} className="px-3 py-1 bg-red-600 text-white rounded">Delete voters (danger)</button>
-                </div>
-              </div>
-              
-              <Modal open={showRemoveModal} title="Remove association" onClose={() => setShowRemoveModal(false)} onConfirm={() => { setShowRemoveModal(false); handleRemoveAssociation({ deleteOrphans: removeDeleteOrphans }); }} confirmLabel="Proceed" confirmClass="bg-yellow-600 text-white">
-                <div>Are you sure you want to remove the association of voters from this election?{removeDeleteOrphans ? ' This will also delete students without any elections.' : ''}</div>
-              </Modal>
-
-              <Modal open={showDeleteModal} title="Delete voters" onClose={() => setShowDeleteModal(false)} onConfirm={() => { setShowDeleteModal(false); handleDeleteByElection(); }} confirmLabel="Delete" confirmClass="bg-red-600 text-white">
-                <div>Permanently delete all student records associated with this election? This cannot be undone.</div>
-              </Modal>
             </div>
           )}
         </main>

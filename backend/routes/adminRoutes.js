@@ -281,7 +281,8 @@ router.get('/election/:id', adminAuth, async (req, res) => {
     const candidates = await Candidate.find({ election: election._id }).sort({ voteCount: -1 });
     const totalVotes = candidates.reduce((s, c) => s + (c.voteCount || 0), 0);
     const totalVoters = await Student.countDocuments({ elections: election._id });
-    const votedCount = await Student.countDocuments({ elections: election._id, voted: true });
+    // Use Vote collection for accurate voted count (one Vote record per actual vote cast)
+    const votedCount = await Vote.countDocuments({ election: election._id });
 
     res.json({
       success: true,
