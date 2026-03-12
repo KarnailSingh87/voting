@@ -14,6 +14,8 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "cloudinary": "^2.9.0",
+    "multer-storage-cloudinary": "^2.2.1",
     "pino": "^10.3.1",
     "puppeteer": "^24.35.0"
   }
