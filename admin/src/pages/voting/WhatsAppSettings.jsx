@@ -181,6 +181,6 @@ const WhatsAppSettings = ({ token }) => {
       </div>
     </div>
   );
-};
+}
 
 export default WhatsAppSettings;
