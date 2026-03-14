@@ -76,7 +76,9 @@ router.post('/seed-super', async (req, res) => {
     const { username='admin', email='admin@Voting.com', password='Admin@123456' } = req.body;
     const existing = await Admin.findOne({ role: 'super_admin' });
     if (existing) return res.status(409).json({ message: 'Super admin already exists' });
-    const passwordHash = await bcrypt.hash(password, 10);
+  // Use fewer bcrypt rounds in development for faster login
+  const saltRounds = process.env.NODE_ENV === 'production' ? 10 : 6;
+  const passwordHash = await bcrypt.hash(password, saltRounds);
     const admin = await Admin.create({ username, email, passwordHash, role: 'super_admin' });
       // Return created credentials to caller for developer convenience
       res.json({ message: 'Super admin created', id: admin._id, username, email, password });
