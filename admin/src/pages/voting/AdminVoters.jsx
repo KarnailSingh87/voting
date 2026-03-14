@@ -19,6 +19,8 @@ const AdminVoters = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
   const [viewAll, setViewAll] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(null); // { name, roll, src }
 
@@ -178,8 +180,16 @@ const AdminVoters = () => {
     }
   };
 
-  const openEdit = (student) => setEditing({ ...student });
-  const closeEdit = () => setEditing(null);
+  const openEdit = (student) => {
+    setEditing({ ...student });
+    setPhotoFile(null);
+    setPhotoPreviewUrl(null);
+  };
+  const closeEdit = () => {
+    setEditing(null);
+    setPhotoFile(null);
+    setPhotoPreviewUrl(null);
+  };
   const saveEdit = async () => {
     if (!editing) return;
     // client-side validation
@@ -204,6 +214,7 @@ const AdminVoters = () => {
     }
 
     try {
+      // Save text fields
       await axios.patch(`/api/admin/students/${encodeURIComponent(editing.roll)}`, { 
         name: editing.name, 
         email: editing.email, 
@@ -215,6 +226,15 @@ const AdminVoters = () => {
         category: editing.category,
         batch: editing.batch
       });
+      // If photo file selected, upload it
+      if (photoFile) {
+        const formData = new FormData();
+        formData.append('photo', photoFile);
+        await axios.post(`/api/admin/students/${encodeURIComponent(editing.roll)}/photo`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
+        });
+        toast.success('Photo uploaded');
+      }
       toast.success('Saved');
       closeEdit(); fetchData();
     } catch (e) { const msg = e.response?.data?.message || e.message; setError(msg); toast.error(msg); }
@@ -387,15 +407,32 @@ const AdminVoters = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Photo</label>
-                {editing.hasPhoto ? (
-                  <img
-                    src={getPhotoUrl(editing.roll)}
-                    alt={editing.name}
-                    className="w-24 h-24 rounded-lg object-cover mt-2 border border-gray-200"
+                <div className="flex items-center gap-4 mt-2">
+                  {photoPreviewUrl ? (
+                    <img src={photoPreviewUrl} alt="Preview" className="w-24 h-24 rounded-lg object-cover border border-cyan-300" />
+                  ) : editing.hasPhoto ? (
+                    <img src={getPhotoUrl(editing.roll)} alt={editing.name} className="w-24 h-24 rounded-lg object-cover border border-gray-200" />
+                  ) : (
+                    <div className="w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">No photo</div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        setPhotoFile(file);
+                        const reader = new FileReader();
+                        reader.onload = ev => setPhotoPreviewUrl(ev.target.result);
+                        reader.readAsDataURL(file);
+                      } else {
+                        setPhotoFile(null);
+                        setPhotoPreviewUrl(null);
+                      }
+                    }}
                   />
-                ) : (
-                  <p className="text-sm text-gray-400 mt-2">No photo available</p>
-                )}
+                </div>
+                {photoFile && <div className="text-xs text-gray-500 mt-1">Selected: {photoFile.name}</div>}
               </div>
             </div>
             <div className="mt-4 flex justify-end space-x-2">
