@@ -100,8 +100,8 @@ const WhatsAppSettings = ({ token }) => {
     }, [fetchStatus]);
 
     return (
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-8">
+  <div className="max-w-3xl mx-auto px-2 sm:px-4">
+  <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl font-bold text-gray-900">WhatsApp Settings</h1>
           <p className="mt-1 text-sm text-gray-500">
                   Manage WhatsApp connection for sending OTP messages to voters
@@ -110,19 +110,19 @@ const WhatsAppSettings = ({ token }) => {
 
               {/* QR Code & Code Entry Section */}
               {!status.connected && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-                  <div className="p-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-4 sm:mb-6">
+                  <div className="p-3 sm:p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Connect WhatsApp</h3>
-                    <div className="mb-4 flex space-x-2">
+                    <div className="mb-4 flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
                       <button
-                        className={`px-4 py-2 rounded-t-lg font-medium focus:outline-none ${!showCodeEntry ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+                        className={`w-full sm:w-auto px-4 py-2 rounded-t-lg font-medium focus:outline-none ${!showCodeEntry ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
                         onClick={() => setShowCodeEntry(false)}
                         type="button"
                       >
                         Scan QR Code
                       </button>
                       <button
-                        className={`px-4 py-2 rounded-t-lg font-medium focus:outline-none ${showCodeEntry ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+                        className={`w-full sm:w-auto px-4 py-2 rounded-t-lg font-medium focus:outline-none ${showCodeEntry ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
                         onClick={() => setShowCodeEntry(true)}
                         type="button"
                       >
@@ -133,33 +133,62 @@ const WhatsAppSettings = ({ token }) => {
                       {!showCodeEntry ? (
                         qrCode ? (
                           <div className="flex flex-col items-center">
-                            <div className="p-4 bg-white rounded-lg border-2 border-green-200 shadow-sm">
-                              <img src={qrCode} alt="WhatsApp QR Code" className="w-64 h-64" />
+                            <div className="p-2 sm:p-4 bg-white rounded-lg border-2 border-green-200 shadow-sm">
+                              <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48 sm:w-64 sm:h-64" />
                             </div>
-                            <p className="mt-4 text-sm text-gray-600 text-center">
+                            <p className="mt-3 sm:mt-4 text-sm text-gray-600 text-center">
                               Open WhatsApp on your phone → Settings → Linked Devices → Link a Device
                             </p>
                           </div>
                         ) : (
-                          <div className="flex flex-col items-center py-8">
-                            <div className="animate-pulse bg-gray-200 w-64 h-64 rounded-lg mb-4"></div>
+                          <div className="flex flex-col items-center py-6 sm:py-8">
+                            <div className="animate-pulse bg-gray-200 w-48 h-48 sm:w-64 sm:h-64 rounded-lg mb-4"></div>
                             <p className="text-sm text-gray-500">Waiting for QR code...</p>
                             <button
                               onClick={handleReconnect}
                               disabled={actionLoading}
-                              className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                              className="mt-4 w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
                             >
                               {actionLoading ? 'Initializing...' : 'Generate QR Code'}
                             </button>
                           </div>
                         )
                       ) : (
-                        <div className="flex flex-col items-center py-8 w-full max-w-xs mx-auto">
+                        <div className="flex flex-col items-center py-6 sm:py-8 w-full max-w-xs mx-auto">
+                          {/* Mobile-specific instructions */}
+                          <div className="block sm:hidden w-full mb-4">
+                            <div className="text-base font-semibold text-gray-800 mb-2 text-center">How to Link WhatsApp on Mobile</div>
+                            <ol className="list-decimal list-inside text-sm text-gray-700 space-y-1 mb-2">
+                              <li>Open <b>WhatsApp</b> on your phone.</li>
+                              <li>Go to <b>Settings</b> &gt; <b>Linked Devices</b> &gt; <b>Link a Device</b>.</li>
+                              <li>Choose <b>Link with phone number</b> if available.</li>
+                              <li>Follow the on-screen instructions to complete linking.</li>
+                            </ol>
+                            <div className="text-xs text-blue-700 bg-blue-50 rounded p-2 mb-2 text-center">
+                              You do not need to use a PC or WhatsApp Web for this process on mobile.
+                            </div>
+                          </div>
+                          {/* Desktop instructions hidden on mobile */}
+                          <div className="hidden sm:block w-full mb-4">
+                            <div className="text-base font-semibold text-gray-800 mb-2">How to Link WhatsApp via Phone Number & OTP (Desktop)</div>
+                            <ol className="list-decimal list-inside text-sm text-gray-700 space-y-1 mb-2">
+                              <li>On your computer, open <b>WhatsApp Web</b> or the <b>Windows WhatsApp app</b>.</li>
+                              <li>Click <b>Link with phone number</b> or <b>Login via phone number</b>.</li>
+                              <li>Select your country and enter your phone number, then click <b>Next</b>.</li>
+                              <li>WhatsApp Web/Windows will show you an <b>8-character code</b>.</li>
+                              <li>On your <b>primary phone</b>, tap the notification or go to <b>Settings &gt; Linked Devices &gt; Link a Device &gt; Link with phone number instead</b>.</li>
+                              <li>Follow the prompts for biometric or PIN verification.</li>
+                              <li>Enter the <b>8-character code</b> from WhatsApp Web/Windows into your phone to complete linking.</li>
+                            </ol>
+                            <div className="text-xs text-blue-700 bg-blue-50 rounded p-2 mb-2 text-center">
+                              This feature is only available for WhatsApp Web and WhatsApp for Windows. The code is generated by WhatsApp Web/Windows, not by this admin panel.
+                            </div>
+                          </div>
                           <label htmlFor="wa-link-code" className="block text-sm font-medium text-gray-700 mb-2">Enter Code from WhatsApp</label>
                           <input
                             id="wa-link-code"
                             type="text"
-                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-200 mb-4"
+                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-200 mb-4 text-base sm:text-lg"
                             placeholder="123-456"
                             value={waLinkCode}
                             onChange={e => setWaLinkCode(e.target.value)}
@@ -169,14 +198,10 @@ const WhatsAppSettings = ({ token }) => {
                           <button
                             onClick={handleLinkWithCode}
                             disabled={actionLoading || !waLinkCode.trim()}
-                            className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                            className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
                           >
                             {actionLoading ? 'Linking...' : 'Link Device'}
                           </button>
-                          <p className="mt-4 text-sm text-gray-600 text-center">
-                            On your phone: WhatsApp → Settings → Linked Devices → Link with phone number
-                          </p>
-                          <p className="mt-2 text-xs text-gray-400 text-center">(Backend support required for code entry)</p>
                         </div>
                       )}
                     </div>
@@ -185,8 +210,8 @@ const WhatsAppSettings = ({ token }) => {
               )}
 
               {/* Actions Section */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-4 sm:mt-6">
+                <div className="p-3 sm:p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
                   <div className="space-y-4">
                     {status.connected ? (
@@ -240,9 +265,9 @@ const WhatsAppSettings = ({ token }) => {
               </div>
 
               {/* Info Section */}
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex">
-                  <svg className="w-5 h-5 text-blue-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex flex-col sm:flex-row">
+                  <svg className="w-5 h-5 text-blue-600 mr-0 sm:mr-3 mb-2 sm:mb-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
