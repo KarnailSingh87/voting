@@ -1,3 +1,4 @@
+// (moved IdentityReport import + route to below with other imports and after router initialization)
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -15,6 +16,7 @@ import Student from '../models/Student.js';
 import Voter from '../models/Voter.js';
 import Vote from '../models/Vote.js';
 import AdminAction from '../models/AdminAction.js';
+import IdentityReport from '../models/IdentityReport.js';
 import { requestOTP, getOTPEntry, getWhatsAppStatus, isWhatsAppConnected, disconnectWhatsApp, reconnectWhatsApp, initWhatsApp } from '../config/otpService.js';
 import { parseFile } from '../config/aiParser.js';
 import QRCode from 'qrcode';
@@ -155,6 +157,35 @@ function adminAuth(req, res, next) {
     return res.status(401).json({ message: 'Invalid token' });
   }
 }
+
+// GET /api/admin/identity-reports?q=&page=&limit=
+router.get('/identity-reports', adminAuth, async (req, res) => {
+  try {
+    const { q = '', page = 1, limit = 50 } = req.query;
+    const filter = {};
+    if (q) {
+      // escape user input for use in a RegExp
+      const escaped = q.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      filter.$or = [
+        { roll: { $regex: escaped, $options: 'i' } },
+        { detectedName: { $regex: escaped, $options: 'i' } },
+        { reason: { $regex: escaped, $options: 'i' } },
+        { contactProvided: { $regex: escaped, $options: 'i' } }
+      ];
+    }
+    const skip = (Math.max(1, Number(page)) - 1) * Number(limit);
+    const total = await IdentityReport.countDocuments(filter);
+    const items = await IdentityReport.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
+    res.json({ success: true, total, items });
+  } catch (e) {
+    console.error('Admin identity-reports fetch error:', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 // Create election
 router.post('/election', adminAuth, async (req, res) => {

@@ -18,6 +18,7 @@ const Monitoring = lazy(() => import('./pages/voting/Monitoring'));
 const SimpleImport = lazy(() => import('./pages/voting/SimpleImport'));
 const AdminVoters = lazy(() => import('./pages/voting/AdminVoters'));
 const WhatsAppSettings = lazy(() => import('./pages/voting/WhatsAppSettings'));
+const AdminQueries = lazy(() => import('./pages/voting/AdminQueries'));
 
 // Export for other components
 export { backendUrl };
@@ -108,6 +109,13 @@ const App = () => {
           <Route path='/voters' element={
             <ProtectedRoute token={token}>
               <AdminVoters token={token} />
+            </ProtectedRoute>
+          }/>
+          <Route path='/queries' element={
+            <ProtectedRoute token={token}>
+              <ErrorBoundary>
+                <AdminQueries token={token} />
+              </ErrorBoundary>
             </ProtectedRoute>
           }/>
           <Route path='/whatsapp' element={
