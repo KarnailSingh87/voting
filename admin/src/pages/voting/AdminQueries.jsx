@@ -24,55 +24,52 @@ const AdminQueries = () => {
   }, [q, page, limit]);
 
   return (
-    <div className="admin-queries-page" style={{ padding: 24 }}>
-      <h2>All Raised Queries</h2>
-      <div style={{ margin: '16px 0' }}>
+    <div className="admin-queries-page max-w-6xl mx-auto p-6">
+      <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-slate-100">All Raised Queries</h2>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
         <input
           type="text"
           placeholder="Search by roll, name, reason, contact..."
           value={q}
           onChange={e => { setQ(e.target.value); setPage(1); }}
-          style={{ padding: 8, width: 300 }}
+          className="input-field w-full sm:w-80"
         />
       </div>
-      {loading ? <div>Loading...</div> : (
+      {loading ? <div className="text-center py-8 text-lg text-gray-500 dark:text-gray-400">Loading...</div> : (
         <>
-          <table className="queries-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th>Roll</th>
-                <th>Name</th>
-                {/* Reason column removed */}
-                {/* Contact column removed */}
-                <th>IP</th>
-                <th>Created</th>
-                <th>View</th>
-              </tr>
-            </thead>
-            <tbody>
-              {queries.length === 0 ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center' }}>No queries found.</td></tr>
-              ) : queries.map(qr => (
-                <tr key={qr._id}>
-                  <td>{qr.roll}</td>
-                  <td>{qr.detectedName || '-'}</td>
-                  <td>{qr.reporterIp || '-'}</td>
-                  <td>{qr.createdAt ? new Date(qr.createdAt).toLocaleString() : '-'}</td>
-                  <td>
-                    <button onClick={() => { setSelectedReport(qr); setShowModal(true); }} style={{ padding: '4px 10px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                      View
-                    </button>
-                  </td>
+          <div className="overflow-x-auto rounded-xl shadow card">
+            <table className="w-full border-collapse min-w-max">
+              <thead>
+                <tr className="bg-gray-100 dark:bg-gray-900">
+                  <th className="py-3 px-4 text-left">Roll</th>
+                  <th className="py-3 px-4 text-left">Name</th>
+                  <th className="py-3 px-4 text-left">IP</th>
+                  <th className="py-3 px-4 text-left">Created</th>
+                  <th className="py-3 px-4 text-left">View</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {queries.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center py-8 text-gray-400 dark:text-gray-500">No queries found.</td></tr>
+                ) : queries.map(qr => (
+                  <tr key={qr._id} className="border-b hover:bg-indigo-50 dark:hover:bg-slate-800 transition-all">
+                    <td className="py-2 px-4 font-mono text-sm">{qr.roll}</td>
+                    <td className="py-2 px-4">{qr.detectedName || '-'}</td>
+                    <td className="py-2 px-4">{qr.reporterIp || '-'}</td>
+                    <td className="py-2 px-4">{qr.createdAt ? new Date(qr.createdAt).toLocaleString() : '-'}</td>
+                    <td className="py-2 px-4">
+                      <button onClick={() => { setSelectedReport(qr); setShowModal(true); }} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded shadow text-sm transition-all">View</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           <Modal open={showModal} title={selectedReport ? `All Details for: ${selectedReport.roll}` : 'Report details'} onClose={() => { setShowModal(false); setSelectedReport(null); }} confirmLabel={null}>
             {selectedReport ? (
               <EditDetailsModal selectedReport={selectedReport} setQueries={setQueries} setSelectedReport={setSelectedReport} />
             ) : null}
-
           </Modal>
         </>
       )}
@@ -114,23 +111,21 @@ function EditDetailsModal({ selectedReport, setQueries, setSelectedReport }) {
     }
   };
 
-  // Show all fields except 'contactProvided' and 'reason'
+  // Show only editable fields (hide createdAt, updatedAt, contactProvided, reason)
   const allFields = [
     'roll',
     'detectedName',
     'phone',
     'userMessage',
-    'reporterIp',
-    'createdAt',
-    'updatedAt'
+    'reporterIp'
   ];
   const fieldsToShow = allFields
-    .filter(k => !['__v','_id'].includes(k))
+    .filter(k => !['__v','_id','createdAt','updatedAt'].includes(k))
     .map(key => [key, selectedReport[key] || '']);
 
   return (
     <div className="max-w-xl mx-auto p-6 bg-white dark:bg-slate-900 rounded-xl shadow-lg">
-      <h3 className="mb-6 text-2xl font-bold text-slate-800 dark:text-slate-100">Full Query Information <span className="text-base font-normal text-slate-500">(Edit any field)</span></h3>
+      <h3 className="mb-6 text-2xl font-bold text-slate-800 dark:text-slate-100">Full Query Information</h3>
       <table className="w-full border-separate [border-spacing:0.5rem]">
         <tbody>
           {fieldsToShow.map(([key, value]) => (
