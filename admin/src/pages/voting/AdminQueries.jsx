@@ -13,14 +13,20 @@ const AdminQueries = () => {
   const [selectedReport, setSelectedReport] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
-  useEffect(() => {
+  // Fetch queries function for refresh
+  const fetchQueries = () => {
     setLoading(true);
-  axios.get(`/api/admin/identity-reports?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`)
+    axios.get(`/api/admin/identity-reports?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`)
       .then(res => {
         setQueries(res.data.items || []);
         setTotal(res.data.total || 0);
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchQueries();
+    // eslint-disable-next-line
   }, [q, page, limit]);
 
   return (
@@ -34,6 +40,13 @@ const AdminQueries = () => {
           onChange={e => { setQ(e.target.value); setPage(1); }}
           className="input-field w-full sm:w-80"
         />
+        <button
+          onClick={fetchQueries}
+          className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded shadow text-sm transition-all"
+          title="Refresh queries"
+        >
+          Refresh
+        </button>
       </div>
       {loading ? <div className="text-center py-8 text-lg text-gray-500 dark:text-gray-400">Loading...</div> : (
         <>
