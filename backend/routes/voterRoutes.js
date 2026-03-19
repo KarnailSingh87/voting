@@ -117,23 +117,31 @@ router.get('/profile', voterAuth, async (req, res) => {
   try {
     const voter = await Voter.findById(req.voter.id).populate('history.electionId', 'title');
     if (!voter) return res.status(404).json({ success: false, message: 'Voter not found' });
-    
+
     // Try to get additional details from Student collection using identifierRaw (roll number)
     let studentDetails = null;
     if (voter.identifierRaw) {
       const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      studentDetails = await Student.findOne({ 
-        roll: { $regex: `^${escapeRegExp(voter.identifierRaw)}$`, $options: 'i' } 
+      studentDetails = await Student.findOne({
+        roll: { $regex: `^${escapeRegExp(voter.identifierRaw)}$`, $options: 'i' }
       }).lean();
     }
-    
+
+    // Fetch all queries for this voter
+    const queries = await Query.find({ user: voter._id }).sort({ createdAt: -1 }).lean();
+
+    // Fetch all identity reports for this roll number
+    let reports = [];
+    if (voter.identifierRaw) {
+      reports = await (await import('../models/IdentityReport.js')).default.find({ roll: voter.identifierRaw }).sort({ createdAt: -1 }).lean();
+    }
+
     // Get photo URL - prefer student photo (always freshest), fall back to voter's own upload
     let photoUrl = studentDetails?.photo || voter.photoUrl || null;
-    // If photo is a base64 data URI, use as-is; if a relative path, prepend /uploads/
     if (photoUrl && !photoUrl.startsWith('data:') && !photoUrl.startsWith('http') && !photoUrl.startsWith('/')) {
       photoUrl = `/uploads/${photoUrl}`;
     }
-    
+
     // Build profile response
     const profile = {
       id: voter._id,
@@ -160,9 +168,11 @@ router.get('/profile', voterAuth, async (req, res) => {
         candidateName: h.candidateName || 'N/A',
         timestamp: h.timestamp,
         voteHash: h.voteHash
-      }))
+      })),
+      queries,
+      reports
     };
-    
+
     res.json({ success: true, profile });
   } catch (e) {
     console.error('PROFILE ERROR', e);
