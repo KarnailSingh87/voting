@@ -34,6 +34,11 @@ const Login = () => {
   const [isMe, setIsMe] = useState(null); // null = not chosen, true = it's me, false = not me
   const [, setQueryRaised] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportPhone, setReportPhone] = useState('');
+  const [reportMessage, setReportMessage] = useState('');
+  const [reportErrorMsg, setReportErrorMsg] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
   // removed unused emailError state
 
   // Theme state for login page (no navbar here)
@@ -115,21 +120,36 @@ const Login = () => {
   };
 
   const reportIdentity = async () => {
+    // Open the report modal so the user must provide phone and a custom message
     if (!roll || !name) return;
-    setReportLoading(true);
+    setReportErrorMsg('');
+    setReportPhone(studentData?.mobile || mobile || '');
+    setReportMessage('');
+    setShowReportModal(true);
+  };
+
+  const submitReportWithInfo = async () => {
+    // validate
+    setReportErrorMsg('');
+    if (!reportMessage || !reportMessage.trim()) return setReportErrorMsg('Please enter a message describing the issue');
+    if (!reportPhone || !/^\+?\d{7,15}$/.test(reportPhone)) return setReportErrorMsg('Enter a valid phone number (digits only, optional leading +)');
+    setReportSubmitting(true);
     try {
-      const payload = { roll, detectedName: name, reason: 'mismatch' };
+      const payload = { roll, detectedName: name, reason: 'mismatch', phone: reportPhone, message: reportMessage };
       if (email) payload.contactProvided = email;
       await axios.post('/api/report-identity', payload);
       setMessage('Query raised. Admin will review.');
       setQueryRaised(true);
       toast.success('Report saved');
-    } catch (e) {
-      const msg = e.response?.data?.message || 'Failed to report';
-      setError(msg);
-      toast.error(msg);
+      setShowReportModal(false);
+      // clear modal fields
+      setReportPhone('');
+      setReportMessage('');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to submit report';
+      setReportErrorMsg(msg);
     } finally {
-      setReportLoading(false);
+      setReportSubmitting(false);
     }
   };
 
@@ -407,8 +427,14 @@ const Login = () => {
                               setMessage('');
                               setQueryRaised(false);
                             } else {
-                              setMessage('Query raised. Admin will review.');
-                              setQueryRaised(true);
+                              // Open the report modal so user can provide phone and a custom message
+                              setShowReportModal(true);
+                              // prefills
+                              setReportPhone(studentData?.mobile || mobile || '');
+                              setReportMessage('');
+                              // clear UI banner until user submits
+                              setMessage('');
+                              setQueryRaised(false);
                             }
                           }}
                           className="mr-2"
@@ -417,7 +443,7 @@ const Login = () => {
                       </label>
                       <button
                         type="button"
-                        onClick={async () => { setIsMe(false); await reportIdentity(); }}
+                        onClick={() => { setIsMe(false); setShowReportModal(true); }}
                         disabled={reportLoading}
                         className="text-sm text-red-600 hover:underline disabled:opacity-50"
                       >
@@ -484,6 +510,38 @@ const Login = () => {
                               )}
                             </div>
                           ) : null}
+                        </Modal>
+                        <Modal show={showReportModal} onClose={() => setShowReportModal(false)}>
+                          <div className="p-4">
+                            <h3 className="text-lg font-semibold mb-2">Report identity (provide phone for admin call)</h3>
+                            <div className="mb-2">
+                              <label className="block text-sm font-medium text-gray-700">Phone (WhatsApp or phone)</label>
+                              <input
+                                type="text"
+                                value={reportPhone}
+                                onChange={e => setReportPhone(e.target.value.replace(/[^+\d]/g, ''))}
+                                placeholder="e.g. +911234567890"
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                              />
+                            </div>
+                            <div className="mb-2">
+                              <label className="block text-sm font-medium text-gray-700">Message to admin</label>
+                              <textarea
+                                value={reportMessage}
+                                onChange={e => setReportMessage(e.target.value)}
+                                rows={4}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                                placeholder="Describe the issue so admin can verify when they call"
+                              />
+                            </div>
+                            {reportErrorMsg && <div className="text-sm text-red-600 mb-2">{reportErrorMsg}</div>}
+                            <div className="flex justify-end space-x-2">
+                              <button type="button" onClick={() => setShowReportModal(false)} className="px-3 py-1 rounded border">Cancel</button>
+                              <button type="button" onClick={submitReportWithInfo} disabled={reportSubmitting} className="px-3 py-1 rounded bg-red-600 text-white disabled:opacity-50">
+                                {reportSubmitting ? 'Submitting...' : 'Submit Report'}
+                              </button>
+                            </div>
+                          </div>
                         </Modal>
                       </>
                       ) : null}
@@ -579,9 +637,49 @@ const Login = () => {
                 ) : isMe === false ? (
                   <div className="rounded-md bg-yellow-50 p-4">
                     <div className="flex">
-                        <div className="ml-3">
-                        <h3 className="text-sm font-medium text-yellow-800">Query raised</h3>
-                        <div className="mt-2 text-sm text-yellow-700">We&apos;ve logged a query for this roll; an admin will review it.</div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-yellow-800">Provide verification details</h3>
+                        <div className="mt-2 text-sm text-yellow-700">Please provide a phone number and a short note so an admin can call and verify your identity.</div>
+                        <div className="mt-3 space-y-2">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Phone (required)</label>
+                            <input
+                              type="text"
+                              value={reportPhone}
+                              onChange={e => setReportPhone(e.target.value.replace(/[^+\d]/g, ''))}
+                              placeholder="e.g. +911234567890"
+                              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Message to admin (required)</label>
+                            <textarea
+                              value={reportMessage}
+                              onChange={e => setReportMessage(e.target.value)}
+                              rows={3}
+                              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                              placeholder="Describe the issue so admin can verify when they call"
+                            />
+                          </div>
+                          {reportErrorMsg && <div className="text-sm text-red-600">{reportErrorMsg}</div>}
+                          <div className="flex space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => { setReportPhone(''); setReportMessage(''); setReportErrorMsg(''); }}
+                              className="px-3 py-2 rounded border"
+                            >
+                              Clear
+                            </button>
+                            <button
+                              type="button"
+                              onClick={submitReportWithInfo}
+                              disabled={reportSubmitting}
+                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                            >
+                              {reportSubmitting ? 'Submitting...' : 'Submit verification details'}
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

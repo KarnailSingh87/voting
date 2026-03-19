@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from '../../utils/axios';
+import Modal from '../../components/Modal';
 
 const AdminQueries = () => {
   const [queries, setQueries] = useState([]);
@@ -8,6 +9,8 @@ const AdminQueries = () => {
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -38,27 +41,43 @@ const AdminQueries = () => {
               <tr>
                 <th>Roll</th>
                 <th>Name</th>
-                <th>Reason</th>
-                <th>Contact</th>
+                {/* Reason column removed */}
+                {/* Contact column removed */}
+                <th>Phone</th>
+                <th>Message</th>
                 <th>IP</th>
                 <th>Created</th>
               </tr>
             </thead>
             <tbody>
               {queries.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center' }}>No queries found.</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center' }}>No queries found.</td></tr>
               ) : queries.map(qr => (
                 <tr key={qr._id}>
                   <td>{qr.roll}</td>
-                  <td>{qr.detectedName || '-'}</td>
-                  <td>{qr.reason || '-'}</td>
-                  <td>{qr.contactProvided || '-'}</td>
+                  <td style={{ cursor: 'pointer', color: '#3b82f6', textDecoration: 'underline' }}
+                      onClick={() => { setSelectedReport(qr); setShowModal(true); }}>
+                    {qr.detectedName || '-'}
+                  </td>
+                  {/* Reason cell removed */}
+                  {/* Contact cell removed */}
+                  <td>{qr.phone || '-'}</td>
+                  <td style={{ maxWidth: 300, whiteSpace: 'normal' }}>{qr.userMessage || qr.message || '-'}</td>
                   <td>{qr.reporterIp || '-'}</td>
                   <td>{qr.createdAt ? new Date(qr.createdAt).toLocaleString() : '-'}</td>
+                    {/* View button removed. Name cell is now clickable. */}
                 </tr>
               ))}
             </tbody>
           </table>
+
+          <Modal open={showModal} title={selectedReport ? `Report: ${selectedReport.roll}` : 'Report details'} onClose={() => { setShowModal(false); setSelectedReport(null); }} confirmLabel={null}>
+            {selectedReport ? (
+              <div style={{ maxHeight: '60vh', overflow: 'auto' }}>
+                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{JSON.stringify(selectedReport, null, 2)}</pre>
+              </div>
+            ) : null}
+          </Modal>
           <div style={{ marginTop: 16 }}>
             <button disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</button>
             <span style={{ margin: '0 12px' }}>Page {page} / {Math.ceil(total / limit) || 1}</span>

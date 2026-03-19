@@ -10,7 +10,30 @@ import jwt from 'jsonwebtoken';
 import upload from '../middleware/voterPhotoUpload.js';
 import Vote from '../models/Vote.js';
 
+import mongoose from 'mongoose';
+import Query from '../models/Query.js';
+
 const router = express.Router();
+// Submit a query
+router.post('/query', voterAuth, async (req, res) => {
+  try {
+    const voter = await Voter.findById(req.voter.id);
+    if (!voter) return res.status(404).json({ success: false, message: 'Voter not found' });
+    const { subject, message } = req.body;
+    if (!subject || !message) return res.status(400).json({ success: false, message: 'Subject and message are required' });
+    const query = new Query({
+      user: voter._id,
+      name: voter.name,
+      email: voter.email,
+      subject,
+      message
+    });
+    await query.save();
+    res.status(201).json({ success: true, query });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // Upload voter photo
 router.post('/upload-photo', voterAuth, upload.single('photo'), async (req, res) => {

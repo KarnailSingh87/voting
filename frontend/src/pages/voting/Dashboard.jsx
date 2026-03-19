@@ -5,6 +5,8 @@ import axios from '../../utils/axios';
 import { io } from 'socket.io-client';
 import VoterNavbar from '../../components/VoterNavbar';
 
+import QueryForm from './QueryForm';
+
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 
 // Helper to get full image URL (handles both absolute and relative URLs)
@@ -37,6 +39,10 @@ const PhotoModal = ({ photoUrl, name, onClose }) => {
       </div>
     </div>
   );
+          {/* Query Form */}
+          <div className="mt-8">
+            <QueryForm />
+          </div>
 };
 
 PhotoModal.propTypes = {

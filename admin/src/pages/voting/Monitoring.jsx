@@ -13,12 +13,22 @@ const Monitoring = () => {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-    // Initialize WebSocket connection
-    socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
-    
+    // Initialize WebSocket connection with better debug/reconnect options
+    socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005', {
+      auth: { token: localStorage.getItem('adminToken') },
+      // keep retrying forever, but backoff the delay (socket.io default behavior is fine)
+      reconnectionAttempts: Infinity,
+      reconnectionDelayMax: 5000,
+    });
+
     socket.on('connect', () => {
       console.log('Connected to WebSocket server');
       setEvents(prev => [{ time: new Date(), message: 'Connected to server', type: 'system' }, ...prev]);
+    });
+    
+    socket.on('connect_error', (err) => {
+      console.error('WebSocket connect_error', err && (err.message || err));
+      setEvents(prev => [{ time: new Date(), message: `WebSocket connect_error: ${err && err.message ? err.message : String(err)}`, type: 'system' }, ...prev]);
     });
     
     socket.on('vote_cast', (data) => {

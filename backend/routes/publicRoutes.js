@@ -75,13 +75,24 @@ router.post('/student-lookup', lookupLimiter, async (req, res) => {
 });
 
 // Report identity mismatch ("Not me / Report")
-// POST /api/report-identity { roll, detectedName, reason?, contactProvided? }
+// POST /api/report-identity { roll, detectedName, reason?, contactProvided?, phone?, message? }
 router.post('/report-identity', lookupLimiter, async (req, res) => {
   try {
-    const { roll, detectedName, reason = 'mismatch', contactProvided } = req.body;
-    if (!roll || !detectedName) return res.status(400).json({ success: false, message: 'roll and detectedName required' });
+    const { roll, detectedName, reason = 'mismatch', contactProvided, phone, message } = req.body;
+  if (!roll || !detectedName) return res.status(400).json({ success: false, message: 'roll and detectedName required' });
+  // Require phone and message to ensure admins can contact and have context
+  if (!phone || !String(phone).trim()) return res.status(400).json({ success: false, message: 'phone required' });
+  if (!message || !String(message).trim()) return res.status(400).json({ success: false, message: 'message required' });
     const r = String(roll).trim();
-    const report = await IdentityReport.create({ roll: r, detectedName: String(detectedName), reason: String(reason), contactProvided: contactProvided ? String(contactProvided) : undefined, reporterIp: req.ip });
+    const report = await IdentityReport.create({
+      roll: r,
+      detectedName: String(detectedName),
+      reason: String(reason),
+      contactProvided: contactProvided ? String(contactProvided) : undefined,
+      phone: phone ? String(phone) : undefined,
+      userMessage: message ? String(message) : undefined,
+      reporterIp: req.ip,
+    });
     return res.json({ success: true, message: 'Report saved', id: report._id });
   } catch (e) {
     console.error('REPORT IDENTITY ERROR', e);
@@ -92,10 +103,16 @@ router.post('/report-identity', lookupLimiter, async (req, res) => {
 // Report missing student record - POST /api/report-missing { roll, contactProvided? }
 router.post('/report-missing', lookupLimiter, async (req, res) => {
   try {
-    const { roll, contactProvided } = req.body;
+    const { roll, contactProvided, phone } = req.body;
     if (!roll) return res.status(400).json({ success: false, message: 'roll required' });
     const r = String(roll).trim();
-    const report = await IdentityReport.create({ roll: r, reason: 'missing', contactProvided: contactProvided ? String(contactProvided) : undefined, reporterIp: req.ip });
+    const report = await IdentityReport.create({
+      roll: r,
+      reason: 'missing',
+      contactProvided: contactProvided ? String(contactProvided) : undefined,
+      phone: phone ? String(phone) : undefined,
+      reporterIp: req.ip,
+    });
     return res.json({ success: true, message: 'Missing student report saved', id: report._id });
   } catch (e) {
     console.error('REPORT MISSING ERROR', e);

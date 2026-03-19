@@ -22,9 +22,33 @@ import { parseFile } from '../config/aiParser.js';
 import QRCode from 'qrcode';
 import { fileURLToPath } from 'url';
 
+import Query from '../models/Query.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const router = express.Router();
+// Get all user queries
+router.get('/queries', async (req, res) => {
+  try {
+    const queries = await Query.find().lean();
+    // Map fields for frontend
+    const mapped = queries.map(q => ({
+      roll: q.roll || '-',
+      name: q.name || '-',
+      detectedName: q.detectedName || '-',
+  // reason field removed
+      contactProvided: q.contactProvided || '-',
+      phone: q.phone || '-',
+      message: q.message || '-',
+      ip: q.ip || '-',
+      createdAt: q.createdAt,
+      _id: q._id
+    }));
+    res.json({ success: true, queries: mapped });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // limit file size to 50MB and accept common spreadsheet/zip types (reject plain text uploads)
 const upload = multer({ 
@@ -128,12 +152,15 @@ router.post('/login', async (req, res) => {
     const q = { $or: [ { username: { $regex: `^${escapeRegExp(username)}$`, $options: 'i' } }, { email: { $regex: `^${escapeRegExp(username)}$`, $options: 'i' } } ] };
     const admin = await Admin.findOne(q);
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
-    const ok = await admin.comparePassword(password);
-    if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
-    const token = jwt.sign({ aid: admin._id, role: admin.role }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '4h' });
-    // Log login action
-    try { await AdminAction.create({ admin: admin._id, action: 'Admin Login', details: { description: `${admin.username} logged in`, severity: 'low' }, ip: req.ip }); } catch (_) {}
-    res.json({ token, admin: { id: admin._id, role: admin.role, username: admin.username } });
+  const ok = await admin.comparePassword(password);
+  if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
+  // Update lastLogin
+  admin.lastLogin = new Date();
+  await admin.save();
+  const token = jwt.sign({ aid: admin._id, role: admin.role }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '4h' });
+  // Log login action
+  try { await AdminAction.create({ admin: admin._id, action: 'Admin Login', details: { description: `${admin.username} logged in`, severity: 'low' }, ip: req.ip }); } catch (_) {}
+  res.json({ token, admin: { id: admin._id, role: admin.role, username: admin.username, lastLogin: admin.lastLogin } });
   } catch(e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
@@ -170,7 +197,9 @@ router.get('/identity-reports', adminAuth, async (req, res) => {
         { roll: { $regex: escaped, $options: 'i' } },
         { detectedName: { $regex: escaped, $options: 'i' } },
         { reason: { $regex: escaped, $options: 'i' } },
-        { contactProvided: { $regex: escaped, $options: 'i' } }
+        { contactProvided: { $regex: escaped, $options: 'i' } },
+        { phone: { $regex: escaped, $options: 'i' } },
+        { userMessage: { $regex: escaped, $options: 'i' } }
       ];
     }
     const skip = (Math.max(1, Number(page)) - 1) * Number(limit);
@@ -180,7 +209,9 @@ router.get('/identity-reports', adminAuth, async (req, res) => {
       .skip(skip)
       .limit(Number(limit))
       .lean();
-    res.json({ success: true, total, items });
+    // Normalize message field so frontend can always read `message`
+    const normalized = items.map(it => ({ ...it, message: it.userMessage || it.message }));
+    res.json({ success: true, total, items: normalized });
   } catch (e) {
     console.error('Admin identity-reports fetch error:', e);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -656,7 +687,7 @@ router.get('/dashboard', adminAuth, async (req, res) => {
     const activeElections = elections.filter(e => e.status === 'ongoing').length;
     const upcomingElections = elections.filter(e => e.status === 'scheduled').length;
     const completedElections = elections.filter(e => e.status === 'ended').length;
-    const admin = await Admin.findById(req.admin.aid).select('username role updatedAt').lean();
+  const admin = await Admin.findById(req.admin.aid).select('username role updatedAt lastLogin').lean();
 
     // ── Build recent activity from real data ──
     const recentActivity = [];

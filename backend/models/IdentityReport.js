@@ -5,6 +5,8 @@ const identityReportSchema = new mongoose.Schema({
   detectedName: { type: String },
   reason: { type: String },
   contactProvided: { type: String },
+  phone: { type: String },
+  userMessage: { type: String },
   reporterIp: { type: String },
 }, { timestamps: true });
 
