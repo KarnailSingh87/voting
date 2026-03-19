@@ -145,12 +145,24 @@ function EditDetailsModal({ selectedReport, setQueries, setSelectedReport }) {
             <tr key={key}>
               <td className="font-semibold capitalize py-2 px-3 text-slate-700 dark:text-slate-200 w-40">{key.replace(/([A-Z])/g, ' $1')}</td>
               <td className="py-2 px-3">
-                <input
-                  value={editFields[key] !== undefined ? editFields[key] : value || ''}
-                  onChange={e => handleChange(key, e.target.value)}
-                  className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
-                  disabled={saving}
-                />
+                {key === 'userMessage' ? (
+                  <textarea
+                    value={editFields[key] !== undefined ? editFields[key] : value || ''}
+                    onChange={e => handleChange(key, e.target.value)}
+                    className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60 resize-none"
+                    style={{ minHeight: '80px', height: 'auto', overflow: 'hidden' }}
+                    disabled={saving}
+                    rows={Math.max(3, (editFields[key] !== undefined ? editFields[key] : value || '').split('\n').length)}
+                    readOnly={saving}
+                  />
+                ) : (
+                  <input
+                    value={editFields[key] !== undefined ? editFields[key] : value || ''}
+                    onChange={e => handleChange(key, e.target.value)}
+                    className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
+                    disabled={saving}
+                  />
+                )}
               </td>
             </tr>
           ))}
