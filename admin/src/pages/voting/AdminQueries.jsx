@@ -129,18 +129,18 @@ function EditDetailsModal({ selectedReport, setQueries, setSelectedReport }) {
     .map(key => [key, selectedReport[key] || '']);
 
   return (
-    <div style={{ maxWidth: 500, margin: '0 auto', padding: 16, background: '#fff', borderRadius: 8 }}>
-      <h3 style={{ marginBottom: 16, color: '#1e293b' }}>Full Query Information (Edit any field)</h3>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+    <div className="max-w-xl mx-auto p-6 bg-white dark:bg-slate-900 rounded-xl shadow-lg">
+      <h3 className="mb-6 text-2xl font-bold text-slate-800 dark:text-slate-100">Full Query Information <span className="text-base font-normal text-slate-500">(Edit any field)</span></h3>
+      <table className="w-full border-separate [border-spacing:0.5rem]">
         <tbody>
           {fieldsToShow.map(([key, value]) => (
             <tr key={key}>
-              <td style={{ fontWeight: 600, textTransform: 'capitalize', padding: '6px 10px', color: '#334155', width: 120 }}>{key.replace(/([A-Z])/g, ' $1')}</td>
-              <td style={{ padding: '6px 10px', color: '#475569' }}>
+              <td className="font-semibold capitalize py-2 px-3 text-slate-700 dark:text-slate-200 w-40">{key.replace(/([A-Z])/g, ' $1')}</td>
+              <td className="py-2 px-3">
                 <input
                   value={editFields[key] !== undefined ? editFields[key] : value || ''}
                   onChange={e => handleChange(key, e.target.value)}
-                  style={{ width: '100%', padding: 4, border: '1px solid #cbd5e1', borderRadius: 4 }}
+                  className="w-full p-2 border border-slate-300 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
                   disabled={saving}
                 />
               </td>
@@ -148,12 +148,12 @@ function EditDetailsModal({ selectedReport, setQueries, setSelectedReport }) {
           ))}
         </tbody>
       </table>
-      {error && <div style={{ color: 'red', marginTop: 8 }}>{error}</div>}
-      <div style={{ marginTop: 16, textAlign: 'right' }}>
+      {error && <div className="text-red-600 mt-3">{error}</div>}
+      <div className="mt-6 flex justify-end">
         <button
           onClick={handleSave}
           disabled={saving}
-          style={{ padding: '6px 18px', background: '#10b981', color: 'white', border: 'none', borderRadius: 4, cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+          className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-md shadow disabled:opacity-60 disabled:cursor-not-allowed transition"
         >
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
