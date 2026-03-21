@@ -6,6 +6,7 @@ import compression from 'compression';
 import http from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { connectDB } from './config/db.js';
 import Election from './models/Election.js';
@@ -69,6 +70,21 @@ app.use('/api/admin', adminRoutes);
 app.use('/api', publicRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+// If a built frontend exists at ../frontend/dist, serve it as static files
+// and provide a SPA fallback so refreshing client-side routes doesn't return 404.
+try {
+  const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
+  if (fs.existsSync(frontendDist)) {
+    app.use(express.static(frontendDist, { maxAge: '1d' }));
+    // Serve index.html for any non-API route (SPA history fallback)
+    app.get(/^\/(?!api\/).*/, (req, res) => {
+      res.sendFile(path.join(frontendDist, 'index.html'));
+    });
+  }
+} catch (err) {
+  // If fs isn't available for some reason, skip without crashing
+}
 
 // Global error handler to return JSON for Multer and common errors
 app.use((err, req, res, next) => {
