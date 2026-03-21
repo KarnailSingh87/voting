@@ -47,11 +47,17 @@ router.post('/student-lookup', lookupLimiter, async (req, res) => {
   try {
     const { roll } = req.body;
     if (!roll || typeof roll !== 'string') return res.status(400).json({ success: false, message: 'roll required' });
-    // match roll case-insensitively and trim whitespace
+    // match roll: prefer an indexed exact match first (fast). Only fall back to a
+    // case-insensitive regex scan if exact match fails. Regex scans can be slow on
+    // large collections and cause the frontend to hang showing "Verifying roll number...".
     const r = roll.trim();
-    // escape regex special chars in roll
-    const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const student = await Student.findOne({ roll: { $regex: `^${escapeRegExp(r)}$`, $options: 'i' } }).lean();
+    // Try an indexed exact lookup first. This will use the unique index on `roll`.
+    let student = await Student.findOne({ roll: r }).lean();
+    if (!student) {
+      // If not found, fall back to case-insensitive match (covers case variations)
+      const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+      student = await Student.findOne({ roll: { $regex: `^${escapeRegExp(r)}$`, $options: 'i' } }).lean();
+    }
     if (!student) return res.status(404).json({ success: false, message: 'Not found' });
     // Return richer student data so frontends can display photo and any original upload fields
     const payload = {
@@ -82,6 +88,8 @@ router.post('/report-identity', lookupLimiter, async (req, res) => {
   if (!roll || !detectedName) return res.status(400).json({ success: false, message: 'roll and detectedName required' });
   // Require phone and message to ensure admins can contact and have context
   if (!phone || !String(phone).trim()) return res.status(400).json({ success: false, message: 'phone required' });
+  // Enforce 10-digit local phone format (digits only). This mirrors client-side validation.
+  if (!/^\d{10}$/.test(String(phone).trim())) return res.status(400).json({ success: false, message: 'phone must be 10 digits' });
   if (!message || !String(message).trim()) return res.status(400).json({ success: false, message: 'message required' });
     const r = String(roll).trim();
     const report = await IdentityReport.create({
@@ -106,6 +114,8 @@ router.post('/report-missing', lookupLimiter, async (req, res) => {
     const { roll, contactProvided, phone } = req.body;
     if (!roll) return res.status(400).json({ success: false, message: 'roll required' });
     const r = String(roll).trim();
+    // If phone provided, validate it's 10 digits (client expects 10-digit local numbers)
+    if (phone && String(phone).trim() && !/^\d{10}$/.test(String(phone).trim())) return res.status(400).json({ success: false, message: 'phone must be 10 digits' });
     const report = await IdentityReport.create({
       roll: r,
       reason: 'missing',

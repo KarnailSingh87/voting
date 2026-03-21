@@ -23,6 +23,7 @@ import QRCode from 'qrcode';
 import { fileURLToPath } from 'url';
 
 import Query from '../models/Query.js';
+import { sendWhatsAppMessage } from '../config/whatsappService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -184,6 +185,25 @@ function adminAuth(req, res, next) {
     return res.status(401).json({ message: 'Invalid token' });
   }
 }
+
+// Admin endpoint: send a manual WhatsApp message to a phone number (used by admin UI)
+router.post('/whatsapp-send', adminAuth, async (req, res) => {
+  try {
+    const { phone, message } = req.body || {};
+    if (!phone) return res.status(400).json({ success: false, message: 'phone required' });
+
+    const result = await sendWhatsAppMessage(String(phone), String(message || ''));
+
+    // Log admin action (best effort)
+    try { await AdminAction.create({ admin: req.admin?.aid, action: 'WhatsApp Sent', details: { phone, message: message || '' }, ip: req.ip }); } catch (_) {}
+
+    if (result && result.success) return res.json({ success: true, message: result.message || 'sent' });
+    return res.status(500).json({ success: false, message: result && result.error ? result.error : 'failed to send' });
+  } catch (e) {
+    console.error('whatsapp-send error', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 // GET /api/admin/identity-reports?q=&page=&limit=
 router.get('/identity-reports', adminAuth, async (req, res) => {

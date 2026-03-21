@@ -39,6 +39,7 @@ const Login = () => {
   const [reportMessage, setReportMessage] = useState('');
   const [reportErrorMsg, setReportErrorMsg] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
   // removed unused emailError state
 
   // Theme state for login page (no navbar here)
@@ -131,20 +132,23 @@ const Login = () => {
   const submitReportWithInfo = async () => {
     // validate
     setReportErrorMsg('');
-    if (!reportMessage || !reportMessage.trim()) return setReportErrorMsg('Please enter a message describing the issue');
-    if (!reportPhone || !/^\+?\d{7,15}$/.test(reportPhone)) return setReportErrorMsg('Enter a valid phone number (digits only, optional leading +)');
+  if (!reportMessage || !reportMessage.trim()) return setReportErrorMsg('Please enter a message describing the issue');
+  // Enforce exactly 10 digits for query phone so admins get a local contact number
+  if (!reportPhone || !/^\d{10}$/.test(reportPhone)) return setReportErrorMsg('Enter a valid 10-digit phone number (digits only)');
     setReportSubmitting(true);
     try {
       const payload = { roll, detectedName: name, reason: 'mismatch', phone: reportPhone, message: reportMessage };
       if (email) payload.contactProvided = email;
       await axios.post('/api/report-identity', payload);
-      setMessage('Query raised. Admin will review.');
+      setMessage('Report submitted successfully. Admin will review.');
       setQueryRaised(true);
-      toast.success('Report saved');
+      toast.success('Report submitted successfully');
       setShowReportModal(false);
       // clear modal fields
       setReportPhone('');
       setReportMessage('');
+      // show a simple confirmation screen instead of the login form
+      setReportSubmitted(true);
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to submit report';
       setReportErrorMsg(msg);
@@ -174,6 +178,28 @@ const Login = () => {
       setLoading(false);
     }
   };
+  // If user has just submitted a report, show a simple confirmation screen.
+  if (reportSubmitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg text-center">
+          <h2 className="text-2xl font-bold">Report submitted successfully</h2>
+          <p className="text-gray-600">Thank you. An admin will contact you on the provided number to verify your identity.</p>
+          <div className="mt-6">
+            <button
+              onClick={() => {
+                // redirect to public dashboard
+                navigate('/public');
+              }}
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded"
+            >
+              View Public Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -519,8 +545,13 @@ const Login = () => {
                               <input
                                 type="text"
                                 value={reportPhone}
-                                onChange={e => setReportPhone(e.target.value.replace(/[^+\d]/g, ''))}
-                                placeholder="e.g. +911234567890"
+                                onChange={e => {
+                                  // allow only digits and limit to 10 characters
+                                  const cleaned = (e.target.value || '').replace(/\D/g, '');
+                                  setReportPhone(cleaned.slice(0, 10));
+                                }}
+                                maxLength={10}
+                                placeholder="e.g. 9123456789"
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
                               />
                             </div>
@@ -528,10 +559,11 @@ const Login = () => {
                               <label className="block text-sm font-medium text-gray-700">Message to admin</label>
                               <textarea
                                 value={reportMessage}
-                                onChange={e => setReportMessage(e.target.value)}
+                                onChange={e => setReportMessage(e.target.value.slice(0, 300))}
                                 rows={4}
+                                maxLength={300}
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                                placeholder="Describe the issue so admin can verify when they call"
+                                placeholder="Describe the issue so admin can verify when they call (max 300 chars)"
                               />
                             </div>
                             {reportErrorMsg && <div className="text-sm text-red-600 mb-2">{reportErrorMsg}</div>}
@@ -567,7 +599,12 @@ const Login = () => {
                     type="text"
                     required
                     value={mobile}
-                    onChange={(e)=>setMobile(e.target.value.replace(/\D/g, ''))}
+                    onChange={(e)=>{
+                      // allow only digits and limit to 10 characters
+                      const digits = (e.target.value || '').replace(/\D/g, '').slice(0,10);
+                      setMobile(digits);
+                    }}
+                    maxLength={10}
                     className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
                     placeholder="10-digit WhatsApp number"
                   />
@@ -646,8 +683,13 @@ const Login = () => {
                             <input
                               type="text"
                               value={reportPhone}
-                              onChange={e => setReportPhone(e.target.value.replace(/[^+\d]/g, ''))}
-                              placeholder="e.g. +911234567890"
+                              onChange={e => {
+                                // allow only digits and limit to 10 characters
+                                const cleaned = (e.target.value || '').replace(/\D/g, '');
+                                setReportPhone(cleaned.slice(0, 10));
+                              }}
+                              maxLength={10}
+                              placeholder="e.g. 9123456789"
                               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
                             />
                           </div>
@@ -655,10 +697,11 @@ const Login = () => {
                             <label className="block text-sm font-medium text-gray-700">Message to admin (required)</label>
                             <textarea
                               value={reportMessage}
-                              onChange={e => setReportMessage(e.target.value)}
+                              onChange={e => setReportMessage(e.target.value.slice(0, 300))}
                               rows={3}
+                              maxLength={300}
                               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                              placeholder="Describe the issue so admin can verify when they call"
+                              placeholder="Describe the issue so admin can verify when they call (max 300 chars)"
                             />
                           </div>
                           {reportErrorMsg && <div className="text-sm text-red-600">{reportErrorMsg}</div>}

@@ -168,6 +168,35 @@ export async function sendWhatsAppOTP(phoneNumber, otp) {
   }
 }
 
+// Send a custom text message via WhatsApp (manual/admin use)
+export async function sendWhatsAppMessage(phoneNumber, text) {
+  // If not connected, log and return mock response so admin knows it was not delivered
+  if (!sock || !isConnected) {
+    console.log(`[WhatsApp] 📱 MOCK MODE - Message for ${phoneNumber}: ${text}`);
+    return { success: true, mock: true, message: 'WhatsApp not connected; message logged to console' };
+  }
+
+  try {
+    let formattedNumber = (phoneNumber || '').replace(/\D/g, '');
+    if (!formattedNumber) throw new Error('Invalid phone number');
+
+    // Add India country code for 10-digit numbers for convenience
+    if (formattedNumber.length === 10) {
+      formattedNumber = '91' + formattedNumber;
+    }
+
+    const whatsappId = formattedNumber + '@s.whatsapp.net';
+
+    await sock.sendMessage(whatsappId, { text: text || '' });
+    console.log(`[WhatsApp] ✅ Message sent to ${phoneNumber}`);
+    return { success: true, message: 'Message sent via WhatsApp' };
+  } catch (error) {
+    console.error('[WhatsApp] Error sending message:', error.message || error);
+    console.log(`[WhatsApp] 📱 FALLBACK - Message for ${phoneNumber}: ${text}`);
+    return { success: false, error: error.message || String(error) };
+  }
+}
+
 // Get connection status
 export function getWhatsAppStatus() {
   return {

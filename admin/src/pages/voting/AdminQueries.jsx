@@ -96,6 +96,7 @@ export default AdminQueries;
 function EditDetailsModal({ selectedReport, setQueries, setSelectedReport }) {
   const [editFields, setEditFields] = React.useState({});
   const [saving, setSaving] = React.useState(false);
+  const [sendingWA, setSendingWA] = React.useState(false);
   const [error, setError] = React.useState('');
 
   // Helper to show phone if present, fallback to contactProvided
@@ -121,6 +122,29 @@ function EditDetailsModal({ selectedReport, setQueries, setSelectedReport }) {
       setError(e?.response?.data?.message || 'Failed to save changes');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const sendWhatsApp = async () => {
+    setError('');
+    const phone = getPhone();
+    if (!phone) {
+      setError('No phone number available to send WhatsApp');
+      return;
+    }
+    if (!window.confirm(`Send WhatsApp confirmation to ${phone}?`)) return;
+    const defaultMessage = `Hello ${selectedReport.detectedName || selectedReport.roll}, your report has been processed by the admin.`;
+    const custom = window.prompt('Optional message (leave empty for default):', defaultMessage);
+    setSendingWA(true);
+    try {
+      await axios.post('/api/admin/whatsapp-send', { phone, message: custom || defaultMessage });
+      // Optionally inform user
+      window.alert('WhatsApp message queued/sent');
+    } catch (e) {
+      console.error('Failed to send WhatsApp', e);
+      setError(e?.response?.data?.message || 'Failed to send WhatsApp');
+    } finally {
+      setSendingWA(false);
     }
   };
 
@@ -169,7 +193,14 @@ function EditDetailsModal({ selectedReport, setQueries, setSelectedReport }) {
         </tbody>
       </table>
       {error && <div className="text-red-600 mt-3">{error}</div>}
-      <div className="mt-6 flex justify-end">
+      <div className="mt-6 flex justify-end items-center gap-3">
+        <button
+          onClick={sendWhatsApp}
+          disabled={sendingWA || saving}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow disabled:opacity-60 disabled:cursor-not-allowed transition"
+        >
+          {sendingWA ? 'Sending...' : 'Send WhatsApp'}
+        </button>
         <button
           onClick={handleSave}
           disabled={saving}
