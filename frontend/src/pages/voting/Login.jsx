@@ -434,7 +434,16 @@ const Login = () => {
                     </button>
                   </div>
                 )}
-                {lookupLoading && <p className="mt-2 text-sm text-gray-500">Verifying roll number...</p>}
+                {lookupLoading ? (
+                  <p className="mt-2 text-sm text-gray-500 flex items-center">
+                    Verifying roll number
+                    <span className="ml-2 dots text-gray-500" aria-hidden>
+                      <span className="dot" />
+                      <span className="dot" />
+                      <span className="dot" />
+                    </span>
+                  </p>
+                ) : null}
                 {name && (
                   <div className="mt-2 text-sm text-gray-700">
                     <p>Name: <span className="font-medium">{name}</span></p>

@@ -99,6 +99,33 @@ h1, h2, h3, h4, h5, h6 {
     }
 }
 
+/* Verifying dots (wave) */
+@keyframes jump {
+    0% { transform: translateY(0); opacity: 0.85; }
+    25% { transform: translateY(-6px); opacity: 1; }
+    50% { transform: translateY(0); opacity: 0.85; }
+    100% { transform: translateY(0); opacity: 0.85; }
+}
+
+.dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem; /* 6px */
+}
+.dot {
+    width: 6px;
+    height: 6px;
+    background-color: currentColor;
+    border-radius: 9999px;
+    display: inline-block;
+    transform-origin: center bottom;
+    opacity: 0.85;
+    animation: jump 0.9s infinite ease-in-out;
+}
+.dot:nth-child(1) { animation-delay: 0s; }
+.dot:nth-child(2) { animation-delay: 0.12s; }
+.dot:nth-child(3) { animation-delay: 0.24s; }
+
 .skeleton {
     animation: shimmer 2s infinite;
     background: linear-gradient(to right, #f0f0f0 4%, #e0e0e0 25%, #f0f0f0 36%);
