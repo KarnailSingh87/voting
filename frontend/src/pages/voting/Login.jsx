@@ -25,7 +25,6 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [missingRecord, setMissingRecord] = useState(false);
   const [needsContact, setNeedsContact] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   const lookupTimer = useRef(null);
@@ -336,7 +335,6 @@ const Login = () => {
                     setRoll(v);
                     setError('');
                     setMessage('');
-                    setMissingRecord(false);
                     // reset any pending stage switch
                     if (pendingStageTimer.current) { clearTimeout(pendingStageTimer.current); pendingStageTimer.current = null; }
                     // clear previous name until lookup completes
@@ -378,7 +376,8 @@ const Login = () => {
                               const respMsg = res.data?.message || 'Student lookup failed';
                               // If backend explicitly indicates Not found, show a neutral message and allow reporting
                               if (respMsg === 'Not found') {
-                                setMissingRecord(true);
+                                // Show a friendly notice when roll is not found (no reporting UI)
+                                setMessage('No record found for this roll. Please re-check the roll number.');
                               } else {
                                 setError(respMsg);
                                 toast.error(respMsg);
@@ -388,7 +387,7 @@ const Login = () => {
                             let msg = err.response?.data?.message || 'Student lookup failed';
                             // "Not found" is the raw 404 message from backend; show a friendly hint
               if (err.response?.status === 404 || msg === 'Not found') {
-                setMissingRecord(true);
+                setMessage('No record found for this roll. Please re-check the roll number.');
               } else {
                 setError(msg);
                 toast.error(msg);
@@ -398,42 +397,14 @@ const Login = () => {
                         }
                       }, 300);
                     } else if (v) {
-                      // invalid format
-                      setError('Roll number appears invalid. Use 4–20 alphanumeric characters.');
+                      // invalid format - do not show an error message here per request
+                      // silently ignore until user types a valid roll or stops typing
                     }
                   }}
                   className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 focus:z-10 sm:text-sm"
                   placeholder="Roll number"
                 />
-                {/* When lookup fails, allow the user to report a missing record */}
-                {missingRecord && (
-                  <div className="mt-3">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          setLookupLoading(true);
-                          const payload = { roll };
-                          if (email) payload.contactProvided = email;
-                          if (mobile) payload.contactProvided = mobile;
-                          const res = await axios.post('/api/report-missing', payload);
-                          setMessage(res.data?.message || 'Report submitted');
-                          toast.success(res.data?.message || 'Report submitted');
-                          setMissingRecord(false);
-                        } catch (e) {
-                          const msg = e.response?.data?.message || 'Failed to report missing student';
-                          setError(msg);
-                          toast.error(msg);
-                        } finally {
-                          setLookupLoading(false);
-                        }
-                      }}
-                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
-                    >
-                      Report missing record
-                    </button>
-                  </div>
-                )}
+                
                 {lookupLoading ? (
                   <p className="mt-2 text-sm text-gray-500 flex items-center">
                     Verifying roll number
