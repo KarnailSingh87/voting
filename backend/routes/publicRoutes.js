@@ -211,14 +211,23 @@ router.get('/stats', async (req, res) => {
     const recentVotes = await Vote.countDocuments({ timestamp: { $gte: new Date(Date.now() - 24*60*60*1000) } });
     const activeElections = await Election.countDocuments({ status: 'ongoing' });
     const totalVoters = await Student.countDocuments();
-    
+    // Attempt to include live connected client count (if Socket.IO instance is available)
+    let connectedClients = 0;
+    try {
+      const io = req.app && req.app.get && req.app.get('io');
+      if (io) connectedClients = io.engine?.clientsCount ?? (io.sockets?.sockets?.size ?? 0);
+    } catch (e) {
+      connectedClients = 0;
+    }
+
     res.json({
       success: true,
       statistics: {
         totalVotes,
         recentVotes,
         activeElections,
-        totalVoters
+        totalVoters,
+        connectedClients
       }
     });
   } catch (e) {

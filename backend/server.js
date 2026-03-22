@@ -117,8 +117,24 @@ const io = new Server(server, {
 });
 app.set('io', io);
 
+// Helper to safely read current connected socket count
+const getConnectedClients = () => {
+  try {
+    // socket.io v4 exposes engine.clientsCount; fallback to sockets map size
+    return io && (io.engine?.clientsCount ?? (io.sockets?.sockets?.size ?? 0));
+  } catch (e) {
+    return 0;
+  }
+};
+
 io.on('connection', (socket) => {
-  socket.on('disconnect', () => {});
+  // Broadcast current viewer count when a client connects
+  try { io.emit('viewerCount', { connectedClients: getConnectedClients() }); } catch (_) {}
+
+  socket.on('disconnect', () => {
+    // Broadcast updated viewer count when a client disconnects
+    try { io.emit('viewerCount', { connectedClients: getConnectedClients() }); } catch (_) {}
+  });
 });
 
 const PORT = Number(process.env.PORT) || 5005;

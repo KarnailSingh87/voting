@@ -125,6 +125,14 @@ const PublicDashboard = () => {
       console.log('System status update received:', data);
     });
 
+    // Live viewer count updates from server
+    socket.on('viewerCount', (data) => {
+      try {
+        const count = (data && typeof data.connectedClients === 'number') ? data.connectedClients : 0;
+        setStats(prev => ({ ...(prev || {}), connectedClients: count }));
+      } catch (e) { /* ignore */ }
+    });
+
     socket.on('disconnect', () => {
       console.log('Disconnected from WebSocket server');
     });
