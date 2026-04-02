@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';
 import axios from '../../utils/axios';
 import io from 'socket.io-client';
+import LanguageSelector from '../../components/LanguageSelector';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 
@@ -382,6 +383,9 @@ const PublicDashboard = () => {
                 <p className="mt-2 text-xs text-gray-400">Official record published by SecureVote — Independent, auditable, and privacy preserving.</p>
               </div>
               <div className="text-left sm:text-right text-xs sm:text-sm text-gray-500">
+                <div className="mb-2">
+                  <LanguageSelector />
+                </div>
                 <div>Last updated:</div>
                 <div className="font-mono last-updated-digital">{lastUpdated ? formatLastUpdated(lastUpdated) : '—'}</div>
                 {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
