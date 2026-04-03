@@ -28,8 +28,8 @@ export default function LanguageSelector() {
   // single language selection (string). Stored value is a string like 'en' or 'hi'.
   const [selected, setSelected] = useState(() => {
     try {
-      // prefer new key, fallback to legacy prefs
-      const stored = localStorage.getItem('voterLang') || localStorage.getItem('voterLangPrefs');
+      // prefer admin-specific key, fallback to legacy prefs or voterLang
+      const stored = localStorage.getItem('adminLang') || localStorage.getItem('adminLangPrefs') || localStorage.getItem('voterLang');
       return stored ? (typeof stored === 'string' ? stored : stored) : (i18n.language || 'en');
     } catch (e) {
       return i18n.language || 'en';
@@ -42,7 +42,7 @@ export default function LanguageSelector() {
     if (!selected) return;
     i18n.options.fallbackLng = [selected];
     i18n.changeLanguage(selected);
-    try { localStorage.setItem('voterLang', selected); } catch (e) {}
+    try { localStorage.setItem('adminLang', selected); } catch (e) {}
   }, [selected]);
 
   useEffect(() => {
@@ -62,16 +62,16 @@ export default function LanguageSelector() {
   return (
     <div className="relative" ref={ref}>
       <button
-        className="px-2 py-0.5 rounded bg-cyan-600 text-white text-sm"
+        className="px-2 py-0.5 rounded bg-indigo-600 text-white text-sm"
         onClick={() => setOpen(v => !v)}
         aria-haspopup="true"
         aria-expanded={open}
       >
-  {ALL_LANGS.find(l => l.code === selected)?.label || 'Lang'}
+        {ALL_LANGS.find(l => l.code === selected)?.label || 'Lang'}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded shadow z-50 p-2">
+        <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded shadow z-50 p-2">
           <div className="mb-1 text-sm font-medium">{t('choose_language') || 'Choose language'}</div>
           <div className="mb-2">
             {ALL_LANGS.map(l => (
@@ -82,7 +82,7 @@ export default function LanguageSelector() {
                 <div className="flex items-center gap-1">
                   <input
                     type="radio"
-                    name="voter-lang"
+                    name="admin-lang"
                     checked={selected === l.code}
                     onChange={() => toggleLang(l.code)}
                     className="sr-only"

@@ -14,6 +14,12 @@ import bn from './locales/bn/translation.json';
 import ur from './locales/ur/translation.json';
 import ja from './locales/ja/translation.json';
 import ko from './locales/ko/translation.json';
+import hi from './locales/hi/translation.json';
+import zh from './locales/zh/translation.json';
+import pa from './locales/pa/translation.json';
+import ta from './locales/ta/translation.json';
+import mr from './locales/mr/translation.json';
+import gu from './locales/gu/translation.json';
 
 const resources = {
   en: { translation: en },
@@ -25,8 +31,14 @@ const resources = {
   ar: { translation: ar },
   bn: { translation: bn },
   ur: { translation: ur },
-  ja: { translation: ja }
-  ,ko: { translation: ko }
+  ja: { translation: ja },
+  ko: { translation: ko },
+  hi: { translation: hi }
+  ,zh: { translation: zh },
+  pa: { translation: pa },
+  ta: { translation: ta },
+  mr: { translation: mr },
+  gu: { translation: gu }
 };
 
 i18n

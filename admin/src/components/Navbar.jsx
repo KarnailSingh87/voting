@@ -1,8 +1,10 @@
 /* JSX runtime — no default React import required */
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import './Navbar.css';
 
 const Navbar = ({ setToken }) => {
+  const { t } = useTranslation();
   const [theme, setTheme] = useState('light');
 
   useEffect(() => {
@@ -28,7 +30,7 @@ const Navbar = ({ setToken }) => {
   return (
     <div className='navbar'>
       <div className="navbar-left">
-        <h2>Voting System</h2>
+        <h2>{t('nav.votingSystem') || 'Voting System'}</h2>
       </div>
       <div className="navbar-right">
         {/* Theme toggle icon */}

@@ -2,6 +2,7 @@ import ReactDOM from 'react-dom/client'
 import { StrictMode } from 'react'
 import App from './App.jsx'
 import './index.css'
+import './i18n'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 
 // Initialize theme globally so all pages/components honor it on first render

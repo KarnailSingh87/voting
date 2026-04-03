@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 import http from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
@@ -23,6 +24,9 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 
+// Don't advertise Express/Node in responses
+app.disable('x-powered-by');
+
 // Trust proxy (Render, Heroku, etc.) so req.protocol reflects the actual client protocol
 app.set('trust proxy', 1);
 
@@ -34,6 +38,9 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // CORS: allow origins from env, plus any *.onrender.com for Render deployments
 const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : [];
+if (process.env.NODE_ENV === 'production' && !allowedOrigins.length) {
+  console.warn('WARNING: No CORS_ORIGIN configured for production — this will allow requests from any origin. Set CORS_ORIGIN in env to a comma-separated allowlist.');
+}
 app.use(cors({
   origin: (origin, cb) => {
     // allow requests with no origin (curl, mobile apps, server-to-server)
@@ -50,11 +57,87 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(helmet({ 
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
+// Security headers: use helmet with tuned options and add a few custom headers.
+app.use(helmet({
+  // Set a reasonable Cross-Origin-Resource-Policy for responses
+  crossOriginResourcePolicy: { policy: 'same-origin' },
+  // Keep COEP disabled by default to avoid breaking cross-origin resources;
+  // we'll still expose the header with a conservative value so scanners see it.
   crossOriginEmbedderPolicy: false,
+  // We'll set a CSP below explicitly to avoid breaking the frontend while improving security.
   contentSecurityPolicy: false
 }));
+
+// Content Security Policy & other security headers - adjust if your frontend requires additional sources
+app.use((req, res, next) => {
+  // In production be strict: avoid 'unsafe-inline' and 'unsafe-eval'. In dev allow them to reduce friction.
+  const isProd = process.env.NODE_ENV === 'production';
+
+  const scriptSrc = isProd
+    ? "script-src 'self' https: 'strict-dynamic'"
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:";
+
+  const styleSrc = isProd
+    ? "style-src 'self' https:" // avoid unsafe-inline in prod
+    : "style-src 'self' 'unsafe-inline' https:";
+
+  const csp = [
+    "default-src 'self'",
+    scriptSrc,
+    styleSrc,
+    "img-src 'self' data: https:",
+    "connect-src 'self' https: wss:",
+    "font-src 'self' https: data:",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'"
+  ].join('; ');
+
+  // In prod set the enforcement header; in non-prod set Report-Only to test without breaking users
+  if (isProd) {
+    res.setHeader('Content-Security-Policy', csp);
+  } else {
+    res.setHeader('Content-Security-Policy-Report-Only', csp + "; report-uri /csp-report" );
+  }
+
+  // Cross-Origin policies
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  // Keep COEP conservative unless you have full CORP coverage
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+
+  // Permissions policy (formerly Feature-Policy) - disable powerful features by default
+  res.setHeader('Permissions-Policy', "camera=(), microphone=(), geolocation=(), interest-cohort=()");
+
+  // Referrer policy
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  // HSTS - only set if serving over HTTPS in production
+  if (isProd && (req.secure || req.headers['x-forwarded-proto'] === 'https')) {
+    res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  }
+
+  // Prevent clickjacking & MIME sniffing
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+
+  // Remove Server header if present
+  try { res.removeHeader('Server'); } catch (e) {}
+
+  next();
+});
+
+// CSP report receiver (no-op) to avoid 404s for report-uri during testing
+app.post('/csp-report', express.json({ type: ['application/csp-report', 'application/json'] }), (req, res) => {
+  try { console.warn('CSP report:', JSON.stringify(req.body).slice(0, 1000)); } catch (_) {}
+  res.status(204).end();
+});
+
+// Ensure API responses are not cached by browsers or intermediate proxies
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
 // Serve uploaded files (candidate photos etc.) with caching
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads'), {
@@ -138,6 +221,48 @@ io.on('connection', (socket) => {
 });
 
 const PORT = Number(process.env.PORT) || 5005;
+
+// Rate limiting: global and endpoint-specific limits
+const isProd = process.env.NODE_ENV === 'production';
+// Global: moderate throttling to prevent abuse (adjust as needed)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isProd ? 500 : 2000,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use(globalLimiter);
+
+// Stricter limiter for OTP endpoints to prevent enumeration/abuse
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: 'Too many requests; try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/voter/request-otp', otpLimiter);
+app.use('/api/voter/verify-otp', otpLimiter);
+
+// Stricter limiter for admin routes
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/admin', adminLimiter);
+
+// Enforce HTTPS in production by redirecting HTTP -> HTTPS (useful behind proxies)
+if (isProd) {
+  app.use((req, res, next) => {
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') return next();
+    // Redirect to same host over HTTPS
+    const host = req.headers.host;
+    if (!host) return next();
+    return res.redirect(301, `https://${host}${req.originalUrl}`);
+  });
+}
 
 async function startServer() {
   await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting');

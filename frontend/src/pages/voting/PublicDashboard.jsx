@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import axios from '../../utils/axios';
 import io from 'socket.io-client';
 import LanguageSelector from '../../components/LanguageSelector';
+import { useTranslation } from 'react-i18next';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 
@@ -48,6 +49,7 @@ PhotoModal.propTypes = {
 
 const PublicDashboard = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -270,21 +272,21 @@ const PublicDashboard = () => {
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-cyan-700">SecureVote</h1>
+                <h1 className="text-xl font-bold text-cyan-700">{t('brand') || 'SecureVote'}</h1>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 <button
                   onClick={() => setActiveTab('overview')}
                   className={`${activeTab === 'overview' ? 'border-cyan-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                 >
-                  Elections
+                  {t('nav.elections')}
                 </button>
                 {/* Public Ledger removed per request */}
                 <button
                   onClick={() => setActiveTab('elections')}
                   className={`${activeTab === 'elections' ? 'border-cyan-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                 >
-                  Overview
+                  {t('nav.overview')}
                 </button>
               </div>
             </div>
@@ -378,15 +380,15 @@ const PublicDashboard = () => {
           <div className="mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Public Transparency Dashboard</h1>
-                <p className="mt-1 text-xs sm:text-sm text-gray-500">Real-time view of Voting system activity and immutable ledger</p>
-                <p className="mt-2 text-xs text-gray-400">Official record published by SecureVote — Independent, auditable, and privacy preserving.</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('publicDashboard.title')}</h1>
+                <p className="mt-1 text-xs sm:text-sm text-gray-500">{t('publicDashboard.subtitle')}</p>
+                <p className="mt-2 text-xs text-gray-400">{t('publicDashboard.note')}</p>
               </div>
               <div className="text-left sm:text-right text-xs sm:text-sm text-gray-500">
                 <div className="mb-2">
                   <LanguageSelector />
                 </div>
-                <div>Last updated:</div>
+                <div>{t('lastUpdated')}</div>
                 <div className="font-mono last-updated-digital">{lastUpdated ? formatLastUpdated(lastUpdated) : '—'}</div>
                 {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
               </div>
@@ -398,13 +400,13 @@ const PublicDashboard = () => {
                 onClick={() => setActiveTab('overview')}
                 className={`flex-1 py-2 text-center text-sm font-medium border-b-2 ${activeTab === 'overview' ? 'border-cyan-500 text-gray-900' : 'border-transparent text-gray-500'}`}
               >
-                Elections
+                {t('nav.elections')}
               </button>
               <button
                 onClick={() => setActiveTab('elections')}
                 className={`flex-1 py-2 text-center text-sm font-medium border-b-2 ${activeTab === 'elections' ? 'border-cyan-500 text-gray-900' : 'border-transparent text-gray-500'}`}
               >
-                Overview
+                {t('nav.overview')}
               </button>
             </div>
           </div>
@@ -504,7 +506,7 @@ const PublicDashboard = () => {
               </div>
 
               <div className="bg-white shadow rounded-lg p-4">
-                <h3 className="text-lg font-medium mb-3">Elections</h3>
+                <h3 className="text-lg font-medium mb-3">{t('nav.elections')}</h3>
                 <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex items-center space-x-2">
                     <label className="text-sm text-gray-600">Filter:</label>

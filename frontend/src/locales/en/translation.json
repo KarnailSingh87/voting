@@ -1,4 +1,20 @@
 {
   "choose_language": "Choose language",
-  "welcome": "Welcome to the voting app"
+  "welcome": "Welcome to the voting app",
+  "brand": "SecureVote",
+  "hero_title": "Welcome to the voting app",
+  "nav": {
+    "votingSystem": "Voting System",
+    "elections": "Elections",
+    "overview": "Overview"
+  },
+  "footer": {
+    "copyright": "© 2026 SecureVote"
+  },
+  "publicDashboard": {
+    "title": "Public Transparency Dashboard",
+    "subtitle": "Real-time view of Voting system activity and immutable ledger",
+    "note": "Official record published by SecureVote — Independent, auditable, and privacy preserving."
+  },
+  "lastUpdated": "Last updated:"
 }
