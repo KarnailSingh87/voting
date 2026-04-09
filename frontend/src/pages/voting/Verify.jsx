@@ -19,7 +19,8 @@ const Verify = () => {
           setVerificationData({
             confirmationId: id,
             voteHash: response.data.voteHash,
-            timestamp: response.data.timestamp
+            timestamp: response.data.timestamp,
+            blockchain: response.data.blockchain || null,
           });
           setVerified(true);
         }
@@ -90,7 +91,7 @@ const Verify = () => {
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Vote Verification</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Verify that your vote was recorded correctly
+              Verify that your vote was recorded on the blockchain
             </p>
           </div>
 
@@ -115,63 +116,132 @@ const Verify = () => {
           )}
 
           {verified && verificationData && (
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-              <div className="px-4 py-5 sm:px-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">Vote Verification Successful</h3>
-                <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                  Your vote has been verified in the public ledger
-                </p>
+            <div className="space-y-6">
+              {/* Vote Verification Card */}
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div className="px-4 py-5 sm:px-6">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Vote Verification Successful</h3>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                    Your vote has been verified in the public ledger
+                  </p>
+                </div>
+                <div className="border-t border-gray-200">
+                  <dl>
+                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500">Confirmation ID</dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
+                        {verificationData.confirmationId}
+                      </dd>
+                    </div>
+                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500">Vote Hash</dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono break-all">
+                        {verificationData.voteHash}
+                      </dd>
+                    </div>
+                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500">Timestamp</dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                        {new Date(verificationData.timestamp).toLocaleString()}
+                      </dd>
+                    </div>
+                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500">Verification Status</dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                        <div className="flex items-center">
+                          <svg className="h-5 w-5 text-green-500 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="font-medium text-green-700">Verified</span>
+                        </div>
+                      </dd>
+                    </div>
+                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500">Transparency</dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                        <p className="mb-2">
+                          Your vote has been cryptographically separated from your identity and stored immutably on the blockchain.
+                        </p>
+                        <p>
+                          The vote hash above is publicly available in our <button 
+                          onClick={handleViewPublicLedger}
+                          className="text-cyan-600 hover:text-cyan-500 font-medium"
+                        >
+                          public ledger
+                        </button> for independent verification.
+                        </p>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
               </div>
-              <div className="border-t border-gray-200">
-                <dl>
-                  <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Confirmation ID</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
-                      {verificationData.confirmationId}
-                    </dd>
-                  </div>
-                  <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Vote Hash</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
-                      {verificationData.voteHash}
-                    </dd>
-                  </div>
-                  <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Timestamp</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                      {new Date(verificationData.timestamp).toLocaleString()}
-                    </dd>
-                  </div>
-                  <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Verification Status</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                      <div className="flex items-center">
-                        <svg className="h-5 w-5 text-green-500 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="font-medium text-green-700">Verified</span>
+
+              {/* Blockchain Verification Card */}
+              {verificationData.blockchain && (
+                <div className="bg-gradient-to-br from-slate-900 to-slate-800 shadow-xl overflow-hidden sm:rounded-lg border border-slate-700">
+                  <div className="px-4 py-5 sm:px-6">
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-3">🔗</span>
+                      <div>
+                        <h3 className="text-lg leading-6 font-medium text-white">Blockchain Verification</h3>
+                        <p className="mt-1 max-w-2xl text-sm text-slate-400">
+                          Immutable on-chain record — tamper-proof and auditable
+                        </p>
                       </div>
-                    </dd>
+                      <div className="ml-auto">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          ON-CHAIN
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Transparency</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                      <p className="mb-2">
-                        Your vote has been cryptographically separated from your identity and stored securely in our immutable ledger.
-                      </p>
-                      <p>
-                        The vote hash above is publicly available in our <button 
-                        onClick={handleViewPublicLedger}
-                        className="text-cyan-600 hover:text-cyan-500 font-medium"
-                      >
-                        public ledger
-                      </button> for independent verification.
-                      </p>
-                    </dd>
+                  <div className="border-t border-slate-700">
+                    <dl>
+                      <div className="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 border-b border-slate-700/50">
+                        <dt className="text-sm font-medium text-slate-400">Block Number</dt>
+                        <dd className="mt-1 text-sm text-cyan-400 sm:mt-0 sm:col-span-2 font-mono font-bold">
+                          #{verificationData.blockchain.blockIndex}
+                        </dd>
+                      </div>
+                      <div className="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 border-b border-slate-700/50">
+                        <dt className="text-sm font-medium text-slate-400">Block Hash</dt>
+                        <dd className="mt-1 text-xs text-emerald-400 sm:mt-0 sm:col-span-2 font-mono break-all">
+                          {verificationData.blockchain.blockHash}
+                        </dd>
+                      </div>
+                      <div className="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 border-b border-slate-700/50">
+                        <dt className="text-sm font-medium text-slate-400">Previous Block Hash</dt>
+                        <dd className="mt-1 text-xs text-orange-400 sm:mt-0 sm:col-span-2 font-mono break-all">
+                          {verificationData.blockchain.previousHash}
+                        </dd>
+                      </div>
+                      <div className="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 border-b border-slate-700/50">
+                        <dt className="text-sm font-medium text-slate-400">Proof of Work (Nonce)</dt>
+                        <dd className="mt-1 text-sm text-purple-400 sm:mt-0 sm:col-span-2 font-mono">
+                          {verificationData.blockchain.nonce}
+                        </dd>
+                      </div>
+                      <div className="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-slate-400">Mined At</dt>
+                        <dd className="mt-1 text-sm text-slate-300 sm:mt-0 sm:col-span-2">
+                          {new Date(verificationData.blockchain.minedAt).toLocaleString()}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
-                </dl>
-              </div>
-              <div className="px-4 py-4 bg-gray-50 sm:px-6 flex justify-end">
+                  <div className="px-4 py-3 sm:px-6 bg-slate-900/50">
+                    <p className="text-xs text-slate-500">
+                      🔒 This block is cryptographically linked to the previous block via SHA-256 hash chain. 
+                      Any modification to this or any previous block will break the chain and be immediately detectable.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
                 <button
                   onClick={handleBackToHistory}
                   className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"

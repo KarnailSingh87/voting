@@ -39,10 +39,6 @@ const PhotoModal = ({ photoUrl, name, onClose }) => {
       </div>
     </div>
   );
-          {/* Query Form */}
-          <div className="mt-8">
-            <QueryForm />
-          </div>
 };
 
 PhotoModal.propTypes = {
@@ -251,6 +247,11 @@ const Dashboard = () => {
               </ul>
             </div>
           )}
+
+          {/* Query Form */}
+          <div className="mt-8">
+            <QueryForm />
+          </div>
         </div>
       </div>
 

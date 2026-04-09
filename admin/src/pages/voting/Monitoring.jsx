@@ -11,6 +11,10 @@ const Monitoring = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [events, setEvents] = useState([]);
+  const [chainStats, setChainStats] = useState(null);
+  const [chainValidation, setChainValidation] = useState(null);
+  const [validatingChain, setValidatingChain] = useState(false);
+  const [recentBlocks, setRecentBlocks] = useState([]);
 
   useEffect(() => {
     // Initialize WebSocket connection with better debug/reconnect options
@@ -81,11 +85,71 @@ const Monitoring = () => {
 
     fetchHealthData();
     
+    // Fetch blockchain stats
+    const fetchChainStats = async () => {
+      try {
+        const token = localStorage.getItem('adminToken');
+        // Prefer admin-only stats if logged in
+        if (token) {
+          const res = await axios.get('/api/admin/blockchain/stats', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.data?.success) {
+            setChainStats(res.data);
+            return;
+          }
+        }
+
+        // Fallback to public stats (no auth required)
+        const pub = await axios.get('/api/blockchain/stats');
+        if (pub.data?.success) {
+          // Normalize shape to match expected chainStats used in UI
+          setChainStats({
+            totalBlocks: pub.data.localChain?.totalBlocks ?? pub.data.total ?? 0,
+            latestBlockIndex: pub.data.localChain?.latestBlockIndex ?? pub.data.latestBlockIndex,
+            latestBlockHash: pub.data.localChain?.latestBlockHash ?? pub.data.latestBlockHash,
+            difficulty: pub.data.localChain?.difficulty ?? pub.data.difficulty ?? 2,
+          });
+        }
+      } catch (err) {
+        // Don't throw — keep UI responsive. Log for debugging.
+        console.error('Failed to fetch chain stats (admin/public)', err && err.message ? err.message : err);
+      }
+
+      // Fetch recent blocks
+      try {
+        const blocksRes = await axios.get('/api/blockchain/blocks?limit=5');
+        if (blocksRes.data?.success) {
+          setRecentBlocks(blocksRes.data.blocks || []);
+        }
+      } catch (e) {
+        console.error('Failed to fetch recent blocks', e);
+      }
+    };
+    fetchChainStats();
+
     // Set up interval for periodic updates
-    const interval = setInterval(fetchHealthData, 30000); // Update every 30 seconds
+    const interval = setInterval(() => {
+      fetchHealthData();
+      fetchChainStats();
+    }, 30000);
     
     return () => clearInterval(interval);
   }, []);
+
+  const handleValidateChain = async () => {
+    setValidatingChain(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await axios.get('/api/admin/blockchain/validate', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data) setChainValidation(res.data);
+    } catch (e) {
+      console.error('Validation request failed:', e);
+      setChainValidation({ valid: false, error: e.response?.data?.message || e.message || 'Failed to validate chain' });
+    } finally { setValidatingChain(false); }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
@@ -152,6 +216,95 @@ const Monitoring = () => {
 
           {healthData && (
             <div className="grid grid-cols-1 gap-6">
+              {/* ─── BLOCKCHAIN INTEGRITY ─────────────────────────── */}
+              <div className="bg-gradient-to-br from-slate-900 to-slate-800 shadow-xl overflow-hidden sm:rounded-lg border border-slate-700">
+                <div className="px-4 py-5 sm:px-6 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🔗</span>
+                    <div>
+                      <h3 className="text-lg leading-6 font-medium text-white">Blockchain Integrity</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Tamper-proof vote chain status</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleValidateChain} 
+                    disabled={validatingChain}
+                    className="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                  >
+                    {validatingChain ? (
+                      <>
+                        <svg className="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Validating...
+                      </>
+                    ) : '🔍 Validate Chain'}
+                  </button>
+                </div>
+                <div className="border-t border-slate-700">
+                  {chainStats && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4">
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-cyan-400 font-mono">{chainStats.totalBlocks || 0}</div>
+                        <div className="text-[10px] text-slate-400 mt-1">Total Blocks</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-emerald-400 font-mono">#{chainStats.latestBlockIndex ?? 0}</div>
+                        <div className="text-[10px] text-slate-400 mt-1">Latest Block</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-purple-400 font-mono">{chainStats.difficulty || 2}</div>
+                        <div className="text-[10px] text-slate-400 mt-1">Difficulty</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs font-mono text-orange-400 truncate">{chainStats.latestBlockHash?.slice(0, 12) || '—'}...</div>
+                        <div className="text-[10px] text-slate-400 mt-1">Latest Hash</div>
+                      </div>
+                    </div>
+                  )}
+                  {chainValidation && (
+                    <div className={`mx-4 mb-4 px-4 py-3 rounded-lg ${chainValidation.valid ? 'bg-emerald-900/30 border border-emerald-600/30' : 'bg-red-900/30 border border-red-600/30'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{chainValidation.valid ? '✅' : '❌'}</span>
+                        <div>
+                          <div className={`text-sm font-medium ${chainValidation.valid ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {chainValidation.valid ? 'Chain Intact — No Tampering Detected' : 'Chain Compromised!'}
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            {chainValidation.message || chainValidation.error || `${chainValidation.chainLength} blocks verified`}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {!chainStats && !chainValidation && (
+                    <div className="p-4 text-center text-sm text-slate-500">Loading blockchain data...</div>
+                  )}
+                  {recentBlocks && recentBlocks.length > 0 && (
+                    <div className="px-4 pb-4">
+                      <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Recent Blocks</h4>
+                      <div className="space-y-2">
+                        {recentBlocks.map((b) => (
+                          <div key={b.hash} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-slate-700 text-cyan-300 font-mono text-xs px-2 py-1 rounded">#{b.index}</div>
+                              <div className="text-xs text-slate-300 font-mono truncate max-w-[150px] sm:max-w-[200px]" title={b.hash}>
+                                {b.hash.substring(0, 16)}...
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-[10px] text-slate-500 font-mono">
+                              <div>Nonce: {b.nonce}</div>
+                              <div>{new Date(b.timestamp).toLocaleTimeString()}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* System Status */}
               <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                 <div className="px-4 py-5 sm:px-6">
@@ -342,7 +495,7 @@ const Monitoring = () => {
                       <dt className="text-sm font-medium text-gray-500">Audit Trail</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Immutable Logging
+                          🔗 Blockchain-Backed Immutable Ledger
                         </span>
                       </dd>
                     </div>

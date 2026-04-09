@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from '../utils/axios';
+import WalletButton from './WalletButton';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 
@@ -111,7 +112,8 @@ const VoterNavbar = () => {
           </div>
 
           {/* Right – theme toggle + avatar + logout (desktop) */}
-          <div className="hidden sm:flex sm:items-center sm:space-x-3">
+          <div className="hidden sm:flex sm:items-center sm:space-x-4">
+            <WalletButton />
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
@@ -159,6 +161,7 @@ const VoterNavbar = () => {
 
           {/* Mobile menu button */}
           <div className="flex items-center sm:hidden space-x-2">
+            <WalletButton />
             {/* Mobile theme toggle */}
             <button
               onClick={toggleTheme}

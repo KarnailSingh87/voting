@@ -21,6 +21,7 @@ import { requestOTP, getOTPEntry, getWhatsAppStatus, isWhatsAppConnected, discon
 import { parseFile } from '../config/aiParser.js';
 import QRCode from 'qrcode';
 import { fileURLToPath } from 'url';
+import { createElectionOnChain, addCandidateOnChain, finalizeElectionOnChain } from '../services/web3Service.js';
 
 import Query from '../models/Query.js';
 import { sendWhatsAppMessage } from '../config/whatsappService.js';
@@ -29,7 +30,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const router = express.Router();
 // Get all user queries
-router.get('/queries', async (req, res) => {
+router.get('/queries', adminAuth, async (req, res) => {
   try {
     const queries = await Query.find().lean();
     // Map fields for frontend
@@ -139,6 +140,58 @@ router.get('/debug/otp', adminAuth, async (req, res) => {
     return res.json({ success: true, entry: entry || null });
   } catch (e) {
     console.error('debug otp error', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Dev-only: quick students photo inspector (shows roll, hasPhoto boolean and short preview)
+// Enabled only in non-production or when ALLOW_ADMIN_DEBUG=1. Protected by adminAuth.
+router.get('/debug/students-photos', adminAuth, async (req, res) => {
+  try {
+    const enabled = (process.env.NODE_ENV !== 'production') || (process.env.ALLOW_ADMIN_DEBUG === '1');
+    if (!enabled) return res.status(404).json({ message: 'Not found' });
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
+    // Fetch a sample set (order by importOrder/_id for reproducibility)
+    const students = await Student.find({}).select('roll photo').sort({ importOrder: 1, _id: 1 }).limit(limit).lean();
+    const items = students.map(s => ({
+      roll: s.roll || null,
+      hasPhoto: !!(s.photo && String(s.photo).trim()),
+      // short preview (first 200 chars) to avoid returning huge base64 blobs
+      photoPreview: s.photo ? (String(s.photo).length > 200 ? String(s.photo).slice(0,200) + '...': String(s.photo)) : null
+    }));
+    return res.json({ success: true, total: items.length, items });
+  } catch (e) {
+    console.error('debug students-photos error', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Dev-only: students photo stats (counts)
+router.get('/debug/students-photo-stats', adminAuth, async (req, res) => {
+  try {
+    const enabled = (process.env.NODE_ENV !== 'production') || (process.env.ALLOW_ADMIN_DEBUG === '1');
+    if (!enabled) return res.status(404).json({ message: 'Not found' });
+    const total = await Student.countDocuments({});
+    const withPhoto = await Student.countDocuments({ photo: { $exists: true, $ne: '' } });
+    const withoutPhoto = total - withPhoto;
+    return res.json({ success: true, total, withPhoto, withoutPhoto });
+  } catch (e) {
+    console.error('debug students-photo-stats error', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Dev-only: return a single student's full record (admin-only, dev mode)
+router.get('/debug/student/:roll/full', adminAuth, async (req, res) => {
+  try {
+    const enabled = (process.env.NODE_ENV !== 'production') || (process.env.ALLOW_ADMIN_DEBUG === '1');
+    if (!enabled) return res.status(404).json({ message: 'Not found' });
+    const escaped = req.params.roll.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const student = await Student.findOne({ roll: { $regex: `^${escaped}$`, $options: 'i' } }).lean();
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+    return res.json({ success: true, student });
+  } catch (e) {
+    console.error('debug student full error', e);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -268,6 +321,17 @@ router.post('/election', adminAuth, async (req, res) => {
       endTime: end,
       importConcepts
     });
+
+    let onChainElectionIdx = null;
+    try {
+      const chainResult = await createElectionOnChain(election._id.toString(), title, start, end);
+      if (chainResult && chainResult.onChainIndex !== null && chainResult.onChainIndex !== undefined) {
+        election.onChainIndex = chainResult.onChainIndex;
+        election.onChainTxHash = chainResult.txHash;
+        await election.save();
+        onChainElectionIdx = chainResult.onChainIndex;
+      }
+    } catch (_) {}
     
     // If candidates provided, create them and collect their ids so frontend can upload photos
     const createdCandidates = [];
@@ -281,6 +345,18 @@ router.post('/election', adminAuth, async (req, res) => {
             manifesto: c.description || '',
             photoUrl: c.photoUrl || undefined
           });
+
+          if (onChainElectionIdx !== null) {
+            try {
+               const chainCand = await addCandidateOnChain(onChainElectionIdx, c.name);
+               if (chainCand && chainCand.candidateIndex !== null && chainCand.candidateIndex !== undefined) {
+                  created.onChainIndex = chainCand.candidateIndex;
+                  created.onChainTxHash = chainCand.txHash;
+                  await created.save();
+               }
+            } catch (_) {}
+          }
+
           createdCandidates.push(created);
         }
       }
@@ -551,6 +627,13 @@ router.post('/election/:id/end', adminAuth, async (req, res) => {
     const id = req.params.id;
     const election = await Election.findByIdAndUpdate(id, { status: 'ended' }, { new: true });
     if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
+
+    if (election.onChainIndex !== undefined && election.onChainIndex !== null) {
+      try {
+        await finalizeElectionOnChain(election.onChainIndex);
+      } catch (_) {}
+    }
+
     const io = req.app.get('io');
     if (io) io.emit('election_status', { id: election._id.toString(), status: election.status });
     // Log action
@@ -634,6 +717,18 @@ router.post('/candidate', adminAuth, async (req, res) => {
     const election = await Election.findById(electionId);
     if (!election) return res.status(404).json({ message: 'Election not found' });
     const candidate = await Candidate.create({ election: electionId, name, party, manifesto });
+
+    if (election.onChainIndex !== undefined && election.onChainIndex !== null) {
+      try {
+        const chainCand = await addCandidateOnChain(election.onChainIndex, name);
+        if (chainCand && chainCand.candidateIndex !== null && chainCand.candidateIndex !== undefined) {
+          candidate.onChainIndex = chainCand.candidateIndex;
+          candidate.onChainTxHash = chainCand.txHash;
+          await candidate.save();
+        }
+      } catch (_) {}
+    }
+
     const payload = { id: candidate._id.toString(), name: candidate.name, party: candidate.party, manifesto: candidate.manifesto, photoUrl: absoluteUrl(req, candidate.photoUrl) };
     res.json({ candidate: payload });
   } catch(e) {
@@ -2599,4 +2694,44 @@ router.post('/sync-voter-photos', adminAuth, async (req, res) => {
   }
 });
 
+// ─── BLOCKCHAIN ADMIN ENDPOINTS ──────────────────────────────────────
+
+// Admin: validate entire blockchain
+router.get('/blockchain/validate', adminAuth, async (req, res) => {
+  try {
+    const { validateChain } = await import('../services/blockchainService.js');
+    const result = await validateChain();
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('ADMIN BLOCKCHAIN VALIDATE ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Admin: validate blockchain for a specific election
+router.get('/blockchain/validate/:electionId', adminAuth, async (req, res) => {
+  try {
+    const { validateElectionChain } = await import('../services/blockchainService.js');
+    const { electionId } = req.params;
+    const result = await validateElectionChain(electionId);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('ADMIN BLOCKCHAIN VALIDATE ELECTION ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Admin: get blockchain statistics
+router.get('/blockchain/stats', adminAuth, async (req, res) => {
+  try {
+    const { getChainStats } = await import('../services/blockchainService.js');
+    const stats = await getChainStats();
+    res.json({ success: true, ...stats });
+  } catch (e) {
+    console.error('ADMIN BLOCKCHAIN STATS ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 export default router;
+

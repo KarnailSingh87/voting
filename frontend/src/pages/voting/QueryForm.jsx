@@ -14,8 +14,8 @@ const QueryForm = () => {
     setError(null);
     setSuccess(null);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post('/voter/query', { subject, message }, {
+      const token = localStorage.getItem('voterToken');
+      const res = await axios.post('/api/voter/query', { subject, message }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('Query submitted successfully!');

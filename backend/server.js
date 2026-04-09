@@ -15,7 +15,10 @@ import voterRoutes from './routes/voterRoutes.js';
 import voteRoutes from './routes/voteRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
+import debugRoutes from './routes/debugRoutes.js';
 import { initOTPService } from './config/otpService.js';
+import { createGenesisBlock } from './services/blockchainService.js';
+import { initWeb3 } from './services/web3Service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -146,11 +149,56 @@ app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads'), {
   lastModified: true,
 }));
 
+// Rate limiting: global and endpoint-specific limits
+const isProd = process.env.NODE_ENV === 'production';
+
+// Enforce HTTPS in production by redirecting HTTP -> HTTPS (useful behind proxies)
+if (isProd) {
+  app.use((req, res, next) => {
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') return next();
+    // Redirect to same host over HTTPS
+    const host = req.headers.host;
+    if (!host) return next();
+    return res.redirect(301, `https://${host}${req.originalUrl}`);
+  });
+}
+
+// Global: moderate throttling to prevent abuse (adjust as needed)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isProd ? 500 : 2000,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use(globalLimiter);
+
+// Stricter limiter for OTP endpoints to prevent enumeration/abuse
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: 'Too many requests; try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/voter/request-otp', otpLimiter);
+app.use('/api/voter/verify-otp', otpLimiter);
+
+// Stricter limiter for admin routes
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/admin', adminLimiter);
+
 // Routes
 app.use('/api/voter', voterRoutes);
 app.use('/api/vote', voteRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api', publicRoutes);
+// Debug / diagnostic routes (non-production but useful for checking web3 status)
+app.use('/api/debug', debugRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
@@ -222,52 +270,39 @@ io.on('connection', (socket) => {
 
 const PORT = Number(process.env.PORT) || 5005;
 
-// Rate limiting: global and endpoint-specific limits
-const isProd = process.env.NODE_ENV === 'production';
-// Global: moderate throttling to prevent abuse (adjust as needed)
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isProd ? 500 : 2000,
-  standardHeaders: true,
-  legacyHeaders: false
-});
-app.use(globalLimiter);
-
-// Stricter limiter for OTP endpoints to prevent enumeration/abuse
-const otpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { success: false, message: 'Too many requests; try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-app.use('/api/voter/request-otp', otpLimiter);
-app.use('/api/voter/verify-otp', otpLimiter);
-
-// Stricter limiter for admin routes
-const adminLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false
-});
-app.use('/api/admin', adminLimiter);
-
-// Enforce HTTPS in production by redirecting HTTP -> HTTPS (useful behind proxies)
-if (isProd) {
-  app.use((req, res, next) => {
-    if (req.secure || req.headers['x-forwarded-proto'] === 'https') return next();
-    // Redirect to same host over HTTPS
-    const host = req.headers.host;
-    if (!host) return next();
-    return res.redirect(301, `https://${host}${req.originalUrl}`);
-  });
-}
 
 async function startServer() {
   await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting');
 
   // initialize OTP/email transporter so requestOTP can actually send emails (Ethereal or SMTP)
+  // Initialize blockchain (create genesis block if needed)
+  try {
+    // Only initialize the local DB-backed blockchain when explicitly enabled.
+    // This lets deployments opt-in to the local PoW chain or disable it to
+    // rely purely on the on-chain smart contract (useful for online-only setups).
+    const useLocalChain = process.env.USE_LOCAL_BLOCKCHAIN
+      ? process.env.USE_LOCAL_BLOCKCHAIN === 'true'
+      : true; // default true for backwards compatibility
+
+    if (useLocalChain) {
+      await createGenesisBlock();
+      console.log('🔗 Local blockchain initialized');
+    } else {
+      console.log('ℹ️  Skipping local blockchain initialization (USE_LOCAL_BLOCKCHAIN=false)');
+    }
+  } catch (err) {
+    console.warn('Local blockchain init failed (votes will still work):', err && err.message ? err.message : err);
+  }
+
+  // Initialize Web3 (Hardhat/Alchemy smart contract connection)
+  try {
+    const ok = initWeb3();
+    if (ok) console.log('🔗 Web3 smart contract connected');
+    else console.warn('⚠️  Web3 not configured — smart contract features disabled');
+  } catch (err) {
+    console.warn('Web3 init failed (non-fatal):', err && err.message ? err.message : err);
+  }
+
   try {
     await initOTPService();
   } catch (err) {

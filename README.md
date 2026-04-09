@@ -335,6 +335,105 @@ See `docs/BLOCKCHAIN_INTEGRATION.txt` for detailed instructions.
 
 ---
 
+## 🧩 Blockchain — Tech, Required Credentials & Setup
+
+This section summarizes every technology used for blockchain integration in this project, and lists the environment variables / credentials the server and deployment scripts expect. IMPORTANT: never commit real secret keys into the repository. Use environment variables, secrets manager, or Render/GitHub Secrets.
+
+### Technologies (where used)
+- Solidity — smart contract language (`contracts/src/SecureVote.sol`)
+- Hardhat — compile, test, local node, and deployment (`contracts/package.json`, `hardhat.config.js`, `contracts/scripts/deploy.js`)
+- ethers.js (v6) — server-side provider, Contract and Wallet (`backend/services/web3Service.js`, `backend/package.json`)
+- JSON-RPC providers (Alchemy, Infura, or any Ethereum node) — RPC endpoints used by the backend
+- MetaMask (frontend) — voter wallet for signing on-chain vote transactions (frontend integration)
+- MongoDB + Mongoose — persistent storage (also used by the project-specific DB-backed PoW chain in `backend/services/blockchainService.js`)
+- Node.js, dotenv — environment configuration and runtime
+
+### What you must provide (Environment variables / credentials)
+Below are the env vars the project reads for blockchain features. Provide values in `backend/.env` or in your deployment platform's secret store.
+
+- `VOTING_CONTRACT_ADDRESS` (required for on-chain features)
+  - Description: Deployed SecureVote contract address (0x...)
+  - Example: `VOTING_CONTRACT_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3`
+
+- `ALCHEMY_AMOY_RPC` or `SEPOLIA_RPC_URL` (one required for provider)
+  - Description: JSON-RPC URL for the network you deploy to (Alchemy/Infura/other)
+  - Example: `ALCHEMY_AMOY_RPC=https://eth-rpc.example.com/v2/YOUR_KEY`
+
+- `DEPLOYER_PRIVATE_KEY` / `PRIVATE_KEY` (optional but required for backend write operations)
+  - Description: Private key of the deployer/admin wallet used by the backend to send transactions (keep secret)
+  - Example (DO NOT COMMIT): `DEPLOYER_PRIVATE_KEY=0x...`
+
+- `USE_LOCAL_BLOCKCHAIN` (optional)
+  - Description: If set to `false`, the server will skip initializing the local DB-backed PoW blockchain and rely only on the on-chain contract. Default: `true` for backwards compatibility.
+  - Example: `USE_LOCAL_BLOCKCHAIN=false`
+
+Notes:
+- If you don't provide a deployer private key the backend can still perform read-only calls (views) to the contract, but cannot create on-chain elections or add candidates.
+- The ABI file must exist at `backend/contracts/SecureVote.json` (the repo's `contracts/scripts/copy-abi.js` copies it after compile).
+
+### How to prepare & deploy (online testnet example)
+1. Build and copy ABI:
+```bash
+cd contracts
+npm install
+npx hardhat compile
+node scripts/copy-abi.js
+```
+
+2. Deploy to a public testnet (example: Sepolia or Polygon Amoy). Ensure your RPC URL & private key are set in your shell or a `.env` that Hardhat reads.
+```bash
+# Example (export in shell or use an .env file used by hardhat config)
+export SEPOLIA_RPC_URL="https://sepolia.infura.io/v3/YOUR_PROJECT_ID"
+export DEPLOYER_PRIVATE_KEY="0x..."
+
+npm run deploy:amoy   # or: npx hardhat run scripts/deploy.js --network sepolia
+```
+
+3. Put contract address & RPC into backend environment and disable the local chain (optional):
+```
+# backend/.env
+USE_LOCAL_BLOCKCHAIN=false
+VOTING_CONTRACT_ADDRESS=0x<deployed_address>
+ALCHEMY_AMOY_RPC=https://eth-rpc.example.com/v2/YOUR_KEY
+DEPLOYER_PRIVATE_KEY=0x<your_deployer_key>   # optional for writes
+```
+
+4. Start backend and verify logs show web3 connection:
+```bash
+cd backend
+npm install
+npm start
+```
+Check log output for lines like:
+- `🔗 Web3: Connected to ...`
+- `🔗 Web3: Contract at <address>`
+
+### Quick checklist (online-only deployment)
+- [ ] compile contracts (`npx hardhat compile`)
+- [ ] copy ABI to backend (`node scripts/copy-abi.js`)
+- [ ] deploy to chosen network (Hardhat deploy script)
+- [ ] set `VOTING_CONTRACT_ADDRESS` and RPC env var in backend
+- [ ] (optional) set `DEPLOYER_PRIVATE_KEY` for server write txns
+- [ ] set `USE_LOCAL_BLOCKCHAIN=false` to skip local DB chain
+- [ ] start backend and confirm `getWeb3Status()` via logs or new endpoint
+
+### Security & operational tips
+- Never commit private keys or RPC credentials to git. Use environment variables or the host platform's secrets store (Render, Heroku, GitHub Actions Secrets, etc.).
+- For production, prefer a managed key-store or HSM; rotate keys periodically.
+- Fund the deployer address with testnet tokens before attempting writes.
+- Monitor RPC provider rate limits; Alchemy/Infura keys may be rate-limited on free tiers.
+
+---
+
+If you'd like, I can:
+- add a `/api/debug/web3-status` endpoint that returns `getWeb3Status()` from the backend, or
+- run a test deploy here (I will need your RPC URL and a deployer private key — do NOT paste secrets into chat; instead, I can show the exact commands you should run locally), or
+- update `docs/BLOCKCHAIN_INTEGRATION.txt` with a ready-to-copy `.env` template (without secrets).
+
+---
+
+---
+
 ## 📊 Database Schema
 
 ### **Voter Collection**

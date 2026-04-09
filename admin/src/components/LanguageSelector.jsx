@@ -43,6 +43,21 @@ export default function LanguageSelector() {
     i18n.options.fallbackLng = [selected];
     i18n.changeLanguage(selected);
     try { localStorage.setItem('adminLang', selected); } catch (e) {}
+
+    // Synchronize Google Translate to translate backend-generated data
+    document.cookie = `googtrans=/en/${selected}; path=/`;
+    document.cookie = `googtrans=/en/${selected}; domain=.${document.domain}; path=/`;
+    
+    const triggerTranslate = () => {
+      const googleSelect = document.querySelector('.goog-te-combo');
+      if (googleSelect && googleSelect.value !== selected) {
+        googleSelect.value = selected;
+        googleSelect.dispatchEvent(new Event('change'));
+      }
+    };
+    
+    triggerTranslate();
+    setTimeout(triggerTranslate, 500);
   }, [selected]);
 
   useEffect(() => {
@@ -60,7 +75,7 @@ export default function LanguageSelector() {
   }
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative notranslate" translate="no" ref={ref}>
       <button
         className="px-2 py-0.5 rounded bg-indigo-600 text-white text-sm"
         onClick={() => setOpen(v => !v)}

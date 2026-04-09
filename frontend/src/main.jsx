@@ -5,6 +5,7 @@ import './i18n'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+import { Web3Provider } from './context/Web3Context'
 
 // Initialize theme globally so pages render with the correct theme instantly
 (() => {
@@ -31,7 +32,9 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <>
-    <RouterProvider router={router} />
+    <Web3Provider>
+      <RouterProvider router={router} />
+    </Web3Provider>
     <ToastContainer position="top-right" autoClose={3000} />
   </>
 )

@@ -9,9 +9,12 @@ const PublicLedger = () => {
   const [ledger, setLedger] = useState([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [chainStats, setChainStats] = useState(null);
+  const [chainValid, setChainValid] = useState(null);
+  const [validating, setValidating] = useState(false);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchData = async () => {
       setLoading(true); setError('');
       try {
         const res = await axios.get(`/api/ledger/${id}?page=${page}&limit=25`);
@@ -26,32 +29,151 @@ const PublicLedger = () => {
         setError(e.response?.data?.message || 'Failed to load ledger');
       } finally { setLoading(false); }
     };
-    if (id) fetch();
+
+    const fetchChainStats = async () => {
+      try {
+        const res = await axios.get('/api/blockchain/stats');
+        if (res.data?.success) setChainStats(res.data);
+      } catch (_) {}
+    };
+
+    if (id) {
+      fetchData();
+      fetchChainStats();
+    }
   }, [id, page]);
 
+  const handleValidateChain = async () => {
+    setValidating(true);
+    try {
+      const res = await axios.get(`/api/blockchain/validate/${id}`);
+      if (res.data) setChainValid(res.data);
+    } catch (e) {
+      setChainValid({ valid: false, error: 'Failed to validate chain' });
+    } finally { setValidating(false); }
+  };
+
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">Vote Ledger</h2>
-        <Link to={`/public/election/${id}`} className="text-sm text-indigo-600">Back to results</Link>
+    <div className="max-w-5xl mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">🔗 Blockchain Vote Ledger</h2>
+          <p className="text-sm text-gray-500 mt-1">Immutable, tamper-proof record of all votes</p>
+        </div>
+        <Link to={`/public/election/${id}`} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">← Back to results</Link>
       </div>
-      <div className="mt-4 bg-white shadow rounded p-4">
-        {loading ? <div>Loading...</div> : error ? <div className="text-red-600">{error}</div> : (
+
+      {/* Chain Stats Banner */}
+      {chainStats && (
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-xl shadow-lg p-5 mb-6 border border-slate-700">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-cyan-400 font-mono">{chainStats.totalBlocks || 0}</div>
+              <div className="text-xs text-slate-400 mt-1">Total Blocks</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-emerald-400 font-mono">#{chainStats.latestBlockIndex ?? 0}</div>
+              <div className="text-xs text-slate-400 mt-1">Latest Block</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-400 font-mono">{chainStats.difficulty || 2}</div>
+              <div className="text-xs text-slate-400 mt-1">Difficulty</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs font-mono text-orange-400 truncate max-w-[140px] mx-auto">{chainStats.latestBlockHash?.slice(0, 16) || '...'}</div>
+              <div className="text-xs text-slate-400 mt-1">Latest Hash</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Validate Chain Button */}
+      <div className="flex items-center gap-3 mb-4">
+        <button 
+          onClick={handleValidateChain} 
+          disabled={validating}
+          className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+        >
+          {validating ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Validating Chain...
+            </>
+          ) : '🔍 Validate Blockchain Integrity'}
+        </button>
+        
+        {chainValid && (
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+            chainValid.valid 
+              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+              : 'bg-red-100 text-red-800 border border-red-200'
+          }`}>
+            {chainValid.valid ? '✅ Chain Intact — No Tampering Detected' : `❌ ${chainValid.error || 'Chain Compromised'}`}
+          </span>
+        )}
+      </div>
+
+      {/* Ledger Table */}
+      <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-200">
+        {loading ? (
+          <div className="p-8 text-center">
+            <svg className="animate-spin h-8 w-8 text-cyan-600 mx-auto" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          </div>
+        ) : error ? (
+          <div className="p-6 text-red-600 text-center">{error}</div>
+        ) : (
           <div>
-            <div className="text-sm text-gray-600 mb-2">Showing page {page} — total votes: {total}</div>
-            <div className="space-y-2">
-              {ledger.length === 0 && <div className="text-sm text-gray-500">No votes found</div>}
+            <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
+              <span className="text-sm text-gray-600">Page {page} — <strong>{total}</strong> total votes on-chain</span>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {ledger.length === 0 && <div className="p-6 text-sm text-gray-500 text-center">No votes found</div>}
               {ledger.map(entry => (
-                <div key={entry._id} className="p-2 border rounded flex items-center justify-between">
-                  <div className="text-xs text-gray-700">{entry.voteHash}</div>
-                  <div className="text-xs text-gray-500">{new Date(entry.timestamp).toLocaleString()}</div>
+                <div key={entry._id} className="p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {entry.blockIndex != null && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-cyan-400 font-mono">
+                            Block #{entry.blockIndex}
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-500">{new Date(entry.timestamp).toLocaleString()}</span>
+                      </div>
+                      <div className="text-xs text-gray-700 font-mono truncate" title={entry.voteHash}>
+                        Vote: {entry.voteHash}
+                      </div>
+                      {entry.blockHash && (
+                        <div className="text-[10px] text-emerald-600 font-mono truncate mt-0.5" title={entry.blockHash}>
+                          🔗 {entry.blockHash}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0">
+                      {entry.blockHash ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          ✓ On-chain
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
+                          ⏳ Pending
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="flex items-center justify-between mt-4">
-              <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p-1))} className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50">Prev</button>
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t">
+              <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p-1))} className="px-3 py-1.5 bg-white border rounded-md text-sm disabled:opacity-50 hover:bg-gray-50">Prev</button>
               <div className="text-sm text-gray-600">Page {page}</div>
-              <button disabled={ledger.length === 0} onClick={() => setPage(p => p + 1)} className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50">Next</button>
+              <button disabled={ledger.length === 0} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 bg-white border rounded-md text-sm disabled:opacity-50 hover:bg-gray-50">Next</button>
             </div>
           </div>
         )}

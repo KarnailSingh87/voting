@@ -10,8 +10,6 @@ const Register = () => {
     name: '',
     mobile: '',
     email: '',
-    password: '',
-    confirmPassword: '',
     dateOfBirth: ''
   });
 
@@ -104,11 +102,6 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
 
     setLoading(true);
     try {
@@ -240,15 +233,6 @@ const Register = () => {
               <input id="dateOfBirth" name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" />
             </div>
 
-            <div className="mb-3">
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
-              <input id="password" name="password" type="password" value={formData.password} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" />
-            </div>
-
-            <div className="mb-3">
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">Confirm Password</label>
-              <input id="confirmPassword" name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" />
-            </div>
 
             <div className="flex items-center justify-between">
               <button type="button" onClick={handleBackToRoll} className="inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md">Back</button>

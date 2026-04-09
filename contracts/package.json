@@ -1,0 +1,20 @@
+{
+  "name": "securevote-contracts",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "node": "npx hardhat node",
+    "deploy:local": "npx hardhat run scripts/deploy.js --network localhost",
+    "deploy:amoy": "npx hardhat run scripts/deploy.js --network amoy",
+    "copy-abi": "node scripts/copy-abi.js",
+    "setup": "npm run compile && npm run copy-abi && echo '✅ ABI copied. Now run: npm run node  (terminal 1) then npm run deploy:local  (terminal 2)'"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^3.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
+    "dotenv": "^16.4.5",
+    "hardhat": "^3.3.0"
+  }
+}

@@ -9,6 +9,19 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Poppins:wght@100..900&display=swap" media="print" onload="this.media='all'" />
+  <style>
+    /* Hide the google translate top bar & elements */
+    .goog-te-banner-frame { display: none !important; }
+    body { top: 0 !important; }
+    .skiptranslate { display: none !important; }
+    #google_translate_element { display: none !important; }
+    /* Also hide floating/google inserted widgets and icons (svg/circle) */
+    .goog-te-gadget, .goog-te-gadget-icon, .goog-te-menu-value, .goog-logo-link, .goog-te-spinner, .goog-te-balloon-frame { display: none !important; }
+    iframe[src*="translate.google"] { display: none !important; }
+    iframe.goog-te-banner-frame, iframe.goog-floating-frame { display: none !important; }
+    /* Some Google elements inject raw div/svg structures — hide svg circles under google-added containers */
+    .skiptranslate svg, .goog-te-gadget svg, div[id^="goog"], div[id*=":"], div[id*="google"] svg, body > div > div > svg { display: none !important; }
+  </style>
   </head>
   <body>
     <div id="root"></div>

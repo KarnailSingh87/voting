@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import axios from '../../utils/axios';
 import VoterNavbar from '../../components/VoterNavbar';
+import { useWeb3 } from '../../context/Web3Context';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
 
@@ -55,6 +56,10 @@ const Ballot = () => {
   const [Voting, setVoting] = useState(false);
   const [error, setError] = useState('');
   const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
+  const [blockchainData, setBlockchainData] = useState(null);
+  const [voteHashResult, setVoteHashResult] = useState('');
+
+  const { isConnected, castVoteOnChain, isCorrectChain, connectWallet, account } = useWeb3();
 
   useEffect(() => {
     const fetchElection = async () => {
@@ -80,6 +85,11 @@ const Ballot = () => {
   const handleVote = async () => {
     setVoting(true);
     setError('');
+
+    // Attempt Web3 connection before casting if MetaMask is available
+    if (window.ethereum && !isConnected) {
+      try { await connectWallet(); } catch (_) {}
+    }
     
     try {
       const token = localStorage.getItem('voterToken');
@@ -89,6 +99,33 @@ const Ballot = () => {
       );
       
       if (response.data.message || response.data.voteHash) {
+        const { voteHash, blockchain } = response.data;
+        
+        // ─── MetaMask Signature Step ─────────────────────────
+        if (isConnected && isCorrectChain && election.onChainIndex !== undefined && window.ethereum) {
+          try {
+            const cand = election.candidates.find(c => (c.id || c._id) === selectedCandidate);
+            if (cand && cand.onChainIndex !== undefined) {
+              const chainResult = await castVoteOnChain(election.onChainIndex, cand.onChainIndex, voteHash);
+              
+              // Tell backend to link txHash to the record
+              await axios.post('/api/vote/link-tx', {
+                voteHash,
+                txHash: chainResult.txHash,
+                voterWallet: account,
+                onChainElectionIdx: election.onChainIndex,
+                onChainCandidateIdx: cand.onChainIndex
+              }, { headers: { Authorization: `Bearer ${token}` } });
+            }
+          } catch (err) {
+            console.error('MetaMask Tx failed:', err);
+            // Non-fatal: the vote was successfully saved in standard DB/local chain
+          }
+        }
+        // ───────────────────────────────────────────────────
+
+        setBlockchainData(blockchain || null);
+        setVoteHashResult(voteHash || '');
         setShowConfirmation(false);
         setShowSuccess(true);
       }
@@ -172,9 +209,10 @@ const Ballot = () => {
 
   if (showSuccess) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
-          <div className="text-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-lg w-full space-y-6">
+          {/* Success Card */}
+          <div className="bg-white p-8 rounded-xl shadow-lg text-center">
             <svg className="mx-auto h-16 w-16 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -182,15 +220,57 @@ const Ballot = () => {
             <p className="mt-2 text-gray-600">
               Your vote has been securely recorded and encrypted. Thank you for participating in the democratic process.
             </p>
-            <div className="mt-6">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-              >
-                Return to Dashboard
-              </button>
-            </div>
+            {voteHashResult && (
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">Vote Receipt Hash</p>
+                <p className="text-xs font-mono text-gray-700 break-all">{voteHashResult}</p>
+              </div>
+            )}
           </div>
+
+          {/* Blockchain Confirmation Card */}
+          {blockchainData && (
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden">
+              <div className="px-5 py-4 flex items-center gap-3">
+                <span className="text-xl">🔗</span>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Blockchain Confirmed</h3>
+                  <p className="text-xs text-slate-400">Immutable on-chain record</p>
+                </div>
+                <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  ✓ MINED
+                </span>
+              </div>
+              <div className="border-t border-slate-700 px-5 py-3 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-400">Block</span>
+                  <span className="text-sm font-bold text-cyan-400 font-mono">#{blockchainData.blockIndex}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-400">Block Hash</span>
+                  <p className="text-[10px] font-mono text-emerald-400 break-all mt-0.5">{blockchainData.blockHash}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-400">Previous Hash</span>
+                  <p className="text-[10px] font-mono text-orange-400 break-all mt-0.5">{blockchainData.previousHash}</p>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-400">Nonce (PoW)</span>
+                  <span className="text-xs font-mono text-purple-400">{blockchainData.nonce}</span>
+                </div>
+              </div>
+              <div className="px-5 py-2 bg-slate-900/50 border-t border-slate-700">
+                <p className="text-[10px] text-slate-500">🔒 This vote is permanently sealed in the blockchain and cannot be altered or deleted.</p>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+          >
+            Return to Dashboard
+          </button>
         </div>
       </div>
     );
@@ -233,8 +313,8 @@ const Ballot = () => {
                   <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                     <dt className="text-sm font-medium text-gray-500">Security Assurance</dt>
                     <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                      Your vote will be encrypted and separated from your identity before storage. 
-                      A confirmation receipt will be provided for verification.
+                      Your vote will be encrypted, separated from your identity, and permanently recorded 
+                      on the blockchain. A confirmation receipt with blockchain hash will be provided for verification.
                     </dd>
                   </div>
                 </dl>
@@ -340,7 +420,8 @@ const Ballot = () => {
                         <li>Your vote will be encrypted and stored securely</li>
                         <li>Your identity is cryptographically separated from your vote</li>
                         <li>You will receive a confirmation receipt for verification</li>
-                        <li>All Voting data is immutable and auditable</li>
+                        <li>🔗 Your vote is recorded on an immutable blockchain — tamper-proof</li>
+                        <li>Each vote is mined into a cryptographic block with proof of work</li>
                       </ul>
                     </dd>
                   </div>

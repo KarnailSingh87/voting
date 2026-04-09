@@ -15,7 +15,9 @@ const electionSchema = new mongoose.Schema({
     photoField: { type: String, default: '' },
     // any additional mappings can be stored here
     other: { type: mongoose.Schema.Types.Mixed, default: undefined }
-  }
+  },
+  onChainIndex: { type: Number },
+  onChainTxHash: { type: String }
 }, { timestamps: true });
 
 export default mongoose.model('Election', electionSchema);

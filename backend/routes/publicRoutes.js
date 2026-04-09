@@ -7,6 +7,20 @@ import Student from '../models/Student.js';
 import IdentityReport from '../models/IdentityReport.js';
 import Vote from '../models/Vote.js';
 import Voter from '../models/Voter.js';
+import {
+  validateChain,
+  validateElectionChain,
+  findBlockByVoteHash,
+  getChainStats,
+  getRecentBlocks,
+  getElectionBlocks,
+} from '../services/blockchainService.js';
+import {
+  verifyVoteOnChain,
+  verifyTransaction,
+  getWeb3Status,
+  getElectionResults as getOnChainResults,
+} from '../services/web3Service.js';
 
 const router = express.Router();
 
@@ -55,7 +69,7 @@ router.post('/student-lookup', lookupLimiter, async (req, res) => {
     let student = await Student.findOne({ roll: r }).lean();
     if (!student) {
       // If not found, fall back to case-insensitive match (covers case variations)
-      const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+      const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       student = await Student.findOne({ roll: { $regex: `^${escapeRegExp(r)}$`, $options: 'i' } }).lean();
     }
     if (!student) return res.status(404).json({ success: false, message: 'Not found' });
@@ -173,7 +187,7 @@ router.get('/election/:id', async (req, res) => {
     if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
     const candidates = await Candidate.find({ election: election._id }).sort({ voteCount: -1 });
     const totalVotes = candidates.reduce((s, c) => s + (c.voteCount || 0), 0);
-  res.json({ success: true, election: { _id: election._id, title: election.title, description: election.description, status: election.status, startDate: election.startTime, endDate: election.endTime }, candidates: candidates.map(c => ({ id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount, photoUrl: c.photoUrl || null })), totalVotes });
+  res.json({ success: true, election: { _id: election._id, title: election.title, description: election.description, status: election.status, startDate: election.startTime, endDate: election.endTime, onChainIndex: election.onChainIndex, onChainTxHash: election.onChainTxHash }, candidates: candidates.map(c => ({ id: c._id.toString(), _id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount, photoUrl: c.photoUrl || null, onChainIndex: c.onChainIndex })), totalVotes });
   } catch (e) {
     console.error('public election detail error', e);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -243,18 +257,24 @@ router.get('/ledger', async (req, res) => {
     const votes = await Vote.find()
       .sort({ timestamp: -1 })
       .limit(limit)
-      .select('voteHash timestamp')
+      .select('voteHash timestamp blockIndex blockHash')
       .lean();
       
     // Transform to match frontend expectation
     const ledger = votes.map(v => ({
-      _id: v.voteHash, // frontend uses voteHash as key often
+      _id: v.voteHash,
       voteHash: v.voteHash,
       timestamp: v.timestamp,
-      confirmationId: 'N/A'
+      confirmationId: 'N/A',
+      blockIndex: v.blockIndex ?? null,
+      blockHash: v.blockHash ?? null,
     }));
     
-    res.json({ success: true, ledger });
+    // Include chain stats summary
+    let chainStats = null;
+    try { chainStats = await getChainStats(); } catch (_) {}
+    
+    res.json({ success: true, ledger, chainStats });
   } catch (e) {
     console.error('LEDGER ERROR', e);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -281,7 +301,7 @@ router.get('/ledger/:electionId', async (req, res) => {
         .sort({ timestamp: -1 })
         .skip(skip)
         .limit(limit)
-        .select('voteHash timestamp candidate voter')
+        .select('voteHash timestamp candidate voter blockIndex blockHash')
         .lean()
     ]);
 
@@ -290,7 +310,9 @@ router.get('/ledger/:electionId', async (req, res) => {
       voteHash: v.voteHash,
       timestamp: v.timestamp,
       candidate: v.candidate,
-      voter: v.voter ? String(v.voter) : undefined
+      voter: v.voter ? String(v.voter) : undefined,
+      blockIndex: v.blockIndex ?? null,
+      blockHash: v.blockHash ?? null,
     }));
 
     res.json({ success: true, total, page, limit, ledger });
@@ -300,17 +322,165 @@ router.get('/ledger/:electionId', async (req, res) => {
   }
 });
 
-// Verify vote by hash
+// Verify vote by hash — now includes blockchain verification
 router.get('/vote/:hash', async (req, res) => {
   try {
     const { hash } = req.params;
-    const vote = await Vote.findOne({ voteHash: hash }).select('voteHash timestamp').lean();
+    const vote = await Vote.findOne({ voteHash: hash }).select('voteHash timestamp blockIndex blockHash').lean();
     if (!vote) return res.status(404).json({ success: false, message: 'Vote not found' });
-    res.json({ success: true, voteHash: vote.voteHash, timestamp: vote.timestamp });
+    
+    // Look up the blockchain block for this vote (local index)
+    let blockchainData = null;
+    try {
+      const block = await findBlockByVoteHash(hash);
+      if (block) {
+        blockchainData = {
+          blockIndex: block.index,
+          blockHash: block.hash,
+          previousHash: block.previousHash,
+          nonce: block.nonce,
+          minedAt: block.timestamp,
+        };
+      }
+    } catch (_) {}
+
+    // Verify on Ethereum/Polygon contract
+    let onChainData = null;
+    try {
+      if (vote.txHash) {
+        const txStatus = await verifyTransaction(vote.txHash);
+        const contractRecord = await verifyVoteOnChain(vote.voteHash);
+        if (txStatus || contractRecord?.found) {
+          onChainData = {
+            txHash: vote.txHash,
+            voterWallet: vote.voterWallet,
+            status: txStatus?.status || (contractRecord?.found ? 'success' : 'unknown'),
+            blockNumber: txStatus?.blockNumber || null,
+            confirmed: !!contractRecord?.found || txStatus?.confirmed,
+            contractRecord: contractRecord?.found ? contractRecord : null,
+          };
+        }
+      } else {
+        // Just verify contract directly if they didn't supply txHash
+        const contractRecord = await verifyVoteOnChain(vote.voteHash);
+        if (contractRecord?.found) {
+          onChainData = {
+            voterWallet: contractRecord.voter,
+            status: 'success',
+            confirmed: true,
+            contractRecord,
+          };
+        }
+      }
+    } catch (_) {}
+
+    res.json({ 
+      success: true, 
+      voteHash: vote.voteHash, 
+      timestamp: vote.timestamp,
+      blockchain: blockchainData,
+      onChain: onChainData,
+    });
   } catch (e) {
     console.error('VERIFY VOTE ERROR', e);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
+// ─── BLOCKCHAIN PUBLIC ENDPOINTS ──────────────────────────────────────
+
+// Get blockchain statistics (local MongoDB chain + Web3 status)
+router.get('/blockchain/stats', async (req, res) => {
+  try {
+    const stats = await getChainStats();
+    const web3Status = await getWeb3Status();
+    res.json({ success: true, localChain: stats, web3: web3Status });
+  } catch (e) {
+    console.error('BLOCKCHAIN STATS ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Validate entire blockchain
+router.get('/blockchain/validate', async (req, res) => {
+  try {
+    const result = await validateChain();
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('BLOCKCHAIN VALIDATE ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Validate blockchain for a specific election
+router.get('/blockchain/validate/:electionId', async (req, res) => {
+  try {
+    const { electionId } = req.params;
+    const result = await validateElectionChain(electionId);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('BLOCKCHAIN VALIDATE ELECTION ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get recent blockchain blocks (public explorer)
+router.get('/blockchain/blocks', async (req, res) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 25);
+    const result = await getRecentBlocks(limit, page);
+    res.json({ success: true, ...result, page, limit });
+  } catch (e) {
+    console.error('BLOCKCHAIN BLOCKS ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get blockchain blocks for a specific election
+router.get('/blockchain/blocks/:electionId', async (req, res) => {
+  try {
+    const { electionId } = req.params;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 25);
+    const result = await getElectionBlocks(electionId, limit, page);
+    res.json({ success: true, ...result, page, limit });
+  } catch (e) {
+    console.error('BLOCKCHAIN ELECTION BLOCKS ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Verify a specific block by its hash
+router.get('/blockchain/block/:hash', async (req, res) => {
+  try {
+    const { hash } = req.params;
+    const block = await findBlockByVoteHash(hash);
+    if (!block) {
+      const Block = (await import('../models/Block.js')).default;
+      const byBlockHash = await Block.findOne({ hash }).lean();
+      if (!byBlockHash) return res.status(404).json({ success: false, message: 'Block not found' });
+      return res.json({ success: true, block: byBlockHash });
+    }
+    res.json({ success: true, block });
+  } catch (e) {
+    console.error('BLOCKCHAIN BLOCK LOOKUP ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get election results directly from smart contract
+router.get('/blockchain/web3/results/:electionIndex', async (req, res) => {
+  try {
+    const { electionIndex } = req.params;
+    const results = await getOnChainResults(Number(electionIndex));
+    if (!results) return res.status(500).json({ success: false, message: 'Web3 not configured or contract unreachable' });
+    res.json({ success: true, results });
+  } catch (e) {
+    console.error('WEB3 ELECTION RESULTS ERROR', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 export default router;
+

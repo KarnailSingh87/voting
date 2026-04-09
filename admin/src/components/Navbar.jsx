@@ -1,6 +1,7 @@
 /* JSX runtime — no default React import required */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import LanguageSelector from './LanguageSelector';
 import './Navbar.css';
 
 const Navbar = ({ setToken }) => {
@@ -33,6 +34,11 @@ const Navbar = ({ setToken }) => {
         <h2>{t('nav.votingSystem') || 'Voting System'}</h2>
       </div>
       <div className="navbar-right">
+        {/* Language selector */}
+        <div className="mr-2">
+          <LanguageSelector />
+        </div>
+
         {/* Theme toggle icon */}
         <button aria-label="Toggle theme" title="Toggle theme" className="theme-toggle" onClick={toggleTheme}>
           {theme === 'dark' ? (

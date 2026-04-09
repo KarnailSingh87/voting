@@ -7,13 +7,23 @@ import Candidate from '../models/Candidate.js';
 import Election from '../models/Election.js';
 import Student from '../models/Student.js';
 import Vote from '../models/Vote.js';
+import { addVoteToChain } from '../services/blockchainService.js';
+import { verifyTransaction } from '../services/web3Service.js';
 
 const router = express.Router();
 
+/**
+ * POST /api/vote/cast
+ * Cast a vote. The frontend may optionally include:
+ *   - txHash:              MetaMask on-chain transaction hash
+ *   - onChainElectionIdx:  election index in the smart contract
+ *   - onChainCandidateIdx: candidate index in the smart contract
+ *   - voterWallet:         wallet address that signed the tx
+ */
 router.post('/cast', voterAuth, async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    const { candidateId } = req.body;
+    const { candidateId, txHash, onChainElectionIdx, onChainCandidateIdx, voterWallet } = req.body;
     if (!candidateId) return res.status(400).json({ message: 'candidateId required' });
 
     session.startTransaction();
@@ -40,9 +50,7 @@ router.post('/cast', voterAuth, async (req, res) => {
       await session.abortTransaction();
       return res.status(409).json({ message: 'You have already voted in this election' });
     }
-    // Fallback for legacy data without history array
     if (voter.hasVoted && (!voter.history || voter.history.length === 0)) {
-       // assumes single election system if history is empty but hasVoted is true
        await session.abortTransaction();
        return res.status(409).json({ message: 'Voter already cast a vote' });
     }
@@ -58,11 +66,36 @@ router.post('/cast', voterAuth, async (req, res) => {
     
     // Create Vote record for ledger
     const voteHash = crypto.createHash('sha256').update(`${voter._id}-${candidate._id}-${now.getTime()}-${Math.random()}`).digest('hex');
+    
+    // ─── LOCAL BLOCKCHAIN: Add vote to MongoDB chain ──────────────────
+    let blockData = null;
+    try {
+      blockData = await addVoteToChain(voteHash, election._id, candidate._id);
+    } catch (blockErr) {
+      console.error('LOCAL CHAIN ERROR (non-fatal):', blockErr.message || blockErr);
+    }
+
+    // ─── Verify on-chain tx if provided ───────────────────────────────
+    let verifiedTx = null;
+    if (txHash) {
+      try {
+        verifiedTx = await verifyTransaction(txHash);
+      } catch (_) {}
+    }
+
     const newVote = new Vote({
       voteHash,
       election: election._id,
       candidate: candidate._id,
-      timestamp: now
+      timestamp: now,
+      // Local chain
+      blockIndex: blockData?.index ?? null,
+      blockHash: blockData?.hash ?? null,
+      // On-chain (Hardhat/Polygon)
+      txHash: txHash || null,
+      onChainElectionIdx: onChainElectionIdx ?? null,
+      onChainCandidateIdx: onChainCandidateIdx ?? null,
+      voterWallet: voterWallet || null,
     });
     await newVote.save({ session });
 
@@ -74,7 +107,7 @@ router.post('/cast', voterAuth, async (req, res) => {
       timestamp: now
     });
 
-    // also mark master list Student record as voted if we can map
+    // Mark Student record as voted
     try {
       if (voter.identifierRaw) {
         const r = voter.identifierRaw.trim();
@@ -90,21 +123,79 @@ router.post('/cast', voterAuth, async (req, res) => {
     await session.commitTransaction();
 
     const io = req.app.get('io');
-    // Emit for Admin Dashboard
     io.emit('vote_cast', { candidateId: candidate._id.toString(), voteCount: candidate.voteCount });
-    // Emit for Public Dashboard
     io.emit('voteUpdate', { 
       voteHash: newVote.voteHash, 
-      timestamp: newVote.timestamp 
+      timestamp: newVote.timestamp,
+      blockIndex: blockData?.index ?? null,
+      blockHash: blockData?.hash ?? null,
+      txHash: txHash || null,
     });
 
-    return res.json({ message: 'Vote cast', candidateId: candidate._id, voteCount: candidate.voteCount, voteHash });
+    return res.json({ 
+      message: 'Vote cast', 
+      candidateId: candidate._id, 
+      voteCount: candidate.voteCount, 
+      voteHash,
+      // Local chain confirmation
+      blockchain: blockData ? {
+        blockIndex: blockData.index,
+        blockHash: blockData.hash,
+        previousHash: blockData.previousHash,
+        nonce: blockData.nonce,
+        minedAt: blockData.timestamp,
+      } : null,
+      // On-chain confirmation
+      onChain: txHash ? {
+        txHash,
+        verified: verifiedTx?.confirmed ?? false,
+        blockNumber: verifiedTx?.blockNumber ?? null,
+      } : null,
+    });
   } catch (e) {
     console.error(e);
     try { await session.abortTransaction(); } catch {}
     res.status(500).json({ message: 'Server error' });
   } finally {
     session.endSession();
+  }
+});
+
+/**
+ * POST /api/vote/link-tx
+ * Link an on-chain transaction hash to an existing vote record.
+ * Called by the frontend after MetaMask tx is mined.
+ */
+router.post('/link-tx', voterAuth, async (req, res) => {
+  try {
+    const { voteHash, txHash, voterWallet, onChainElectionIdx, onChainCandidateIdx } = req.body;
+    if (!voteHash || !txHash) return res.status(400).json({ message: 'voteHash and txHash required' });
+
+    const vote = await Vote.findOne({ voteHash });
+    if (!vote) return res.status(404).json({ message: 'Vote not found' });
+
+    // Verify the tx on-chain
+    let verified = null;
+    try {
+      verified = await verifyTransaction(txHash);
+    } catch (_) {}
+
+    vote.txHash = txHash;
+    vote.voterWallet = voterWallet || null;
+    vote.onChainElectionIdx = onChainElectionIdx ?? null;
+    vote.onChainCandidateIdx = onChainCandidateIdx ?? null;
+    await vote.save();
+
+    res.json({
+      success: true,
+      message: 'Transaction linked',
+      txHash,
+      verified: verified?.confirmed ?? false,
+      blockNumber: verified?.blockNumber ?? null,
+    });
+  } catch (e) {
+    console.error('LINK-TX ERROR', e);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
