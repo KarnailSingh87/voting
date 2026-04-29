@@ -1855,7 +1855,7 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
           for (let j = 0; j < arrRow.length; j++) {
             const v = (arrRow[j] || '').toString().trim();
             if (!v) continue;
-            if (/^https?:\/\/.+\.(jpg|jpeg|png|gif|svg)(\?.*)?$/i.test(v)) { photo = v; break; }
+            if (/^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(v) || /^https?:\/\/(?:drive\.google\.com|lh3\.googleusercontent\.com|res\.cloudinary\.com|.*\.dropbox\.com)/i.test(v)) { photo = v; break; }
           }
         }
         // embedded images: check imagesRowMap for this sheet row (best-effort)
@@ -1882,6 +1882,17 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
               }
             }
           }
+        }
+
+        if (photo) {
+          try {
+            const gdMatch1 = photo.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+            if (gdMatch1) photo = `https://drive.google.com/uc?export=view&id=${gdMatch1[1]}`;
+            else {
+              const gdMatch2 = photo.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+              if (gdMatch2) photo = `https://drive.google.com/uc?export=view&id=${gdMatch2[1]}`;
+            }
+          } catch(e) {}
         }
 
         if (previewFlag) {
@@ -2036,7 +2047,7 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
           for (let j = 0; j < arrRow.length; j++) {
             const v = (arrRow[j] || '').toString().trim();
             if (!v) continue;
-            if (/^https?:\/\/.+\.(jpg|jpeg|png|gif|svg)(\?.*)?$/i.test(v)) { photo = v; break; }
+            if (/^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(v) || /^https?:\/\/(?:drive\.google\.com|lh3\.googleusercontent\.com|res\.cloudinary\.com|.*\.dropbox\.com)/i.test(v)) { photo = v; break; }
           }
         }
         // embedded images: check imagesRowMap for this sheet row (best-effort)
@@ -2063,6 +2074,17 @@ router.post('/import-students', adminAuth, upload.single('file'), async (req, re
               }
             }
           }
+        }
+
+        if (photo) {
+          try {
+            const gdMatch1 = photo.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+            if (gdMatch1) photo = `https://drive.google.com/uc?export=view&id=${gdMatch1[1]}`;
+            else {
+              const gdMatch2 = photo.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+              if (gdMatch2) photo = `https://drive.google.com/uc?export=view&id=${gdMatch2[1]}`;
+            }
+          } catch(e) {}
         }
 
         if (previewFlag) {

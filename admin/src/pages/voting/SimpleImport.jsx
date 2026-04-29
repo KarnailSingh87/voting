@@ -341,7 +341,7 @@ const SimpleImport = () => {
                     if (!photoSrc) {
                       for (let ci = 0; ci < (row.arr || []).length; ci++) {
                         const s = String(row.arr[ci] || '');
-                        if (/^data:image\/.+;base64,/.test(s) || /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(s)) {
+                        if (/^data:image\/.+;base64,/.test(s) || /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(s) || /^https?:\/\/(?:drive\.google\.com|lh3\.googleusercontent\.com|res\.cloudinary\.com|.*\.dropbox\.com)/i.test(s)) {
                           photoSrc = s;
                           break;
                         }
@@ -385,7 +385,7 @@ const SimpleImport = () => {
                         if (/^(photo|photo[_ ]?url|image|image[_ ]?url|avatar|picture|pic)$/.test(headerName)) return null;
                         const s = String(cell || '');
                         // Skip cells that are data URIs, image URLs, or [photo] placeholder
-                        if (/^data:image\/.+;base64,/.test(s) || /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(s) || s === '[photo]') {
+                        if (/^data:image\/.+;base64,/.test(s) || /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(s) || /^https?:\/\/(?:drive\.google\.com|lh3\.googleusercontent\.com|res\.cloudinary\.com|.*\.dropbox\.com)/i.test(s) || s === '[photo]') {
                           return <td key={ci} className="px-3 py-2 text-gray-400 text-xs italic">📷 photo</td>;
                         }
                         return (

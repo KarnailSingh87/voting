@@ -353,7 +353,7 @@ const ImportStudents = () => {
                         const cell = c || '';
                         const s = String(cell);
                         const isDataUrl = /^data:image\/.+;base64,/.test(s);
-                        const isImageUrl = /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(s);
+                        const isImageUrl = /^https?:\/\/.+\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(s) || /^https?:\/\/(?:drive\.google\.com|lh3\.googleusercontent\.com|res\.cloudinary\.com|.*\.dropbox\.com)/i.test(s);
                         if (isDataUrl || isImageUrl) {
                           return (
                             <td key={ci} className="p-2">
