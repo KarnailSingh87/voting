@@ -891,15 +891,30 @@ router.get('/health', adminAuth, async (req, res) => {
       apiResponseTime = 0;
     }
 
-    // Active users: approximate by counting verified voters (if model exists)
+    // Active users: real-time connected clients (socket.io), fallback to verified voters
     let activeUsers = 0;
+    let activeUsersSource = 'sockets';
     try {
-      const VoterModel = await import('../models/Voter.js');
-      if (VoterModel && VoterModel.default) {
-        activeUsers = await VoterModel.default.countDocuments({ verifiedAt: { $exists: true } });
+      const io = req.app.get('io');
+      if (io) {
+        activeUsers = io.engine?.clientsCount ?? io.sockets?.sockets?.size ?? 0;
+      } else {
+        activeUsersSource = 'fallback';
       }
-    } catch (e) {
-      // ignore
+    } catch (_) {
+      activeUsersSource = 'fallback';
+    }
+
+    if (activeUsersSource === 'fallback') {
+      try {
+        const VoterModel = await import('../models/Voter.js');
+        if (VoterModel && VoterModel.default) {
+          activeUsers = await VoterModel.default.countDocuments({ verifiedAt: { $exists: true } });
+          activeUsersSource = 'verifiedVoters';
+        }
+      } catch (e) {
+        // ignore
+      }
     }
 
     const health = {
@@ -917,6 +932,7 @@ router.get('/health', adminAuth, async (req, res) => {
       },
       apiResponseTime: apiResponseTime,
       activeUsers: activeUsers,
+      activeUsersSource,
       recentErrors: 0
     };
 
