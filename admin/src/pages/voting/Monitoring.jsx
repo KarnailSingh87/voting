@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import axios from '../../utils/axios';
 import io from 'socket.io-client';
 import Navbar from '../../components/Navbar';
@@ -7,6 +8,7 @@ import Sidebar from '../../components/Sidebar';
 let socket;
 
 const Monitoring = () => {
+  const { t } = useTranslation();
   const [healthData, setHealthData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,31 +29,31 @@ const Monitoring = () => {
 
     socket.on('connect', () => {
       console.log('Connected to WebSocket server');
-      setEvents(prev => [{ time: new Date(), message: 'Connected to server', type: 'system' }, ...prev]);
+      setEvents(prev => [{ time: new Date(), message: t('monitoring.connectedToServer'), type: 'system' }, ...prev]);
     });
     
     socket.on('connect_error', (err) => {
       console.error('WebSocket connect_error', err && (err.message || err));
-      setEvents(prev => [{ time: new Date(), message: `WebSocket connect_error: ${err && err.message ? err.message : String(err)}`, type: 'system' }, ...prev]);
+      setEvents(prev => [{ time: new Date(), message: t('monitoring.wsConnectError', { message: err && err.message ? err.message : String(err) }), type: 'system' }, ...prev]);
     });
     
     socket.on('vote_cast', (data) => {
       // Update vote statistics in real-time
-      const msg = `Vote cast for candidate ${data.candidateId} (Total: ${data.voteCount})`;
+      const msg = t('monitoring.voteCastMessage', { candidateId: data.candidateId, voteCount: data.voteCount });
       console.log('Vote update received:', data);
       setEvents(prev => [{ time: new Date(), message: msg, type: 'vote' }, ...prev].slice(0, 50));
     });
     
     socket.on('election_status', (data) => {
       // Update election status in real-time
-      const msg = `Election ${data.id} status changed to ${data.status}`;
+      const msg = t('monitoring.electionStatusMessage', { id: data.id, status: data.status });
       console.log('Election update received:', data);
       setEvents(prev => [{ time: new Date(), message: msg, type: 'election' }, ...prev].slice(0, 50));
     });
     
     socket.on('disconnect', () => {
       console.log('Disconnected from WebSocket server');
-      setEvents(prev => [{ time: new Date(), message: 'Disconnected from server', type: 'system' }, ...prev]);
+      setEvents(prev => [{ time: new Date(), message: t('monitoring.disconnectedFromServer'), type: 'system' }, ...prev]);
     });
     
     return () => {
@@ -76,7 +78,7 @@ const Monitoring = () => {
           localStorage.removeItem('adminToken');
           window.location.href = '/';
         } else {
-          setError('Failed to fetch system health data');
+          setError(t('monitoring.fetchHealthError'));
         }
       } finally {
         setLoading(false);
@@ -188,9 +190,9 @@ const Monitoring = () => {
         
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">System Monitoring</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('monitoring.title')}</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Real-time view of system performance and health
+              {t('monitoring.subtitle')}
             </p>
           </div>
 
@@ -204,7 +206,7 @@ const Monitoring = () => {
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-red-800">
-                    Error
+                    {t('monitoring.errorTitle')}
                   </h3>
                   <div className="mt-2 text-sm text-red-700">
                     <p>{error}</p>
@@ -222,8 +224,8 @@ const Monitoring = () => {
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">🔗</span>
                     <div>
-                      <h3 className="text-lg leading-6 font-medium text-white">Blockchain Integrity</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">Tamper-proof vote chain status</p>
+                      <h3 className="text-lg leading-6 font-medium text-white">{t('monitoring.blockchainIntegrityTitle')}</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">{t('monitoring.blockchainIntegritySubtitle')}</p>
                     </div>
                   </div>
                   <button 
@@ -237,9 +239,9 @@ const Monitoring = () => {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
-                        Validating...
+                        {t('monitoring.validating')}
                       </>
-                    ) : '🔍 Validate Chain'}
+                    ) : `🔍 ${t('monitoring.validateChain')}`}
                   </button>
                 </div>
                 <div className="border-t border-slate-700">
@@ -247,19 +249,19 @@ const Monitoring = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4">
                       <div className="text-center">
                         <div className="text-xl font-bold text-cyan-400 font-mono">{chainStats.totalBlocks || 0}</div>
-                        <div className="text-[10px] text-slate-400 mt-1">Total Blocks</div>
+                        <div className="text-[10px] text-slate-400 mt-1">{t('monitoring.totalBlocks')}</div>
                       </div>
                       <div className="text-center">
                         <div className="text-xl font-bold text-emerald-400 font-mono">#{chainStats.latestBlockIndex ?? 0}</div>
-                        <div className="text-[10px] text-slate-400 mt-1">Latest Block</div>
+                        <div className="text-[10px] text-slate-400 mt-1">{t('monitoring.latestBlock')}</div>
                       </div>
                       <div className="text-center">
                         <div className="text-xl font-bold text-purple-400 font-mono">{chainStats.difficulty || 2}</div>
-                        <div className="text-[10px] text-slate-400 mt-1">Difficulty</div>
+                        <div className="text-[10px] text-slate-400 mt-1">{t('monitoring.difficulty')}</div>
                       </div>
                       <div className="text-center">
                         <div className="text-xs font-mono text-orange-400 truncate">{chainStats.latestBlockHash?.slice(0, 12) || '—'}...</div>
-                        <div className="text-[10px] text-slate-400 mt-1">Latest Hash</div>
+                        <div className="text-[10px] text-slate-400 mt-1">{t('monitoring.latestHash')}</div>
                       </div>
                     </div>
                   )}
@@ -269,7 +271,7 @@ const Monitoring = () => {
                         <span className="text-lg">{chainValidation.valid ? '✅' : '❌'}</span>
                         <div>
                           <div className={`text-sm font-medium ${chainValidation.valid ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {chainValidation.valid ? 'Chain Intact — No Tampering Detected' : 'Chain Compromised!'}
+                            {chainValidation.valid ? t('monitoring.chainIntact') : t('monitoring.chainCompromised')}
                           </div>
                           <div className="text-xs text-slate-400 mt-0.5">
                             {chainValidation.message || chainValidation.error || `${chainValidation.chainLength} blocks verified`}
@@ -279,11 +281,11 @@ const Monitoring = () => {
                     </div>
                   )}
                   {!chainStats && !chainValidation && (
-                    <div className="p-4 text-center text-sm text-slate-500">Loading blockchain data...</div>
+                    <div className="p-4 text-center text-sm text-slate-500">{t('monitoring.loadingBlockchain')}</div>
                   )}
                   {recentBlocks && recentBlocks.length > 0 && (
                     <div className="px-4 pb-4">
-                      <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Recent Blocks</h4>
+                      <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('monitoring.recentBlocks')}</h4>
                       <div className="space-y-2">
                         {recentBlocks.map((b) => (
                           <div key={b.hash} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -294,7 +296,7 @@ const Monitoring = () => {
                               </div>
                             </div>
                             <div className="flex items-center gap-4 text-[10px] text-slate-500 font-mono">
-                              <div>Nonce: {b.nonce}</div>
+                              <div>{t('monitoring.nonce')}: {b.nonce}</div>
                               <div>{new Date(b.timestamp).toLocaleTimeString()}</div>
                             </div>
                           </div>
@@ -308,12 +310,12 @@ const Monitoring = () => {
               {/* System Status */}
               <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                 <div className="px-4 py-5 sm:px-6">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">System Status</h3>
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">{t('monitoring.systemStatus')}</h3>
                 </div>
                 <div className="border-t border-gray-200">
                   <dl>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Database Status</dt>
+                      <dt className="text-sm font-medium text-gray-500">{t('monitoring.databaseStatus')}</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           {healthData.databaseStatus}
@@ -321,13 +323,13 @@ const Monitoring = () => {
                       </dd>
                     </div>
                     <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Uptime</dt>
+                      <dt className="text-sm font-medium text-gray-500">{t('monitoring.uptime')}</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         {Math.floor(healthData.uptime / 3600)}h {Math.floor((healthData.uptime % 3600) / 60)}m {Math.floor(healthData.uptime % 60)}s
                       </dd>
                     </div>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Last Updated</dt>
+                      <dt className="text-sm font-medium text-gray-500">{t('monitoring.lastUpdated')}</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         {new Date().toLocaleString()}
                       </dd>
@@ -340,13 +342,13 @@ const Monitoring = () => {
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                   <div className="px-4 py-5 sm:px-6">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Memory Usage</h3>
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">{t('monitoring.memoryUsage')}</h3>
                   </div>
                   <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
                     <div className="space-y-4">
                       <div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">RSS</span>
+                          <span className="text-sm font-medium text-gray-700">{t('monitoring.rss')}</span>
                           <span className="text-sm text-gray-500">{formatBytes(healthData.memoryUsage.rss)}</span>
                         </div>
                         <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
@@ -359,7 +361,7 @@ const Monitoring = () => {
                       
                       <div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">Heap Total</span>
+                          <span className="text-sm font-medium text-gray-700">{t('monitoring.heapTotal')}</span>
                           <span className="text-sm text-gray-500">{formatBytes(healthData.memoryUsage.heapTotal)}</span>
                         </div>
                         <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
@@ -372,7 +374,7 @@ const Monitoring = () => {
                       
                       <div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">Heap Used</span>
+                          <span className="text-sm font-medium text-gray-700">{t('monitoring.heapUsed')}</span>
                           <span className="text-sm text-gray-500">{formatBytes(healthData.memoryUsage.heapUsed)}</span>
                         </div>
                         <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
@@ -385,7 +387,7 @@ const Monitoring = () => {
                       
                       <div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">External</span>
+                          <span className="text-sm font-medium text-gray-700">{t('monitoring.external')}</span>
                           <span className="text-sm text-gray-500">{formatBytes(healthData.memoryUsage.external)}</span>
                         </div>
                         <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
@@ -401,13 +403,13 @@ const Monitoring = () => {
 
                 <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                   <div className="px-4 py-5 sm:px-6">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">CPU Usage</h3>
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">{t('monitoring.cpuUsage')}</h3>
                   </div>
                   <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
                     <div className="space-y-4">
                       <div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">User Time</span>
+                          <span className="text-sm font-medium text-gray-700">{t('monitoring.userTime')}</span>
                           <span className="text-sm text-gray-500">{healthData.cpuUsage.user} μs</span>
                         </div>
                         <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
@@ -420,7 +422,7 @@ const Monitoring = () => {
                       
                       <div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">System Time</span>
+                          <span className="text-sm font-medium text-gray-700">{t('monitoring.systemTime')}</span>
                           <span className="text-sm text-gray-500">{healthData.cpuUsage.system} μs</span>
                         </div>
                         <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
@@ -438,12 +440,12 @@ const Monitoring = () => {
               {/* Performance Metrics */}
               <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                 <div className="px-4 py-5 sm:px-6">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">Performance Metrics</h3>
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">{t('monitoring.performanceMetrics')}</h3>
                 </div>
                 <div className="border-t border-gray-200">
                   <dl>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">API Response Time</dt>
+                      <dt className="text-sm font-medium text-gray-500">{t('monitoring.apiResponseTime')}</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         <span className={healthData.apiResponseTime < 100 ? 'text-green-600' : healthData.apiResponseTime < 300 ? 'text-yellow-600' : 'text-red-600'}>
                           {healthData.apiResponseTime.toFixed(2)} ms
@@ -451,13 +453,13 @@ const Monitoring = () => {
                       </dd>
                     </div>
                     <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Active Users</dt>
+                      <dt className="text-sm font-medium text-gray-500">{t('monitoring.activeUsers')}</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         {healthData.activeUsers}
                       </dd>
                     </div>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Recent Errors</dt>
+                      <dt className="text-sm font-medium text-gray-500">{t('monitoring.recentErrors')}</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         <span className={healthData.recentErrors === 0 ? 'text-green-600' : 'text-red-600'}>
                           {healthData.recentErrors}
@@ -471,31 +473,31 @@ const Monitoring = () => {
               {/* Security Information */}
               <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                 <div className="px-4 py-5 sm:px-6">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">Security Information</h3>
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">{t('monitoring.securityInfo')}</h3>
                 </div>
                 <div className="border-t border-gray-200">
                   <dl>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Encryption</dt>
+                      <dt className="text-sm font-medium text-gray-500">{t('monitoring.encryption')}</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          AES-256 Enabled
+                          {t('monitoring.encryptionValue')}
                         </span>
                       </dd>
                     </div>
                     <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Authentication</dt>
+                      <dt className="text-sm font-medium text-gray-500">{t('monitoring.authentication')}</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          JWT + 2FA Required
+                          {t('monitoring.authenticationValue')}
                         </span>
                       </dd>
                     </div>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Audit Trail</dt>
+                      <dt className="text-sm font-medium text-gray-500">{t('monitoring.auditTrail')}</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          🔗 Blockchain-Backed Immutable Ledger
+                          🔗 {t('monitoring.auditTrailValue')}
                         </span>
                       </dd>
                     </div>
@@ -506,18 +508,18 @@ const Monitoring = () => {
               {/* Real-time Events */}
               <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                 <div className="px-4 py-5 sm:px-6">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">Real-time Events</h3>
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">{t('monitoring.realtimeEvents')}</h3>
                 </div>
                 <div className="border-t border-gray-200">
                   <ul className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
                     {events.length === 0 ? (
-                      <li className="px-4 py-4 text-sm text-gray-500">No events yet...</li>
+                      <li className="px-4 py-4 text-sm text-gray-500">{t('monitoring.noEvents')}</li>
                     ) : (
                       events.map((e, i) => (
                         <li key={i} className="px-4 py-4 sm:px-6">
                           <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-cyan-600 truncate">
-                              {e.type === 'vote' ? 'Vote Cast' : e.type === 'election' ? 'Election Update' : 'System Update'}
+                              {e.type === 'vote' ? t('monitoring.eventVoteCast') : e.type === 'election' ? t('monitoring.eventElectionUpdate') : t('monitoring.eventSystemUpdate')}
                             </p>
                             <div className="ml-2 flex-shrink-0 flex">
                               <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
