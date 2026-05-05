@@ -97,6 +97,17 @@ function absoluteUrl(_req, url) {
   return url;
 }
 
+// helper: resolve student photo from known fields (including originalObj)
+function resolveStudentPhotoValue(student) {
+  if (!student) return null;
+  const direct = student.photo || student.photoUrl || student.photoURL || student.image || student.imageUrl;
+  if (direct) return String(direct).trim();
+  const obj = student.originalObj || {};
+  // common header variants
+  const resolved = obj.photo || obj.Photo || obj['photo url'] || obj['Photo URL'] || obj.photourl || obj.photo_url || obj.image || obj['image url'] || obj.Image;
+  return resolved ? String(resolved).trim() : null;
+}
+
 // Seed super admin if none exists (dev convenience)
 router.post('/seed-super', async (req, res) => {
   try {
@@ -2365,7 +2376,25 @@ router.get('/students', adminAuth, async (req, res) => {
     // The frontend can fetch individual photos via GET /students/:roll/photo.
     if (items.length > 0) {
       const ids = items.map(s => s._id);
-      const photoDocs = await Student.find({ _id: { $in: ids }, photo: { $exists: true, $ne: '' } })
+      const photoDocs = await Student.find({
+        _id: { $in: ids },
+        $or: [
+          { photo: { $exists: true, $ne: '' } },
+          { photoUrl: { $exists: true, $ne: '' } },
+          { photoURL: { $exists: true, $ne: '' } },
+          { image: { $exists: true, $ne: '' } },
+          { imageUrl: { $exists: true, $ne: '' } },
+          { 'originalObj.photo': { $exists: true, $ne: '' } },
+          { 'originalObj.Photo': { $exists: true, $ne: '' } },
+          { 'originalObj.photo url': { $exists: true, $ne: '' } },
+          { 'originalObj.Photo URL': { $exists: true, $ne: '' } },
+          { 'originalObj.photourl': { $exists: true, $ne: '' } },
+          { 'originalObj.photo_url': { $exists: true, $ne: '' } },
+          { 'originalObj.image': { $exists: true, $ne: '' } },
+          { 'originalObj.image url': { $exists: true, $ne: '' } },
+          { 'originalObj.Image': { $exists: true, $ne: '' } }
+        ]
+      })
         .select('_id')
         .lean();
       const hasPhotoSet = new Set(photoDocs.map(p => String(p._id)));
@@ -2385,11 +2414,20 @@ router.get('/students', adminAuth, async (req, res) => {
 // Admin: get student photo (returns base64 data URI or redirect to URL)
 router.get('/students/:roll/photo', adminAuth, async (req, res) => {
   try {
+    // Allow embedding in admin UI even when served from a different origin
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     const escaped = req.params.roll.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const student = await Student.findOne({ roll: { $regex: `^${escaped}$`, $options: 'i' } }).select('photo').lean();
-    if (!student || !student.photo) return res.status(404).json({ success: false, message: 'No photo' });
+    const student = await Student.findOne({ roll: { $regex: `^${escaped}$`, $options: 'i' } })
+      .select('photo photoUrl photoURL image imageUrl originalObj')
+      .lean();
+    const photoValue = resolveStudentPhotoValue(student);
+    if (!student || !photoValue) return res.status(404).json({ success: false, message: 'No photo' });
+    // Optional debug mode to inspect resolved photo values
+    if (req.query.debug === '1') {
+      return res.json({ success: true, resolved: photoValue });
+    }
     // If it's a data URI, extract and send as binary image for efficiency
-    const m = student.photo.match(/^data:image\/([^;]+);base64,(.+)$/);
+    const m = String(photoValue).match(/^data:image\/([^;]+);base64,(.+)$/);
     if (m) {
       const ext = m[1] === 'image' ? 'png' : m[1]; // normalise "image/image" → png
       const buf = Buffer.from(m[2], 'base64');
@@ -2397,10 +2435,39 @@ router.get('/students/:roll/photo', adminAuth, async (req, res) => {
       res.set('Cache-Control', 'public, max-age=86400');
       return res.send(buf);
     }
-    // If it's a URL, just redirect
-    if (/^https?:\/\//.test(student.photo)) return res.redirect(student.photo);
+    // If it's an absolute URL, just redirect
+    if (/^https?:\/\//.test(String(photoValue))) return res.redirect(String(photoValue));
+    // Protocol-relative URL (e.g., //res.cloudinary.com/...)
+    if (String(photoValue).startsWith('//')) return res.redirect(`https:${String(photoValue)}`);
+    // Host-only URL (e.g., res.cloudinary.com/...)
+    if (/^(res\.cloudinary\.com|images\.cloudinary\.com|storage\.googleapis\.com|s3\.)/i.test(String(photoValue))) {
+      return res.redirect(`https://${String(photoValue)}`);
+    }
+    // If it's a relative uploads path, redirect to it
+    if (String(photoValue).startsWith('/uploads/') || String(photoValue).startsWith('uploads/')) {
+      const rel = String(photoValue).startsWith('/') ? String(photoValue) : `/${photoValue}`;
+      return res.redirect(rel);
+    }
+    // If it's base64 without a data URI, try to return as image/png
+    if (/^[A-Za-z0-9+/=]+$/.test(String(photoValue)) && String(photoValue).length > 200) {
+      try {
+        const buf = Buffer.from(String(photoValue), 'base64');
+        res.set('Content-Type', 'image/png');
+        res.set('Cache-Control', 'public, max-age=86400');
+        return res.send(buf);
+      } catch (_) {
+        // ignore
+      }
+    }
+    // If it's a filename (e.g., from /uploads/voters), try to serve it
+    if (!String(photoValue).includes('/')) {
+      const filePath = path.join(__dirname, '..', 'public', 'uploads', 'voters', String(photoValue));
+      if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
+      }
+    }
     // fallback: return as JSON
-    res.json({ success: true, photo: student.photo });
+    res.json({ success: true, photo: photoValue });
   } catch (e) {
     res.status(500).json({ success: false, message: 'Server error' });
   }

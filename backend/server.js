@@ -147,6 +147,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads'), {
   maxAge: '7d',
   etag: true,
   lastModified: true,
+  setHeaders: (res) => {
+    // Allow images to be embedded by the admin UI hosted on a different origin
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
 }));
 
 // Rate limiting: global and endpoint-specific limits
