@@ -21,6 +21,23 @@ import {
   getWeb3Status,
   getElectionResults as getOnChainResults,
 } from '../services/web3Service.js';
+import { ethers } from 'ethers';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load contract ABI for log decoding (optional)
+let SECUREVOTE_ABI = null;
+try {
+  const abiPath = path.join(__dirname, '..', 'contracts', 'SecureVote.json');
+  SECUREVOTE_ABI = JSON.parse(fs.readFileSync(abiPath, 'utf8')).abi;
+} catch (e) {
+  // Non-fatal: endpoint will still return tx receipt + confirmation, just without decoded events.
+  SECUREVOTE_ABI = null;
+}
 
 const router = express.Router();
 
@@ -301,7 +318,7 @@ router.get('/ledger/:electionId', async (req, res) => {
         .sort({ timestamp: -1 })
         .skip(skip)
         .limit(limit)
-        .select('voteHash timestamp candidate voter blockIndex blockHash')
+        .select('voteHash timestamp candidate voter blockIndex blockHash txHash voterWallet')
         .lean()
     ]);
 
@@ -313,6 +330,8 @@ router.get('/ledger/:electionId', async (req, res) => {
       voter: v.voter ? String(v.voter) : undefined,
       blockIndex: v.blockIndex ?? null,
       blockHash: v.blockHash ?? null,
+      txHash: v.txHash ?? null,
+      voterWallet: v.voterWallet ?? null,
     }));
 
     res.json({ success: true, total, page, limit, ledger });
@@ -384,6 +403,123 @@ router.get('/vote/:hash', async (req, res) => {
   } catch (e) {
     console.error('VERIFY VOTE ERROR', e);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ─── HYBRID BLOCK DETAIL ENDPOINT ───────────────────────────────────
+// GET /api/blockchain/hybrid/vote/:voteHash
+// Returns local DB-chain block details + (if linked) public-chain tx + decoded VoteCast event
+router.get('/blockchain/hybrid/vote/:voteHash', async (req, res) => {
+  try {
+    const { voteHash } = req.params;
+
+    const vote = await Vote.findOne({ voteHash })
+      .select('voteHash timestamp election candidate blockIndex blockHash txHash voterWallet onChainElectionIdx onChainCandidateIdx')
+      .lean();
+    if (!vote) return res.status(404).json({ success: false, message: 'Vote not found' });
+
+    // 1) Local chain block (MongoDB)
+    let localBlock = null;
+    try {
+      const block = await findBlockByVoteHash(voteHash);
+      if (block) localBlock = block;
+    } catch (_) {}
+
+    // 2) Public chain (Polygon/Hardhat) tx + decoded logs
+    const web3Status = await getWeb3Status();
+    const isLocalNet = !!web3Status?.connected && (web3Status.chainId === 31337 || web3Status.chainId === 1337);
+
+    const makeExplorer = (kind, value) => {
+      if (!value) return null;
+      if (!web3Status?.connected) return null;
+      if (isLocalNet) return null; // no public explorer for local hardhat
+
+      // Default: Polygon Amoy
+      const base = process.env.BLOCK_EXPLORER_BASE_URL || 'https://amoy.polygonscan.com';
+      if (kind === 'tx') return `${base.replace(/\/$/, '')}/tx/${value}`;
+      if (kind === 'block') return `${base.replace(/\/$/, '')}/block/${value}`;
+      if (kind === 'address') return `${base.replace(/\/$/, '')}/address/${value}`;
+      return null;
+    };
+
+    let onChain = null;
+    if (vote.txHash && web3Status?.connected) {
+      const txStatus = await verifyTransaction(vote.txHash);
+      const contractRecord = await verifyVoteOnChain(vote.voteHash);
+
+      // Decode VoteCast event from receipt logs if possible
+      let decoded = null;
+      try {
+        if (SECUREVOTE_ABI) {
+          // Import provider lazily from web3Service (it exports a live binding)
+          const web3 = await import('../services/web3Service.js');
+          const provider = web3.provider;
+          const receipt = provider ? await provider.getTransactionReceipt(vote.txHash) : null;
+          if (receipt) {
+            const iface = new ethers.Interface(SECUREVOTE_ABI);
+            const events = [];
+            for (const log of receipt.logs || []) {
+              try {
+                const parsed = iface.parseLog({ topics: log.topics, data: log.data });
+                if (parsed?.name === 'VoteCast') {
+                  events.push({
+                    name: parsed.name,
+                    electionIndex: Number(parsed.args.electionIndex),
+                    candidateIndex: Number(parsed.args.candidateIndex),
+                    voteHash: parsed.args.voteHash,
+                    voter: parsed.args.voter,
+                    timestamp: Number(parsed.args.timestamp),
+                  });
+                }
+              } catch (_) {}
+            }
+            if (events.length) decoded = events[0];
+          }
+        }
+      } catch (_) {}
+
+      onChain = {
+        network: web3Status,
+        tx: {
+          txHash: vote.txHash,
+          explorerUrl: makeExplorer('tx', vote.txHash),
+          verified: txStatus?.confirmed ?? false,
+          status: txStatus?.status ?? null,
+          blockNumber: txStatus?.blockNumber ?? null,
+          blockExplorerUrl: makeExplorer('block', txStatus?.blockNumber),
+          from: txStatus?.from ?? null,
+          to: txStatus?.to ?? null,
+          gasUsed: txStatus?.gasUsed ?? null,
+        },
+        contractRecord: contractRecord?.found ? contractRecord : null,
+        decodedVoteCast: decoded,
+      };
+    }
+
+    return res.json({
+      success: true,
+      hybridType: 'hybrid',
+      vote: {
+        voteHash: vote.voteHash,
+        timestamp: vote.timestamp,
+        election: vote.election,
+        candidate: vote.candidate,
+        voterWallet: vote.voterWallet || null,
+        blockIndex: vote.blockIndex ?? null,
+        blockHash: vote.blockHash ?? null,
+        txHash: vote.txHash || null,
+        onChainElectionIdx: vote.onChainElectionIdx ?? null,
+        onChainCandidateIdx: vote.onChainCandidateIdx ?? null,
+      },
+      localChain: {
+        enabled: true,
+        block: localBlock,
+      },
+      publicChain: onChain ? { enabled: true, ...onChain } : { enabled: false, reason: !vote.txHash ? 'Vote not linked to a public-chain transaction yet' : 'Web3 not configured' },
+    });
+  } catch (e) {
+    console.error('HYBRID BLOCK DETAIL ERROR', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
