@@ -21,6 +21,7 @@ const AdminVoters = () => {
   const [editing, setEditing] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
+  const [remotePhotoUrl, setRemotePhotoUrl] = useState(null);
   const [viewAll, setViewAll] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(null); // { name, roll, src }
 
@@ -184,12 +185,40 @@ const AdminVoters = () => {
     setEditing({ ...student });
     setPhotoFile(null);
     setPhotoPreviewUrl(null);
+    setRemotePhotoUrl(null);
   };
   const closeEdit = () => {
     setEditing(null);
     setPhotoFile(null);
     setPhotoPreviewUrl(null);
+    if (remotePhotoUrl) URL.revokeObjectURL(remotePhotoUrl);
+    setRemotePhotoUrl(null);
   };
+
+  // Load existing photo as a blob so the preview works across origins
+  useEffect(() => {
+    let cancelled = false;
+    if (!editing || !editing.hasPhoto || photoPreviewUrl) return undefined;
+
+    const loadPhoto = async () => {
+      try {
+        const res = await axios.get(`/api/admin/students/${encodeURIComponent(editing.roll)}/photo`, {
+          responseType: 'blob'
+        });
+        if (cancelled) return;
+        const blobUrl = URL.createObjectURL(res.data);
+        setRemotePhotoUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return blobUrl;
+        });
+      } catch (_) {
+        // keep fallback avatar
+      }
+    };
+
+    loadPhoto();
+    return () => { cancelled = true; };
+  }, [editing, photoPreviewUrl]);
   const saveEdit = async () => {
     if (!editing) return;
     // client-side validation
@@ -301,6 +330,7 @@ const AdminVoters = () => {
                           src={getPhotoUrl(s.roll)}
                           alt={s.name}
                           className="w-11 h-11 rounded-full object-cover border-2 border-cyan-200 group-hover:border-cyan-500 transition-all shadow-sm"
+                          style={{ objectFit: 'cover', objectPosition: '50% 20%' }}
                           loading="lazy"
                           onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex'; }}
                         />
@@ -409,9 +439,19 @@ const AdminVoters = () => {
                 <label className="block text-sm font-medium text-gray-700">Photo</label>
                 <div className="flex items-center gap-4 mt-2">
                   {photoPreviewUrl ? (
-                    <img src={photoPreviewUrl} alt="Preview" className="w-24 h-24 rounded-lg object-cover border border-cyan-300" />
-                  ) : editing.hasPhoto ? (
-                    <img src={getPhotoUrl(editing.roll)} alt={editing.name} className="w-24 h-24 rounded-lg object-cover border border-gray-200" />
+                    <img
+                      src={photoPreviewUrl}
+                      alt="Preview"
+                      className="w-24 h-24 rounded-lg object-cover border border-cyan-300"
+                      style={{ objectFit: 'cover', objectPosition: '50% 20%' }}
+                    />
+                  ) : editing.hasPhoto && remotePhotoUrl ? (
+                    <img
+                      src={remotePhotoUrl}
+                      alt={editing.name}
+                      className="w-24 h-24 rounded-lg object-cover border border-gray-200"
+                      style={{ objectFit: 'cover', objectPosition: '50% 20%' }}
+                    />
                   ) : (
                     <div className="w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">No photo</div>
                   )}
