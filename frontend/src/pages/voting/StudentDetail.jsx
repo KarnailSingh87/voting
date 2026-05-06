@@ -32,7 +32,8 @@ const StudentDetail = () => {
     a.download = `${roll}_student.json`;
     document.body.appendChild(a);
     a.click();
-    a.remove();
+    // Only remove if it is still mounted in DOM (avoids NotFoundError in some environments)
+    if (a.parentNode) a.parentNode.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
