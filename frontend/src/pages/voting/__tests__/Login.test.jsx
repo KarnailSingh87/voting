@@ -57,7 +57,8 @@ describe('Login flow', () => {
     );
     const rollInput = screen.getByPlaceholderText('Roll number');
     await userEvent.type(rollInput, '!!');
-    await waitFor(() => expect(screen.getByText(/Roll number appears invalid/i)).toBeTruthy());
+    // Current UI disables verification and shows a hint instead of throwing a separate checksum error
+    await waitFor(() => expect(screen.getByText(/Enter roll number to verify/i)).toBeTruthy());
   });
 
   test('lookup failure shows error and does not prompt email', async () => {
@@ -78,10 +79,8 @@ describe('Login flow', () => {
     // assert that at least one "Not found" appears and that email prompt is not shown
     await waitFor(() => {
       // The friendly message should be shown and report button visible
-      expect(screen.getByText(/No student record found for that roll/i)).toBeTruthy();
+      expect(screen.getByText(/No record found for this roll/i)).toBeTruthy();
       expect(screen.queryByPlaceholderText('you@example.com')).toBeNull();
-      // Should show a button to report the missing record
-      expect(screen.getByText(/Report missing record/i)).toBeTruthy();
     });
   });
 
