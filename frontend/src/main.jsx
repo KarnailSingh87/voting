@@ -6,6 +6,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { Web3Provider } from './context/Web3Context'
+import RouteErrorBoundary from './components/RouteErrorBoundary'
 
 // Initialize theme globally so pages render with the correct theme instantly
 (() => {
@@ -22,7 +23,7 @@ import { Web3Provider } from './context/Web3Context'
 })();
 
 const router = createBrowserRouter([
-  { path: '*', element: <App /> }
+  { path: '*', element: <App />, errorElement: <RouteErrorBoundary /> }
 ], {
   future: {
     v7_startTransition: true,
