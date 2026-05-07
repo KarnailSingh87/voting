@@ -2,6 +2,24 @@ import { useEffect, useState, useRef } from 'react';
 import i18n from '../i18n';
 import { useTranslation } from 'react-i18next';
 
+function safeSetCookie(value) {
+  try {
+    document.cookie = value;
+  } catch (_) {
+    // ignore (some browsers / privacy modes)
+  }
+}
+
+function safeDispatchChange(el) {
+  try {
+    // Don't dispatch if element is detached (common in translate/widget races)
+    if (!el || !el.isConnected) return;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  } catch (_) {
+    // ignore
+  }
+}
+
 const ALL_LANGS = [
   { code: 'en', label: 'English' },
   { code: 'hi', label: 'हिन्दी' },
@@ -36,6 +54,14 @@ export default function LanguageSelector() {
     }
   });
   const ref = useRef();
+  const aliveRef = useRef(true);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     // apply active language whenever selected changes
@@ -45,19 +71,26 @@ export default function LanguageSelector() {
     try { localStorage.setItem('adminLang', selected); } catch (e) {}
 
     // Synchronize Google Translate to translate backend-generated data
-    document.cookie = `googtrans=/en/${selected}; path=/`;
-    document.cookie = `googtrans=/en/${selected}; domain=.${document.domain}; path=/`;
+    // NOTE: Google translate and browser translate extensions sometimes mutate the DOM.
+    // Keep this block defensive to avoid crashes like:
+    // "Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node."
+    safeSetCookie(`googtrans=/en/${selected}; path=/`);
+    if (document?.domain) {
+      safeSetCookie(`googtrans=/en/${selected}; domain=.${document.domain}; path=/`);
+    }
     
     const triggerTranslate = () => {
+      if (!aliveRef.current) return;
       const googleSelect = document.querySelector('.goog-te-combo');
       if (googleSelect && googleSelect.value !== selected) {
         googleSelect.value = selected;
-        googleSelect.dispatchEvent(new Event('change'));
+        safeDispatchChange(googleSelect);
       }
     };
     
     triggerTranslate();
-    setTimeout(triggerTranslate, 500);
+    const t1 = window.setTimeout(triggerTranslate, 500);
+    return () => window.clearTimeout(t1);
   }, [selected]);
 
   useEffect(() => {
