@@ -59,7 +59,7 @@ const Ballot = () => {
   const [blockchainData, setBlockchainData] = useState(null);
   const [voteHashResult, setVoteHashResult] = useState('');
 
-  const { isConnected, castVoteOnChain, isCorrectChain, connectWallet, account } = useWeb3();
+  const { isConnected, castVoteOnChain, isCorrectChain, account } = useWeb3();
 
   useEffect(() => {
     const fetchElection = async () => {
@@ -86,10 +86,9 @@ const Ballot = () => {
     setVoting(true);
     setError('');
 
-    // Attempt Web3 connection before casting if MetaMask is available
-    if (window.ethereum && !isConnected) {
-      try { await connectWallet(); } catch (_) {}
-    }
+    // Note: MetaMask is NOT required for voting.
+    // Votes are recorded via server-side JWT auth + local blockchain.
+    // MetaMask on-chain recording is an optional bonus if already connected.
     
     try {
       const token = localStorage.getItem('voterToken');
@@ -101,7 +100,8 @@ const Ballot = () => {
       if (response.data.message || response.data.voteHash) {
         const { voteHash, blockchain } = response.data;
         
-        // ─── MetaMask Signature Step ─────────────────────────
+        // ─── Optional MetaMask On-Chain Step ─────────────────
+        // Only if user has already connected MetaMask voluntarily
         if (isConnected && isCorrectChain && election.onChainIndex !== undefined && window.ethereum) {
           try {
             const cand = election.candidates.find(c => (c.id || c._id) === selectedCandidate);
@@ -118,7 +118,7 @@ const Ballot = () => {
               }, { headers: { Authorization: `Bearer ${token}` } });
             }
           } catch (err) {
-            console.error('MetaMask Tx failed:', err);
+            console.error('MetaMask Tx failed (non-fatal):', err);
             // Non-fatal: the vote was successfully saved in standard DB/local chain
           }
         }
@@ -232,13 +232,13 @@ const Ballot = () => {
           {blockchainData && (
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden">
               <div className="px-5 py-4 flex items-center gap-3">
-                <span className="text-xl">🔗</span>
+                <span className="text-xl" aria-hidden="true">🔗</span>
                 <div>
                   <h3 className="text-sm font-bold text-white">Blockchain Confirmed</h3>
                   <p className="text-xs text-slate-400">Immutable on-chain record</p>
                 </div>
                 <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  ✓ MINED
+                  <span aria-hidden="true">✓</span> MINED
                 </span>
               </div>
               <div className="border-t border-slate-700 px-5 py-3 space-y-2">
@@ -260,17 +260,38 @@ const Ballot = () => {
                 </div>
               </div>
               <div className="px-5 py-2 bg-slate-900/50 border-t border-slate-700">
-                <p className="text-[10px] text-slate-500">🔒 This vote is permanently sealed in the blockchain and cannot be altered or deleted.</p>
+                <p className="text-[10px] text-slate-500"><span aria-hidden="true">🔒</span> This vote is permanently sealed in the blockchain and cannot be altered or deleted.</p>
               </div>
             </div>
           )}
 
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-          >
-            Return to Dashboard
-          </button>
+          {/* MetaMask Verification Hint */}
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-xl" aria-hidden="true">🦊</span>
+              <div>
+                <p className="text-sm font-medium text-indigo-900">Want to verify votes on the public ledger?</p>
+                <p className="text-xs text-indigo-700 mt-1">
+                  Connect your MetaMask wallet on the public ledger page to view all voters' hashes and verify vote integrity on the blockchain.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate('/public')}
+              className="flex-1 flex justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              View Public Ledger
+            </button>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="flex-1 flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+            >
+              Return to Dashboard
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -420,8 +441,10 @@ const Ballot = () => {
                         <li>Your vote will be encrypted and stored securely</li>
                         <li>Your identity is cryptographically separated from your vote</li>
                         <li>You will receive a confirmation receipt for verification</li>
-                        <li>🔗 Your vote is recorded on an immutable blockchain — tamper-proof</li>
+                        <li><span aria-hidden="true">🔗</span> Your vote is recorded on an immutable blockchain — tamper-proof</li>
                         <li>Each vote is mined into a cryptographic block with proof of work</li>
+                        <li><span aria-hidden="true">🦊</span> MetaMask is <strong>optional</strong> — connect it only if you want an additional on-chain record</li>
+                        <li><span aria-hidden="true">🔍</span> To verify other voters' hashes on the public ledger, MetaMask connection is required</li>
                       </ul>
                     </dd>
                   </div>

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from '../../utils/axios';
+import { useWeb3 } from '../../context/Web3Context';
 
 const PublicLedger = () => {
   const { id } = useParams();
+  const { isConnected, connectWallet, connecting, account, hasMetaMask, shortenAddress } = useWeb3();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [ledger, setLedger] = useState([]);
@@ -59,6 +61,7 @@ const PublicLedger = () => {
   };
 
   const openHybridDetails = async (voteHash) => {
+    if (!isConnected) return; // MetaMask required for details
     setDetailsOpen(true);
     setDetailsLoading(true);
     setDetailsError('');
@@ -74,11 +77,20 @@ const PublicLedger = () => {
     }
   };
 
+  // Mask a hash string for non-connected users
+  const maskHash = (hash) => {
+    if (!hash) return '—';
+    if (isConnected) return hash;
+    // Show first 8 and last 4 chars, mask the rest
+    if (hash.length <= 16) return '•'.repeat(hash.length);
+    return hash.slice(0, 8) + '•'.repeat(Math.min(20, hash.length - 12)) + hash.slice(-4);
+  };
+
   return (
     <div className="max-w-5xl mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">🔗 Blockchain Vote Ledger</h2>
+          <h2 className="text-2xl font-bold text-gray-900"><span aria-hidden="true">🔗</span> Blockchain Vote Ledger</h2>
           <p className="text-sm text-gray-500 mt-1">
             Hybrid ledger: <span className="font-medium">Local Chain (DB blocks)</span> +{' '}
             <span className="font-medium">Public Chain (Polygon tx proof)</span>
@@ -86,6 +98,66 @@ const PublicLedger = () => {
         </div>
         <Link to={`/public/election/${id}`} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">← Back to results</Link>
       </div>
+
+      {/* ─── MetaMask Verification Gate Banner ──────────────────────── */}
+      {!isConnected && (
+        <div className="mb-6 bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 border border-indigo-200 rounded-xl p-5 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl shadow-lg">
+                <span aria-hidden="true">🦊</span>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-base font-bold text-gray-900">Connect MetaMask to Verify Votes</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Vote hashes and voter wallet addresses are hidden for privacy. Connect your MetaMask wallet to reveal full blockchain data and verify vote integrity.
+              </p>
+            </div>
+            <div className="flex-shrink-0">
+              {hasMetaMask ? (
+                <button
+                  onClick={connectWallet}
+                  disabled={connecting}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-md hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50"
+                >
+                  {connecting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Connecting…
+                    </>
+                  ) : (
+                    <><span aria-hidden="true">🦊</span> Connect Wallet to Verify</>
+                  )}
+                </button>
+              ) : (
+                <a
+                  href="https://metamask.io/download/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors"
+                >
+                  <span aria-hidden="true">🦊</span> Install MetaMask
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Connected wallet indicator */}
+      {isConnected && (
+        <div className="mb-6 flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-sm font-medium text-emerald-800">
+            Wallet Connected: <span className="font-mono">{shortenAddress(account)}</span>
+          </span>
+          <span className="text-xs text-emerald-600 ml-auto"><span aria-hidden="true">✓</span> Full vote hash verification enabled</span>
+        </div>
+      )}
 
       {/* Chain Stats Banner */}
       {chainStats && (
@@ -126,7 +198,7 @@ const PublicLedger = () => {
               </svg>
               Validating Chain...
             </>
-          ) : '🔍 Validate Blockchain Integrity'}
+          ) : <><span aria-hidden="true">🔍</span>{' '}Validate Blockchain Integrity</>}
         </button>
         
         {chainValid && (
@@ -135,7 +207,7 @@ const PublicLedger = () => {
               ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
               : 'bg-red-100 text-red-800 border border-red-200'
           }`}>
-            {chainValid.valid ? '✅ Chain Intact — No Tampering Detected' : `❌ ${chainValid.error || 'Chain Compromised'}`}
+            {chainValid.valid ? <><span aria-hidden="true">✅</span>{' '}Chain Intact — No Tampering Detected</> : <><span aria-hidden="true">❌</span>{' '}{chainValid.error || 'Chain Compromised'}</>}
           </span>
         )}
       </div>
@@ -155,6 +227,14 @@ const PublicLedger = () => {
           <div>
             <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
               <span className="text-sm text-gray-600">Page {page} — <strong>{total}</strong> total votes on-chain</span>
+              {!isConnected && (
+                <span className="inline-flex items-center gap-1 text-xs text-indigo-600 font-medium">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  Hashes masked — Connect MetaMask to reveal
+                </span>
+              )}
             </div>
             <div className="divide-y divide-gray-100">
               {ledger.length === 0 && <div className="p-6 text-sm text-gray-500 text-center">No votes found</div>}
@@ -170,17 +250,27 @@ const PublicLedger = () => {
                         )}
                         <span className="text-xs text-gray-500">{new Date(entry.timestamp).toLocaleString()}</span>
                       </div>
-                      <div className="text-xs text-gray-700 font-mono truncate" title={entry.voteHash}>
-                        Vote: {entry.voteHash}
+                      <div className={`text-xs font-mono truncate ${isConnected ? 'text-gray-700' : 'text-gray-400'}`} title={isConnected ? entry.voteHash : 'Connect MetaMask to reveal'}>
+                        Vote: {maskHash(entry.voteHash)}
                       </div>
                       {entry.blockHash && (
-                        <div className="text-[10px] text-emerald-600 font-mono truncate mt-0.5" title={entry.blockHash}>
-                          Local Hash: {entry.blockHash}
+                        <div className={`text-[10px] font-mono truncate mt-0.5 ${isConnected ? 'text-emerald-600' : 'text-emerald-400'}`} title={isConnected ? entry.blockHash : 'Connect MetaMask to reveal'}>
+                          Local Hash: {maskHash(entry.blockHash)}
                         </div>
                       )}
                       {entry.txHash && (
-                        <div className="text-[10px] text-sky-700 font-mono truncate mt-0.5" title={entry.txHash}>
-                          Public Tx: {entry.txHash}
+                        <div className={`text-[10px] font-mono truncate mt-0.5 ${isConnected ? 'text-sky-700' : 'text-sky-400'}`} title={isConnected ? entry.txHash : 'Connect MetaMask to reveal'}>
+                          Public Tx: {maskHash(entry.txHash)}
+                        </div>
+                      )}
+                      {entry.voterWallet && isConnected && (
+                        <div className="text-[10px] font-mono truncate mt-0.5 text-purple-600" title={entry.voterWallet}>
+                          Voter Wallet: {entry.voterWallet}
+                        </div>
+                      )}
+                      {entry.voterWallet && !isConnected && (
+                        <div className="text-[10px] font-mono truncate mt-0.5 text-purple-400">
+                          Voter Wallet: {maskHash(entry.voterWallet)}
                         </div>
                       )}
                     </div>
@@ -189,20 +279,29 @@ const PublicLedger = () => {
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${
                           entry.blockHash ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'
                         }`}>
-                          {entry.blockHash ? '✓ Local block mined' : '⏳ Local pending'}
+                          {entry.blockHash ? <><span aria-hidden="true">✓</span>{' '}Local block mined</> : <><span aria-hidden="true">⏳</span>{' '}Local pending</>}
                         </span>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${
                           entry.txHash ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-slate-50 text-slate-600 border-slate-200'
                         }`}>
-                          {entry.txHash ? '✓ Public tx linked' : '— Public tx'}
+                          {entry.txHash ? <><span aria-hidden="true">✓</span>{' '}Public tx linked</> : <>— Public tx</>}
                         </span>
-                        <button
-                          onClick={() => openHybridDetails(entry.voteHash)}
-                          className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold bg-slate-900 text-white hover:bg-slate-800"
-                          title="View block / transaction details"
-                        >
-                          🔗 View
-                        </button>
+                        {isConnected ? (
+                          <button
+                            onClick={() => openHybridDetails(entry.voteHash)}
+                            className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold bg-slate-900 text-white hover:bg-slate-800"
+                            title="View block / transaction details"
+                          >
+                            <span aria-hidden="true">🔗</span> View
+                          </button>
+                        ) : (
+                          <span
+                            className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold bg-gray-200 text-gray-500 cursor-not-allowed"
+                            title="Connect MetaMask to view full details"
+                          >
+                            <span aria-hidden="true">🔒</span> Locked
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -218,8 +317,8 @@ const PublicLedger = () => {
         )}
       </div>
 
-      {/* Details Modal */}
-      {detailsOpen && (
+      {/* Details Modal — only accessible when connected */}
+      {detailsOpen && isConnected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDetailsOpen(false)} />
           <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
