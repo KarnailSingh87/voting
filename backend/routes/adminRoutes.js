@@ -24,7 +24,7 @@ import { fileURLToPath } from 'url';
 import { createElectionOnChain, addCandidateOnChain, finalizeElectionOnChain } from '../services/web3Service.js';
 
 import Query from '../models/Query.js';
-import { sendWhatsAppMessage } from '../config/whatsappService.js';
+import { sendWhatsAppMessage, resetWhatsAppAuth } from '../config/whatsappService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2744,6 +2744,23 @@ router.post('/whatsapp-reconnect', async (req, res) => {
   } catch (e) {
     console.error('WhatsApp reconnect error:', e);
     res.status(500).json({ success: false, message: 'Failed to reconnect WhatsApp' });
+  }
+});
+
+// Hard reset WhatsApp auth (generates a fresh QR by clearing baileys auth state)
+router.post('/whatsapp-reset', async (req, res) => {
+  try {
+    await resetWhatsAppAuth();
+    const status = getWhatsAppStatus();
+    res.json({
+      success: true,
+      connected: status.connected,
+      hasQR: !!status.qrCode,
+      message: 'WhatsApp auth reset. Refresh the QR page to scan a new code.'
+    });
+  } catch (e) {
+    console.error('WhatsApp reset error:', e);
+    res.status(500).json({ success: false, message: 'Failed to reset WhatsApp auth' });
   }
 });
 

@@ -13,6 +13,8 @@ let isConnected = false;
 let connectionPromise = null;
 let qrCode = null;
 let retryCount = 0;
+let currentInitId = 0;
+let consecutiveQRs = 0;
 const MAX_RETRIES = 10; // generous retries — WhatsApp should stay connected
 const RETRY_DELAY_MS = 5000; // 5 seconds between retries
 
@@ -33,8 +35,14 @@ export async function initWhatsApp() {
   if (isConnected && sock) return true;
   // If a connection attempt is already in progress, wait for it
   if (connectionPromise) return connectionPromise;
+  // Safety: if a previous socket exists but not marked connected, close it before starting a new one.
+  if (sock) {
+    try { sock.end(); } catch (_) {}
+    sock = null;
+  }
   
   console.log('[WhatsApp] Initializing connection...');
+  const initId = ++currentInitId;
   
   connectionPromise = new Promise(async (resolve) => {
     try {
@@ -56,7 +64,10 @@ export async function initWhatsApp() {
         auth: state,
         logger,
         version,
-        browser: ['Ubuntu', 'Chrome', '114.0.0'],
+        // Using a common desktop UA tends to be more stable than mobile-like values.
+        browser: ['Voting System', 'Chrome', '1.0.0'],
+        // Ensure we always get QR updates (but we don't print it in server logs)
+        printQRInTerminal: false,
         connectTimeoutMs: 60000,
         defaultQueryTimeoutMs: 0,
       });
@@ -65,14 +76,34 @@ export async function initWhatsApp() {
 
       sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
+
+        // Ignore events from older init attempts (paranoia for rapid reconnects)
+        if (initId !== currentInitId) return;
         
         if (qr) {
           qrCode = qr;
+          consecutiveQRs++;
           console.log('[WhatsApp] ✅ QR Code ready! Scan from admin panel');
+
+          // If WhatsApp keeps issuing QRs but pairing fails repeatedly, auth state is often stale.
+          // Auto-reset after a few consecutive QR refreshes.
+          if (consecutiveQRs >= 5 && !isConnected) {
+            console.log('[WhatsApp] ⚠️  Too many QR refreshes without pairing. Clearing auth & restarting...');
+            consecutiveQRs = 0;
+            try { sock?.end(); } catch (_) {}
+            sock = null;
+            clearAuthFolder();
+            connectionPromise = null;
+            setTimeout(() => initWhatsApp(), 1000);
+          }
         }
 
         if (connection === 'close') {
           isConnected = false;
+          consecutiveQRs = 0;
+
+          // If this socket is still the active one, clear it.
+          try { sock?.end(); } catch (_) {}
           sock = null;
           connectionPromise = null;
           
@@ -82,6 +113,13 @@ export async function initWhatsApp() {
           if (statusCode === DisconnectReason.loggedOut) {
             // Session was logged out from the phone — clear stale auth and generate fresh QR
             console.log('[WhatsApp] Logged out from phone. Clearing auth and generating new QR...');
+            retryCount = 0;
+            clearAuthFolder();
+            setTimeout(() => initWhatsApp(), 2000);
+            resolve(false);
+          } else if (statusCode === DisconnectReason.badSession) {
+            // Bad/stale session — reset auth to allow a clean pairing.
+            console.log('[WhatsApp] Bad session detected. Clearing auth and generating new QR...');
             retryCount = 0;
             clearAuthFolder();
             setTimeout(() => initWhatsApp(), 2000);
@@ -101,6 +139,7 @@ export async function initWhatsApp() {
         } else if (connection === 'open') {
           isConnected = true;
           qrCode = null;
+          consecutiveQRs = 0;
           retryCount = 0;
           console.log('[WhatsApp] ✅ Connected successfully!');
           resolve(true);
@@ -220,13 +259,14 @@ export async function reconnectWhatsApp() {
   console.log('[WhatsApp] Force reconnect requested...');
   // Close existing socket gracefully without logging out
   if (sock) {
-    try { sock.end(undefined); } catch (e) { /* ignore */ }
+    try { sock.end(); } catch (e) { /* ignore */ }
     sock = null;
   }
   isConnected = false;
   qrCode = null;
   connectionPromise = null;
   retryCount = 0;
+  consecutiveQRs = 0;
   // Re-initialize — will use existing auth if available
   return initWhatsApp();
 }
@@ -258,4 +298,26 @@ export async function disconnectWhatsApp() {
     console.error('[WhatsApp] Disconnect error:', e.message);
     throw e;
   }
+}
+
+// Hard reset WhatsApp pairing (clears auth and forces a brand-new QR code)
+// Use this when the phone shows "Can't link new device at this time" due to stale pairing state.
+export async function resetWhatsAppAuth() {
+  console.log('[WhatsApp] Hard reset requested (clear auth & restart)...');
+  try {
+    if (sock) {
+      try { await sock.logout(); } catch (_) { /* ignore */ }
+      try { sock.end(); } catch (_) { /* ignore */ }
+    }
+  } finally {
+    sock = null;
+    isConnected = false;
+    qrCode = null;
+    connectionPromise = null;
+    retryCount = 0;
+    consecutiveQRs = 0;
+    clearAuthFolder();
+    setTimeout(() => initWhatsApp(), 300);
+  }
+  return true;
 }
