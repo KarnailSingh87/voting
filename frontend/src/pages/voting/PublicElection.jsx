@@ -136,7 +136,7 @@ const PublicElection = () => {
             </span>
           ) : isCompleted ? (
             <div className="flex items-center space-x-2">
-              <span className="text-lg font-bold text-gray-900">🏆 Final Results</span>
+              <span className="text-lg font-bold text-gray-900"><span aria-hidden="true">🏆</span> Final Results</span>
               <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Completed</span>
             </div>
           ) : (

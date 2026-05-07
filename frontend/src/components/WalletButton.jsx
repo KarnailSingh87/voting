@@ -32,7 +32,7 @@ export default function WalletButton() {
         rel="noopener noreferrer"
         className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors"
       >
-        🦊 Install MetaMask
+        <span aria-hidden="true">🦊</span> Install MetaMask
       </a>
     );
   }
@@ -54,7 +54,7 @@ export default function WalletButton() {
               Connecting…
             </>
           ) : (
-            <>🦊 Connect Wallet</>
+            <><span aria-hidden="true">🦊</span> Connect Wallet</>
           )}
         </button>
         {error && <span className="text-[10px] text-red-500 max-w-[200px] text-right">{error}</span>}
@@ -67,7 +67,7 @@ export default function WalletButton() {
     return (
       <div className="flex items-center gap-2">
         <span className="inline-flex items-center px-2 py-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 rounded-full">
-          ⚠️ Wrong Network
+          <span aria-hidden="true">⚠️</span> Wrong Network
         </span>
         <button
           onClick={switchChain}

@@ -64,7 +64,7 @@ const ElectionResults = ({ electionId }) => {
     <div className="mt-4 pt-4 border-t border-gray-100">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-semibold text-gray-700">
-          {isCompleted ? '🏆 Final Results' : '📊 Current Standings'}
+          {isCompleted ? <><span aria-hidden="true">🏆</span>{' '}Final Results</> : <><span aria-hidden="true">📊</span>{' '}Current Standings</>}
         </h4>
         <span className="text-xs text-gray-500">{totalVotes} total votes</span>
       </div>
