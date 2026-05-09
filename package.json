@@ -18,11 +18,13 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
-    "concurrently": "^9.2.1",
     "cloudinary": "^2.9.0",
     "multer-storage-cloudinary": "^2.2.1",
     "pino": "^10.3.1",
-    "wait-on": "^8.0.5",
     "puppeteer": "^24.35.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "wait-on": "^8.0.5"
   }
 }
