@@ -3,20 +3,26 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:admin": "cd admin && npm run dev",
+    "dev:full": "concurrently -k -n backend,frontend,admin -c red,green,blue \"npm run dev:backend\" \"wait-on http://localhost:5005/health && npm run dev:frontend\" \"wait-on http://localhost:5005/health && npm run dev:admin\"",
     "install:all": "cd backend && npm install && cd ../frontend && rm -rf node_modules package-lock.json && npm install && cd ../admin && rm -rf node_modules package-lock.json && npm install",
     "build:frontend": "cd frontend && npm run build",
     "build:admin": "cd admin && npm run build",
     "build": "npm run build:frontend && npm run build:admin",
     "start": "node backend/server.js",
-    "dev": "cd backend && npm run dev",
+    "dev": "npm run dev:full",
     "render:build": "npm run install:all && npm run build",
     "render:start": "node backend/server.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "concurrently": "^9.2.1",
     "cloudinary": "^2.9.0",
     "multer-storage-cloudinary": "^2.2.1",
     "pino": "^10.3.1",
+    "wait-on": "^8.0.5",
     "puppeteer": "^24.35.0"
   }
 }
