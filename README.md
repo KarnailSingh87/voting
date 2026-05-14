@@ -340,7 +340,7 @@ See `docs/BLOCKCHAIN_INTEGRATION.txt` for detailed instructions.
 This section summarizes every technology used for blockchain integration in this project, and lists the environment variables / credentials the server and deployment scripts expect. IMPORTANT: never commit real secret keys into the repository. Use environment variables, secrets manager, or Render/GitHub Secrets.
 
 ### Technologies (where used)
-- Solidity — smart contract language (`contracts/src/SecureVote.sol`)
+- Solidity — smart contract language (`contracts/src/SecureVote.sol`) *(contract name kept as `SecureVote`)*
 - Hardhat — compile, test, local node, and deployment (`contracts/package.json`, `hardhat.config.js`, `contracts/scripts/deploy.js`)
 - ethers.js (v6) — server-side provider, Contract and Wallet (`backend/services/web3Service.js`, `backend/package.json`)
 - JSON-RPC providers (Alchemy, Infura, or any Ethereum node) — RPC endpoints used by the backend
@@ -352,7 +352,7 @@ This section summarizes every technology used for blockchain integration in this
 Below are the env vars the project reads for blockchain features. Provide values in `backend/.env` or in your deployment platform's secret store.
 
 - `VOTING_CONTRACT_ADDRESS` (required for on-chain features)
-  - Description: Deployed SecureVote contract address (0x...)
+  - Description: Deployed smart contract address (0x...) *(contract name: `SecureVote`)*
   - Example: `VOTING_CONTRACT_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3`
 
 - `ALCHEMY_AMOY_RPC` or `SEPOLIA_RPC_URL` (one required for provider)
@@ -369,7 +369,7 @@ Below are the env vars the project reads for blockchain features. Provide values
 
 Notes:
 - If you don't provide a deployer private key the backend can still perform read-only calls (views) to the contract, but cannot create on-chain elections or add candidates.
-- The ABI file must exist at `backend/contracts/SecureVote.json` (the repo's `contracts/scripts/copy-abi.js` copies it after compile).
+- The ABI file must exist at `backend/contracts/SecureVote.json` (the repo's `contracts/scripts/copy-abi.js` copies it after compile). *(ABI filename kept as `SecureVote.json`)*
 
 ### How to prepare & deploy (online testnet example)
 1. Build and copy ABI:

@@ -1,7 +1,7 @@
 {
   "choose_language": "Choose language",
   "welcome": "Welcome to the voting app",
-  "brand": "SecureVote",
+  "brand": "BlockBallot",
   "hero_title": "Welcome to the voting app",
   "nav": {
     "votingSystem": "Voting System",
@@ -9,12 +9,12 @@
     "overview": "Overview"
   },
   "footer": {
-    "copyright": "© 2026 SecureVote"
+  "copyright": "© 2026 BlockBallot"
   },
   "publicDashboard": {
     "title": "Public Transparency Dashboard",
     "subtitle": "Real-time view of Voting system activity and immutable ledger",
-    "note": "Official record published by SecureVote — Independent, auditable, and privacy preserving."
+  "note": "Official record published by BlockBallot — Independent, auditable, and privacy preserving."
   },
   "lastUpdated": "Last updated:",
   "monitoring": {

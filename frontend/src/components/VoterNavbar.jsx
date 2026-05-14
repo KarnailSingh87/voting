@@ -89,7 +89,7 @@ const VoterNavbar = () => {
                 className="text-xl font-bold text-cyan-700 cursor-pointer"
                 onClick={() => navigate('/dashboard')}
               >
-                SecureVote
+                BlockBallot
               </h1>
             </div>
 

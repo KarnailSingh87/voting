@@ -86,7 +86,7 @@ const Verify = () => {
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-cyan-700">SecureVote</h1>
+                <h1 className="text-xl font-bold text-cyan-700">BlockBallot</h1>
               </div>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:items-center">
