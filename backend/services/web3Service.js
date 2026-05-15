@@ -37,6 +37,20 @@ let provider = null;
 let adminWallet = null;
 let readContract = null;   // read-only (provider)
 let writeContract = null;  // admin signer (deployer wallet)
+let lastInitError = null;
+let lastInitConfig = {
+  rpcUrlSet: false,
+  contractAddressSet: false,
+  abiLoaded: false,
+};
+
+function getMissingConfig() {
+  const missing = [];
+  if (!lastInitConfig.rpcUrlSet) missing.push('ALCHEMY_AMOY_RPC or SEPOLIA_RPC_URL');
+  if (!lastInitConfig.contractAddressSet) missing.push('VOTING_CONTRACT_ADDRESS');
+  if (!lastInitConfig.abiLoaded) missing.push('backend/contracts/SecureVote.json (ABI)');
+  return missing;
+}
 
 /**
  * Initialize the Web3 provider and contract instances.
@@ -47,8 +61,19 @@ function initWeb3() {
   CONTRACT_ADDRESS = process.env.VOTING_CONTRACT_ADDRESS || '';
   DEPLOYER_KEY     = process.env.DEPLOYER_PRIVATE_KEY   || '';
 
+  lastInitConfig = {
+    rpcUrlSet: !!RPC_URL,
+    contractAddressSet: !!CONTRACT_ADDRESS,
+    abiLoaded: !!CONTRACT_ABI,
+  };
+  lastInitError = null;
+
   if (!RPC_URL || !CONTRACT_ADDRESS || !CONTRACT_ABI) {
-    console.warn('⚠️  Web3 not configured — blockchain features will use local chain only.');
+    const missing = getMissingConfig();
+    lastInitError = missing.length
+      ? `Web3 not configured: missing ${missing.join(', ')}`
+      : 'Web3 not configured';
+    console.warn(`⚠️  ${lastInitError} — blockchain features will use local chain only.`);
     return false;
   }
 
@@ -70,7 +95,8 @@ function initWeb3() {
     console.log('🔗 Web3: Contract at', CONTRACT_ADDRESS);
     return true;
   } catch (err) {
-    console.error('❌ Web3 init failed:', err.message);
+    lastInitError = `Web3 init failed: ${err.message}`;
+    console.error('❌', lastInitError);
     return false;
   }
 }
@@ -247,7 +273,17 @@ function isWeb3WriteReady() {
 
 async function getWeb3Status() {
   if (!isWeb3Ready()) {
-    return { connected: false, message: 'Web3 not configured' };
+    const missing = getMissingConfig();
+    const message = lastInitError || (missing.length
+      ? `Web3 not configured: missing ${missing.join(', ')}`
+      : 'Web3 not configured');
+    return {
+      connected: false,
+      message,
+      missing,
+      configured: !missing.length,
+      contractAddress: CONTRACT_ADDRESS || null,
+    };
   }
   try {
     const network = await provider.getNetwork();

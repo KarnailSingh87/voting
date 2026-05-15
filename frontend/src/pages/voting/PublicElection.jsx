@@ -219,7 +219,7 @@ const PublicElection = () => {
               </div>
             ) : (
               <div className="text-xs text-gray-500">
-                {onChainStatus?.connected ? (onChainStatus?.reason || 'On-chain verification unavailable') : 'Web3 not connected for verification.'}
+                {onChainStatus?.reason || (onChainStatus?.connected ? 'On-chain verification unavailable' : 'Web3 not connected for verification.')}
               </div>
             )}
           </div>
