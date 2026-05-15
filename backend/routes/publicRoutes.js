@@ -22,12 +22,56 @@ import {
   getElectionResults as getOnChainResults,
 } from '../services/web3Service.js';
 import { ethers } from 'ethers';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const RESULT_SIGNING_SECRET = process.env.RESULT_SIGNING_SECRET || process.env.JWT_SECRET || 'dev_result_secret';
+
+const csvEscape = (value) => {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+  return str;
+};
+
+const buildResultsCsv = (election, candidates, totalVotes) => {
+  const header = ['election_id', 'election_title', 'status', 'total_votes', 'candidate_id', 'candidate_name', 'party', 'vote_count', 'on_chain_index'];
+  const sorted = [...candidates].sort((a, b) => {
+    const diff = (b.voteCount || 0) - (a.voteCount || 0);
+    if (diff !== 0) return diff;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  const rows = sorted.map(c => [
+    election._id.toString(),
+    election.title,
+    election.status,
+    totalVotes,
+    c._id.toString(),
+    c.name,
+    c.party || '',
+    c.voteCount || 0,
+    c.onChainIndex ?? ''
+  ]);
+  return [header.join(','), ...rows.map(row => row.map(csvEscape).join(','))].join('\n');
+};
+
+const buildResultProof = (csvData) => {
+  const hash = crypto.createHash('sha256').update(csvData).digest('hex');
+  const signature = crypto.createHmac('sha256', RESULT_SIGNING_SECRET).update(hash).digest('hex');
+  return {
+    hash,
+    signature,
+    hashAlgorithm: 'sha256',
+    signatureAlgorithm: 'hmac-sha256',
+    scope: 'results-csv-v1',
+    signedAt: new Date().toISOString(),
+  };
+};
 
 // Load contract ABI for log decoding (optional)
 let SECUREVOTE_ABI = null;
@@ -204,9 +248,148 @@ router.get('/election/:id', async (req, res) => {
     if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
     const candidates = await Candidate.find({ election: election._id }).sort({ voteCount: -1 });
     const totalVotes = candidates.reduce((s, c) => s + (c.voteCount || 0), 0);
-  res.json({ success: true, election: { _id: election._id, title: election.title, description: election.description, status: election.status, startDate: election.startTime, endDate: election.endTime, onChainIndex: election.onChainIndex, onChainTxHash: election.onChainTxHash }, candidates: candidates.map(c => ({ id: c._id.toString(), _id: c._id.toString(), name: c.name, party: c.party, voteCount: c.voteCount, photoUrl: c.photoUrl || null, onChainIndex: c.onChainIndex })), totalVotes });
+    const csvData = buildResultsCsv(election, candidates, totalVotes);
+    const resultProof = buildResultProof(csvData);
+
+    const web3Status = await getWeb3Status();
+    let onChainStatus = {
+      connected: web3Status?.connected ?? false,
+      network: web3Status?.network ?? null,
+      chainId: web3Status?.chainId ?? null,
+      available: false,
+      matched: false,
+      mismatches: [],
+    };
+
+    if (!web3Status?.connected) {
+      onChainStatus.reason = web3Status?.message || 'Web3 not configured';
+    } else if (election.onChainIndex === null || election.onChainIndex === undefined) {
+      onChainStatus.reason = 'Election not linked to an on-chain index';
+    } else {
+      try {
+        const chainResults = await getOnChainResults(election.onChainIndex);
+        if (Array.isArray(chainResults)) {
+          const normalizedChain = chainResults.map((r, index) => ({
+            index,
+            name: r.name,
+            votes: r.votes,
+          }));
+          const localByIndex = [...candidates]
+            .filter(c => c.onChainIndex !== undefined && c.onChainIndex !== null)
+            .sort((a, b) => (a.onChainIndex ?? 0) - (b.onChainIndex ?? 0));
+
+          const mismatches = [];
+          if (localByIndex.length === normalizedChain.length && localByIndex.length > 0) {
+            localByIndex.forEach((candidate, idx) => {
+              const chain = normalizedChain[idx];
+              const localVotes = candidate.voteCount || 0;
+              const chainVotes = chain?.votes ?? 0;
+              if (localVotes !== chainVotes || (candidate.name && chain?.name && candidate.name !== chain.name)) {
+                mismatches.push({
+                  candidateId: candidate._id.toString(),
+                  candidateName: candidate.name,
+                  localVotes,
+                  onChainVotes: chainVotes,
+                  onChainName: chain?.name ?? null,
+                  onChainIndex: candidate.onChainIndex ?? idx,
+                });
+              }
+            });
+          } else {
+            const chainByName = normalizedChain.reduce((acc, item) => {
+              acc[item.name] = item;
+              return acc;
+            }, {});
+            candidates.forEach(candidate => {
+              const chain = chainByName[candidate.name];
+              const localVotes = candidate.voteCount || 0;
+              const chainVotes = chain?.votes ?? null;
+              if (chainVotes === null || localVotes !== chainVotes) {
+                mismatches.push({
+                  candidateId: candidate._id.toString(),
+                  candidateName: candidate.name,
+                  localVotes,
+                  onChainVotes: chainVotes,
+                  onChainName: chain?.name ?? null,
+                  onChainIndex: candidate.onChainIndex ?? null,
+                });
+              }
+            });
+          }
+
+          const onChainTotalVotes = normalizedChain.reduce((s, r) => s + (r.votes || 0), 0);
+          onChainStatus = {
+            connected: true,
+            network: web3Status?.network ?? null,
+            chainId: web3Status?.chainId ?? null,
+            available: true,
+            onChainIndex: election.onChainIndex,
+            totals: { local: totalVotes, onChain: onChainTotalVotes },
+            matched: mismatches.length === 0,
+            mismatches,
+            results: normalizedChain,
+            checkedAt: new Date().toISOString(),
+          };
+        } else {
+          onChainStatus.reason = 'On-chain results unavailable';
+        }
+      } catch (chainError) {
+        console.error('On-chain results check error', chainError);
+        onChainStatus.reason = 'Failed to verify on-chain results';
+      }
+    }
+
+    res.json({
+      success: true,
+      election: {
+        _id: election._id,
+        title: election.title,
+        description: election.description,
+        status: election.status,
+        startDate: election.startTime,
+        endDate: election.endTime,
+        onChainIndex: election.onChainIndex,
+        onChainTxHash: election.onChainTxHash,
+      },
+      candidates: candidates.map(c => ({
+        id: c._id.toString(),
+        _id: c._id.toString(),
+        name: c.name,
+        party: c.party,
+        voteCount: c.voteCount,
+        photoUrl: c.photoUrl || null,
+        onChainIndex: c.onChainIndex,
+      })),
+      totalVotes,
+      resultProof,
+      onChainStatus,
+      csvUrl: `/api/election/${election._id}/results.csv`,
+    });
   } catch (e) {
     console.error('public election detail error', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Public: download election results as CSV (supports /results.csv and /results)
+router.get('/election/:id/results.:format?', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const format = (req.params.format || 'csv').toLowerCase();
+    if (!id) return res.status(400).json({ success: false, message: 'election id required' });
+    const election = await Election.findById(id);
+    if (!election) return res.status(404).json({ success: false, message: 'Election not found' });
+    const candidates = await Candidate.find({ election: election._id }).sort({ voteCount: -1 });
+    const totalVotes = candidates.reduce((s, c) => s + (c.voteCount || 0), 0);
+    const csvData = buildResultsCsv(election, candidates, totalVotes);
+    if (format !== 'csv') {
+      return res.status(400).json({ success: false, message: 'Unsupported format. Use .csv' });
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="election-${election._id}-results.csv"`);
+    res.status(200).send(csvData);
+  } catch (e) {
+    console.error('public election csv error', e);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

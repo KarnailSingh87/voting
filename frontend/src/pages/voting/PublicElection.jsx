@@ -56,6 +56,9 @@ const PublicElection = () => {
   const [page, setPage] = useState(1);
   const [socketConnected, setSocketConnected] = useState(false);
   const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
+  const [resultProof, setResultProof] = useState(null);
+  const [onChainStatus, setOnChainStatus] = useState(null);
+  const [csvUrl, setCsvUrl] = useState('');
 
   useEffect(() => {
     const fetch = async () => {
@@ -66,6 +69,9 @@ const PublicElection = () => {
           setElection(res.data.election);
           setCandidates(res.data.candidates || []);
           setTotalVotes(res.data.totalVotes || (res.data.candidates||[]).reduce((s,c)=>s+(c.voteCount||0),0));
+          setResultProof(res.data.resultProof || null);
+          setOnChainStatus(res.data.onChainStatus || null);
+          setCsvUrl(res.data.csvUrl || '');
         } else {
           setError(res.data?.message || 'Failed to load election');
         }
@@ -85,6 +91,23 @@ const PublicElection = () => {
 
   // Check if election is completed/ended
   const isCompleted = election?.status === 'ended' || election?.status === 'completed';
+
+  const resolvedCsvUrl = (() => {
+    if (csvUrl) {
+      if (csvUrl.startsWith('http://') || csvUrl.startsWith('https://')) return csvUrl;
+      return `${backendUrl}${csvUrl}`;
+    }
+    return `${backendUrl}/api/election/${id}/results.csv`;
+  })();
+
+  const handleCopy = async (value) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch (e) {
+      console.warn('Copy failed', e);
+    }
+  };
 
   // live updates when election is ongoing
   useEffect(() => {
@@ -124,6 +147,82 @@ const PublicElection = () => {
         </div>
         <div className="flex-shrink-0">
           <Link to="/public" className="px-3 py-2 bg-gray-100 rounded text-sm">Back to list</Link>
+        </div>
+      </div>
+
+      <div className="bg-white shadow rounded-lg p-4 sm:p-6 mt-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Result transparency</h3>
+            <p className="text-xs text-gray-500">Signed results hash, CSV download, and on-chain verification summary.</p>
+          </div>
+          <a
+            href={resolvedCsvUrl}
+            className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md bg-cyan-600 text-white hover:bg-cyan-700"
+            download
+          >
+            Download CSV
+          </a>
+        </div>
+
+        <div className="space-y-4">
+          <div className="border rounded-lg p-3">
+            <div className="text-xs text-gray-500 mb-1">Result Hash (SHA-256)</div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="text-xs font-mono text-gray-700 break-all">
+                {resultProof?.hash || '—'}
+              </div>
+              <button
+                onClick={() => handleCopy(resultProof?.hash)}
+                className="px-2 py-1 text-xs rounded border text-gray-600 hover:bg-gray-50"
+              >
+                Copy hash
+              </button>
+            </div>
+            <div className="mt-2 text-[11px] text-gray-400">Scope: {resultProof?.scope || 'results-csv-v1'}</div>
+          </div>
+
+          <div className="border rounded-lg p-3">
+            <div className="text-xs text-gray-500 mb-1">Result Signature (HMAC)</div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="text-xs font-mono text-gray-700 break-all">
+                {resultProof?.signature || '—'}
+              </div>
+              <button
+                onClick={() => handleCopy(resultProof?.signature)}
+                className="px-2 py-1 text-xs rounded border text-gray-600 hover:bg-gray-50"
+              >
+                Copy signature
+              </button>
+            </div>
+            <div className="mt-2 text-[11px] text-gray-400">Signed at: {resultProof?.signedAt ? new Date(resultProof.signedAt).toLocaleString() : '—'}</div>
+          </div>
+
+          <div className="border rounded-lg p-3">
+            <div className="text-xs text-gray-500 mb-2">On-chain verification status</div>
+            {onChainStatus?.available ? (
+              <div className="flex flex-col gap-2">
+                <div className={`text-sm font-semibold ${onChainStatus?.matched ? 'text-emerald-700' : 'text-amber-700'}`}>
+                  {onChainStatus?.matched ? 'Matched with on-chain results' : 'Mismatch detected'}
+                </div>
+                <div className="text-xs text-gray-500">
+                  Network: {onChainStatus?.network || 'unknown'} (Chain ID: {onChainStatus?.chainId ?? '—'})
+                </div>
+                <div className="text-xs text-gray-500">
+                  Total votes — Local: {onChainStatus?.totals?.local ?? totalVotes} / On-chain: {onChainStatus?.totals?.onChain ?? '—'}
+                </div>
+                {!onChainStatus?.matched && onChainStatus?.mismatches?.length ? (
+                  <div className="text-xs text-gray-600">
+                    {onChainStatus.mismatches.length} candidate(s) differ from on-chain results.
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500">
+                {onChainStatus?.connected ? (onChainStatus?.reason || 'On-chain verification unavailable') : 'Web3 not connected for verification.'}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
