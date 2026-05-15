@@ -6,6 +6,9 @@ const AdminDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [chainStats, setChainStats] = useState(null);
+  const [chainValidation, setChainValidation] = useState(null);
+  const [validatingChain, setValidatingChain] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -30,7 +33,35 @@ const AdminDashboard = () => {
       }
     };
 
+    const fetchChainStats = async () => {
+      try {
+        const token = localStorage.getItem('adminToken');
+        if (token) {
+          const res = await axios.get('/api/admin/blockchain/stats', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.data?.success) {
+            setChainStats(res.data);
+            return;
+          }
+        }
+
+        const pub = await axios.get('/api/blockchain/stats');
+        if (pub.data?.success) {
+          setChainStats({
+            totalBlocks: pub.data.localChain?.totalBlocks ?? pub.data.total ?? 0,
+            latestBlockIndex: pub.data.localChain?.latestBlockIndex ?? pub.data.latestBlockIndex,
+            latestBlockHash: pub.data.localChain?.latestBlockHash ?? pub.data.latestBlockHash,
+            difficulty: pub.data.localChain?.difficulty ?? pub.data.difficulty ?? 2,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch chain stats', err && err.message ? err.message : err);
+      }
+    };
+
     fetchDashboardData();
+    fetchChainStats();
     const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
     socket.on('vote_cast', (_payload) => {
       // Could trigger a refetch or update a local tally widget in future
@@ -40,9 +71,26 @@ const AdminDashboard = () => {
     socket.on('election_status', () => {
       // Refetch to update stats
       fetchDashboardData();
+      fetchChainStats();
     });
     return () => socket.disconnect();
   }, []);
+
+  const handleValidateChain = async () => {
+    setValidatingChain(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await axios.get('/api/admin/blockchain/validate', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data) setChainValidation(res.data);
+    } catch (e) {
+      console.error('Validation request failed:', e);
+      setChainValidation({ valid: false, error: e.response?.data?.message || e.message || 'Failed to validate chain' });
+    } finally {
+      setValidatingChain(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
@@ -92,6 +140,73 @@ const AdminDashboard = () => {
 
           {dashboardData && (
             <div>
+              <div className="bg-white dark:bg-slate-900 shadow-xl overflow-hidden sm:rounded-lg border border-gray-200 dark:border-slate-700 mb-6">
+                <div className="px-4 py-5 sm:px-6 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl" aria-hidden="true">🔗</span>
+                    <div>
+                      <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Blockchain Integrity</h3>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Tamper-proof vote chain status</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleValidateChain}
+                    disabled={validatingChain}
+                    className="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                  >
+                    {validatingChain ? (
+                      <>
+                        <svg className="animate-spin -ml-0.5 mr-1.5 h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Validating...
+                      </>
+                    ) : (
+                      <>🔍 Validate Chain</>
+                    )}
+                  </button>
+                </div>
+                <div className="border-t border-gray-200 dark:border-slate-700">
+                  {chainStats ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4">
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-cyan-600 dark:text-cyan-400 font-mono">{chainStats.totalBlocks || 0}</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">Total Blocks</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">#{chainStats.latestBlockIndex ?? 0}</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">Latest Block</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-purple-600 dark:text-purple-400 font-mono">{chainStats.difficulty || 2}</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">Difficulty</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs font-mono text-orange-600 dark:text-orange-400 truncate">{chainStats.latestBlockHash?.slice(0, 12) || '—'}...</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">Latest Hash</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-sm text-gray-500 dark:text-slate-500">Loading blockchain stats...</div>
+                  )}
+                  {chainValidation && (
+                    <div className={`mx-4 mb-4 px-4 py-3 rounded-lg ${chainValidation.valid ? 'bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-600/30' : 'bg-red-50 border border-red-200 dark:bg-red-900/30 dark:border-red-600/30'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{chainValidation.valid ? '✅' : '❌'}</span>
+                        <div>
+                          <div className={`text-sm font-medium ${chainValidation.valid ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                            {chainValidation.valid ? 'Chain Intact — No Tampering Detected' : 'Chain Compromised'}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                            {chainValidation.message || chainValidation.error || `${chainValidation.chainLength} blocks verified`}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">

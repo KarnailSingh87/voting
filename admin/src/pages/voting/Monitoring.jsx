@@ -219,13 +219,13 @@ const Monitoring = () => {
           {healthData && (
             <div className="grid grid-cols-1 gap-6">
               {/* ─── BLOCKCHAIN INTEGRITY ─────────────────────────── */}
-              <div className="bg-gradient-to-br from-slate-900 to-slate-800 shadow-xl overflow-hidden sm:rounded-lg border border-slate-700">
+              <div className="bg-white dark:bg-slate-900 shadow-xl overflow-hidden sm:rounded-lg border border-gray-200 dark:border-slate-700">
                 <div className="px-4 py-5 sm:px-6 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">🔗</span>
                     <div>
-                      <h3 className="text-lg leading-6 font-medium text-white">{t('monitoring.blockchainIntegrityTitle')}</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">{t('monitoring.blockchainIntegritySubtitle')}</p>
+                      <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">{t('monitoring.blockchainIntegrityTitle')}</h3>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{t('monitoring.blockchainIntegritySubtitle')}</p>
                     </div>
                   </div>
                   <button 
@@ -244,36 +244,36 @@ const Monitoring = () => {
                     ) : `🔍 ${t('monitoring.validateChain')}`}
                   </button>
                 </div>
-                <div className="border-t border-slate-700">
+                <div className="border-t border-gray-200 dark:border-slate-700">
                   {chainStats && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4">
                       <div className="text-center">
-                        <div className="text-xl font-bold text-cyan-400 font-mono">{chainStats.totalBlocks || 0}</div>
-                        <div className="text-[10px] text-slate-400 mt-1">{t('monitoring.totalBlocks')}</div>
+                        <div className="text-xl font-bold text-cyan-600 dark:text-cyan-400 font-mono">{chainStats.totalBlocks || 0}</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">{t('monitoring.totalBlocks')}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-xl font-bold text-emerald-400 font-mono">#{chainStats.latestBlockIndex ?? 0}</div>
-                        <div className="text-[10px] text-slate-400 mt-1">{t('monitoring.latestBlock')}</div>
+                        <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">#{chainStats.latestBlockIndex ?? 0}</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">{t('monitoring.latestBlock')}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-xl font-bold text-purple-400 font-mono">{chainStats.difficulty || 2}</div>
-                        <div className="text-[10px] text-slate-400 mt-1">{t('monitoring.difficulty')}</div>
+                        <div className="text-xl font-bold text-purple-600 dark:text-purple-400 font-mono">{chainStats.difficulty || 2}</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">{t('monitoring.difficulty')}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-xs font-mono text-orange-400 truncate">{chainStats.latestBlockHash?.slice(0, 12) || '—'}...</div>
-                        <div className="text-[10px] text-slate-400 mt-1">{t('monitoring.latestHash')}</div>
+                        <div className="text-xs font-mono text-orange-600 dark:text-orange-400 truncate">{chainStats.latestBlockHash?.slice(0, 12) || '—'}...</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">{t('monitoring.latestHash')}</div>
                       </div>
                     </div>
                   )}
                   {chainValidation && (
-                    <div className={`mx-4 mb-4 px-4 py-3 rounded-lg ${chainValidation.valid ? 'bg-emerald-900/30 border border-emerald-600/30' : 'bg-red-900/30 border border-red-600/30'}`}>
+                    <div className={`mx-4 mb-4 px-4 py-3 rounded-lg ${chainValidation.valid ? 'bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-600/30' : 'bg-red-50 border border-red-200 dark:bg-red-900/30 dark:border-red-600/30'}`}>
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{chainValidation.valid ? '✅' : '❌'}</span>
                         <div>
-                          <div className={`text-sm font-medium ${chainValidation.valid ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <div className={`text-sm font-medium ${chainValidation.valid ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
                             {chainValidation.valid ? t('monitoring.chainIntact') : t('monitoring.chainCompromised')}
                           </div>
-                          <div className="text-xs text-slate-400 mt-0.5">
+                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
                             {chainValidation.message || chainValidation.error || `${chainValidation.chainLength} blocks verified`}
                           </div>
                         </div>
@@ -281,21 +281,21 @@ const Monitoring = () => {
                     </div>
                   )}
                   {!chainStats && !chainValidation && (
-                    <div className="p-4 text-center text-sm text-slate-500">{t('monitoring.loadingBlockchain')}</div>
+                    <div className="p-4 text-center text-sm text-gray-500 dark:text-slate-500">{t('monitoring.loadingBlockchain')}</div>
                   )}
                   {recentBlocks && recentBlocks.length > 0 && (
                     <div className="px-4 pb-4">
-                      <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('monitoring.recentBlocks')}</h4>
+                      <h4 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('monitoring.recentBlocks')}</h4>
                       <div className="space-y-2">
                         {recentBlocks.map((b) => (
-                          <div key={b.hash} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div key={b.hash} className="bg-gray-50 dark:bg-slate-800/50 rounded-lg p-3 border border-gray-200 dark:border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div className="flex items-center gap-3">
-                              <div className="bg-slate-700 text-cyan-300 font-mono text-xs px-2 py-1 rounded">#{b.index}</div>
-                              <div className="text-xs text-slate-300 font-mono truncate max-w-[150px] sm:max-w-[200px]" title={b.hash}>
+                              <div className="bg-cyan-100 text-cyan-700 dark:bg-slate-700 dark:text-cyan-300 font-mono text-xs px-2 py-1 rounded">#{b.index}</div>
+                              <div className="text-xs text-gray-600 dark:text-slate-300 font-mono truncate max-w-[150px] sm:max-w-[200px]" title={b.hash}>
                                 {b.hash.substring(0, 16)}...
                               </div>
                             </div>
-                            <div className="flex items-center gap-4 text-[10px] text-slate-500 font-mono">
+                            <div className="flex items-center gap-4 text-[10px] text-gray-500 dark:text-slate-500 font-mono">
                               <div>{t('monitoring.nonce')}: {b.nonce}</div>
                               <div>{new Date(b.timestamp).toLocaleTimeString()}</div>
                             </div>
