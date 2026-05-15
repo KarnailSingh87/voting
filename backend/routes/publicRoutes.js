@@ -239,6 +239,17 @@ router.get('/election', async (req, res) => {
   }
 });
 
+// Public: web3 status (diagnostics for on-chain verification)
+router.get('/web3/status', async (req, res) => {
+  try {
+    const status = await getWeb3Status();
+    return res.json({ success: true, status });
+  } catch (e) {
+    console.error('WEB3 STATUS ERROR', e);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Public: get single election by id
 router.get('/election/:id', async (req, res) => {
   try {
@@ -259,6 +270,9 @@ router.get('/election/:id', async (req, res) => {
       available: false,
       matched: false,
       mismatches: [],
+      missing: web3Status?.missing || [],
+      configured: web3Status?.configured ?? false,
+      contractAddress: web3Status?.contractAddress ?? null,
     };
 
     if (!web3Status?.connected) {
