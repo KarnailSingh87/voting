@@ -96,6 +96,12 @@ export function Web3Provider({ children }) {
     }
   }, []);
 
+  // ── Disconnect ────────────────────────────────────────────
+  const disconnect = useCallback(() => {
+    setAccount(null); setProvider(null); setSigner(null);
+    setSignerContract(null); setChainId(null); setIsCorrectChain(false);
+  }, []);
+
   const onAccountsChanged = useCallback((accs) => {
     if (accs.length === 0) disconnect();
     else setupProvider(accs[0]);
@@ -171,12 +177,6 @@ export function Web3Provider({ children }) {
       setError(`Could not switch to ${ACTIVE_NETWORK.chainName}`);
       return false;
     }
-  }, []);
-
-  // ── Disconnect ────────────────────────────────────────────
-  const disconnect = useCallback(() => {
-    setAccount(null); setProvider(null); setSigner(null);
-    setSignerContract(null); setChainId(null); setIsCorrectChain(false);
   }, []);
 
   // ── Cast vote on-chain (voter signs via MetaMask) ─────────

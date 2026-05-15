@@ -2,6 +2,9 @@
   "name": "securevote-contracts",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=18.18 <23"
+  },
   "scripts": {
     "compile": "npx hardhat compile",
     "test": "npx hardhat test",

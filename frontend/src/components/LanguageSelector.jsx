@@ -50,42 +50,7 @@ export default function LanguageSelector() {
     if (!selected) return;
     i18n.options.fallbackLng = [selected];
     i18n.changeLanguage(selected);
-  try { localStorage.setItem('voterLang', selected); } catch (e) { void e; }
-
-    // Synchronize Google Translate to translate backend-generated data
-    try {
-      document.cookie = `googtrans=/en/${selected}; path=/`;
-      // domain cookie may throw on localhost or unusual domains; keep it best-effort
-      try {
-        document.cookie = `googtrans=/en/${selected}; domain=.${document.domain}; path=/`;
-      } catch (_) { void _; }
-    } catch (_) { void _; }
-
-    const triggerTranslate = () => {
-      if (!mountedRef.current) return;
-      try {
-        const googleSelect = document.querySelector('.goog-te-combo');
-        if (!googleSelect) return;
-        if (googleSelect.value !== selected) {
-          googleSelect.value = selected;
-          // Dispatching change can cause 3rd-party code to mutate DOM; wrap safely.
-          try { googleSelect.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) { void _; }
-        }
-      } catch (_) {
-        // ignore DOM mutation errors from 3rd-party translate widget
-      }
-    };
-
-    // Defer until after React commits and the 3rd-party widget is mounted
-    const rafId = window.requestAnimationFrame(triggerTranslate);
-    const t1 = window.setTimeout(triggerTranslate, 300);
-    const t2 = window.setTimeout(triggerTranslate, 800);
-
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
+    try { localStorage.setItem('voterLang', selected); } catch (e) { void e; }
   }, [selected]);
 
   useEffect(() => {

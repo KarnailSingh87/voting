@@ -2,11 +2,15 @@
   "name": "blockballot",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=18.18 <23"
+  },
   "scripts": {
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:admin": "cd admin && npm run dev",
     "dev:full": "concurrently -k -n backend,frontend,admin -c red,green,blue \"npm run dev:backend\" \"wait-on http://localhost:5005/health && npm run dev:frontend\" \"wait-on http://localhost:5005/health && npm run dev:admin\"",
+    "dev:all": "npm run dev:full",
     "install:all": "cd backend && npm install && cd ../frontend && rm -rf node_modules package-lock.json && npm install && cd ../admin && rm -rf node_modules package-lock.json && npm install",
     "build:frontend": "cd frontend && npm run build",
     "build:admin": "cd admin && npm run build",

@@ -2,24 +2,6 @@ import { useEffect, useState, useRef } from 'react';
 import i18n from '../i18n';
 import { useTranslation } from 'react-i18next';
 
-function safeSetCookie(value) {
-  try {
-    document.cookie = value;
-  } catch (_) {
-    // ignore (some browsers / privacy modes)
-  }
-}
-
-function safeDispatchChange(el) {
-  try {
-    // Don't dispatch if element is detached (common in translate/widget races)
-    if (!el || !el.isConnected) return;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  } catch (_) {
-    // ignore
-  }
-}
-
 const ALL_LANGS = [
   { code: 'en', label: 'English' },
   { code: 'hi', label: 'हिन्दी' },
@@ -69,28 +51,6 @@ export default function LanguageSelector() {
     i18n.options.fallbackLng = [selected];
     i18n.changeLanguage(selected);
     try { localStorage.setItem('adminLang', selected); } catch (e) {}
-
-    // Synchronize Google Translate to translate backend-generated data
-    // NOTE: Google translate and browser translate extensions sometimes mutate the DOM.
-    // Keep this block defensive to avoid crashes like:
-    // "Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node."
-    safeSetCookie(`googtrans=/en/${selected}; path=/`);
-    if (document?.domain) {
-      safeSetCookie(`googtrans=/en/${selected}; domain=.${document.domain}; path=/`);
-    }
-    
-    const triggerTranslate = () => {
-      if (!aliveRef.current) return;
-      const googleSelect = document.querySelector('.goog-te-combo');
-      if (googleSelect && googleSelect.value !== selected) {
-        googleSelect.value = selected;
-        safeDispatchChange(googleSelect);
-      }
-    };
-    
-    triggerTranslate();
-    const t1 = window.setTimeout(triggerTranslate, 500);
-    return () => window.clearTimeout(t1);
   }, [selected]);
 
   useEffect(() => {

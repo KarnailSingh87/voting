@@ -10,23 +10,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Poppins:wght@100..900&family=Playfair+Display:wght@400..900&display=swap" media="print" onload="this.media='all'" />
   <style>
-    /* Hide the google translate top bar & elements */
-    .goog-te-banner-frame { display: none !important; }
     body { top: 0 !important; }
-    .skiptranslate { display: none !important; }
-    #google_translate_element { display: none !important; }
   </style>
   </head>
   <body>
-    <div id="google_translate_element"></div>
-    <div id="root"></div>
+  <div id="root" class="notranslate" translate="no"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script src="https://checkout.razorpay.com/v1/checkout.js" async defer></script>
-    <script type="text/javascript">
-      function googleTranslateElementInit() {
-        new google.translate.TranslateElement({pageLanguage: 'en', autoDisplay: false}, 'google_translate_element');
-      }
-    </script>
-    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
   </body>
 </html>
