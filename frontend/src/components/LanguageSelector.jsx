@@ -50,7 +50,7 @@ export default function LanguageSelector() {
     if (!selected) return;
     i18n.options.fallbackLng = [selected];
     i18n.changeLanguage(selected);
-    try { localStorage.setItem('voterLang', selected); } catch (e) {}
+  try { localStorage.setItem('voterLang', selected); } catch (e) { void e; }
 
     // Synchronize Google Translate to translate backend-generated data
     try {
@@ -58,8 +58,8 @@ export default function LanguageSelector() {
       // domain cookie may throw on localhost or unusual domains; keep it best-effort
       try {
         document.cookie = `googtrans=/en/${selected}; domain=.${document.domain}; path=/`;
-      } catch (_) {}
-    } catch (_) {}
+      } catch (_) { void _; }
+    } catch (_) { void _; }
 
     const triggerTranslate = () => {
       if (!mountedRef.current) return;
@@ -69,7 +69,7 @@ export default function LanguageSelector() {
         if (googleSelect.value !== selected) {
           googleSelect.value = selected;
           // Dispatching change can cause 3rd-party code to mutate DOM; wrap safely.
-          try { googleSelect.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+          try { googleSelect.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) { void _; }
         }
       } catch (_) {
         // ignore DOM mutation errors from 3rd-party translate widget

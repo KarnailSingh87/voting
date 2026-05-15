@@ -272,7 +272,7 @@ const Ballot = () => {
               <div>
                 <p className="text-sm font-medium text-indigo-900">Want to verify votes on the public ledger?</p>
                 <p className="text-xs text-indigo-700 mt-1">
-                  Connect your MetaMask wallet on the public ledger page to view all voters' hashes and verify vote integrity on the blockchain.
+                  Connect your MetaMask wallet on the public ledger page to view all voters&apos; hashes and verify vote integrity on the blockchain.
                 </p>
               </div>
             </div>
@@ -298,7 +298,7 @@ const Ballot = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 notranslate" translate="no">
       <VoterNavbar />
 
       {/* Main Content */}
@@ -444,7 +444,7 @@ const Ballot = () => {
                         <li><span aria-hidden="true">🔗</span> Your vote is recorded on an immutable blockchain — tamper-proof</li>
                         <li>Each vote is mined into a cryptographic block with proof of work</li>
                         <li><span aria-hidden="true">🦊</span> MetaMask is <strong>optional</strong> — connect it only if you want an additional on-chain record</li>
-                        <li><span aria-hidden="true">🔍</span> To verify other voters' hashes on the public ledger, MetaMask connection is required</li>
+                        <li><span aria-hidden="true">🔍</span> To verify other voters&apos; hashes on the public ledger, MetaMask connection is required</li>
                       </ul>
                     </dd>
                   </div>

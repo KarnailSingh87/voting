@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Web3Context — React context for blockchain connection management
  *
@@ -14,6 +15,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
 import SecureVoteABI from '../contracts/SecureVote.json';
 
@@ -70,35 +72,7 @@ export function Web3Provider({ children }) {
     catch { return null; }
   }, [readProvider]);
 
-  // ── Detect wallet on mount ───────────────────────────────
-  useEffect(() => {
-    const detect = async () => {
-      if (!window.ethereum) return;
-      try {
-        const accs = await window.ethereum.request({ method: 'eth_accounts' });
-        if (accs.length > 0) await setupProvider(accs[0]);
-      } catch {}
-    };
-    detect();
-
-    if (window.ethereum) {
-      window.ethereum.on('accountsChanged', onAccountsChanged);
-      window.ethereum.on('chainChanged', () => window.location.reload());
-    }
-    return () => {
-      if (window.ethereum) {
-        window.ethereum.removeListener('accountsChanged', onAccountsChanged);
-        window.ethereum.removeListener('chainChanged', () => {});
-      }
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function onAccountsChanged(accs) {
-    if (accs.length === 0) disconnect();
-    else setupProvider(accs[0]);
-  }
-
-  async function setupProvider(addr) {
+  const setupProvider = useCallback(async (addr) => {
     try {
       const bp = new ethers.BrowserProvider(window.ethereum);
       const s = await bp.getSigner();
@@ -120,7 +94,37 @@ export function Web3Provider({ children }) {
       console.error('Web3 setup error:', err);
       setError(err.message || 'Failed to setup Web3');
     }
-  }
+  }, []);
+
+  const onAccountsChanged = useCallback((accs) => {
+    if (accs.length === 0) disconnect();
+    else setupProvider(accs[0]);
+  }, [disconnect, setupProvider]);
+
+  // ── Detect wallet on mount ───────────────────────────────
+  useEffect(() => {
+    const detect = async () => {
+      if (!window.ethereum) return;
+      try {
+        const accs = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accs.length > 0) await setupProvider(accs[0]);
+      } catch (err) {
+        return;
+      }
+    };
+    detect();
+
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', onAccountsChanged);
+      window.ethereum.on('chainChanged', () => window.location.reload());
+    }
+    return () => {
+      if (window.ethereum) {
+        window.ethereum.removeListener('accountsChanged', onAccountsChanged);
+        window.ethereum.removeListener('chainChanged', () => {});
+      }
+    };
+  }, [onAccountsChanged, setupProvider]);
 
   // ── Connect Wallet ────────────────────────────────────────
   const connectWallet = useCallback(async () => {
@@ -140,7 +144,7 @@ export function Web3Provider({ children }) {
     } finally {
       setConnecting(false);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [setupProvider]);
 
   // ── Switch to target chain ────────────────────────────────
   const switchChain = useCallback(async () => {
@@ -256,7 +260,7 @@ export function Web3Provider({ children }) {
     // Utility
     shortenAddress: (addr) => addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : '',
     explorerUrl: IS_LOCAL
-      ? (_txHash) => '#'
+      ? () => '#'
       : (txHash) => `https://amoy.polygonscan.com/tx/${txHash}`,
   }), [
     account, chainId, isCorrectChain, connecting, error,
@@ -267,6 +271,10 @@ export function Web3Provider({ children }) {
 
   return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>;
 }
+
+Web3Provider.propTypes = {
+  children: PropTypes.node.isRequired,
+};
 
 export function useWeb3() {
   const ctx = useContext(Web3Context);

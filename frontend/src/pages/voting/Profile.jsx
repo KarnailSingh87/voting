@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
-import { toast } from 'react-toastify';
 import VoterNavbar from '../../components/VoterNavbar';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5005';
@@ -23,7 +22,7 @@ const Profile = () => {
   // const [uploading, setUploading] = useState(false);
   // const fileInputRef = useRef(null);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       const token = localStorage.getItem('voterToken');
       if (!token) {
@@ -48,11 +47,11 @@ const Profile = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
 
   useEffect(() => {
     fetchProfile();
-  }, [navigate]);
+  }, [fetchProfile]);
 
   // Remove photo upload handler for voters
 
@@ -153,7 +152,7 @@ const Profile = () => {
               </div>
               {profile?.fatherName && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500">Father's Name</label>
+                  <label className="block text-sm font-medium text-gray-500">Father&apos;s Name</label>
                   <p className="mt-1 text-gray-900">{profile.fatherName}</p>
                 </div>
               )}

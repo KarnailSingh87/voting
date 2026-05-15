@@ -41,7 +41,9 @@ const PublicLedger = () => {
       try {
         const res = await axios.get('/api/blockchain/stats');
         if (res.data?.success && res.data.localChain) setChainStats(res.data.localChain);
-      } catch (_) {}
+      } catch (_) {
+        return;
+      }
     };
 
     if (id) {

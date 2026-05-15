@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
 import VoterNavbar from '../../components/VoterNavbar';
@@ -141,6 +142,10 @@ const ElectionResults = ({ electionId }) => {
       })()}
     </div>
   );
+};
+
+ElectionResults.propTypes = {
+  electionId: PropTypes.string,
 };
 
 const History = () => {

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 // Simple i18n export/import tool
 // Usage:
 //  node scripts/i18n-tools.js export <localesDir> <out.csv>

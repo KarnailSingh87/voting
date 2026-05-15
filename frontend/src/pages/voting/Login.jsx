@@ -9,17 +9,12 @@ const Login = () => {
   // University roll-number based flow state
   const [roll, setRoll] = useState('');
   const [name, setName] = useState('');
-  const [photo, setPhoto] = useState('');
-  const [extraInfo, setExtraInfo] = useState(null); // arbitrary fields from originalObj
   const [studentData, setStudentData] = useState(null);
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [rollDetected, setRollDetected] = useState('');
   // removed unused `voted` state
-  const [registeredAtDetected, setRegisteredAtDetected] = useState(null);
-  const [originalArrDetected, setOriginalArrDetected] = useState(null);
-  const [originalHeadersDetected, setOriginalHeadersDetected] = useState(null);
   const [otp, setOtp] = useState('');
   const [stage, setStage] = useState('aadhaar'); // aadhaar | otp
   const [loading, setLoading] = useState(false);
@@ -32,7 +27,6 @@ const Login = () => {
   const [verifiedRoll, setVerifiedRoll] = useState(false);
   const [isMe, setIsMe] = useState(null); // null = not chosen, true = it's me, false = not me
   const [, setQueryRaised] = useState(false);
-  const [reportLoading, setReportLoading] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportPhone, setReportPhone] = useState('');
   const [reportMessage, setReportMessage] = useState('');
@@ -79,7 +73,7 @@ const Login = () => {
     setMessage('');
     try {
       // Send OTP via WhatsApp (mobile number) instead of email
-      const res = await axios.post('/api/voter/request-otp', { roll, name, mobile, channel: 'whatsapp' });
+  await axios.post('/api/voter/request-otp', { roll, name, mobile, channel: 'whatsapp' });
       setStage('otp');
       setMessage(`OTP sent to WhatsApp: ${maskMobile(mobile)}`);
       toast.success('OTP sent via WhatsApp');
@@ -100,7 +94,7 @@ const Login = () => {
     try {
       // Send OTP via WhatsApp
       const mobileToUse = providedMobile || mobile;
-      const res = await axios.post('/api/voter/request-otp', { roll, name, mobile: mobileToUse, channel: 'whatsapp' });
+  await axios.post('/api/voter/request-otp', { roll, name, mobile: mobileToUse, channel: 'whatsapp' });
       setMessage(`OTP sent to WhatsApp: ${maskMobile(mobileToUse)}. Preparing OTP entry...`);
       // delay briefly so user sees the confirmation
       if (pendingStageTimer.current) clearTimeout(pendingStageTimer.current);
@@ -117,15 +111,6 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const reportIdentity = async () => {
-    // Open the report modal so the user must provide phone and a custom message
-    if (!roll || !name) return;
-    setReportErrorMsg('');
-    setReportPhone(studentData?.mobile || mobile || '');
-    setReportMessage('');
-    setShowReportModal(true);
   };
 
   const submitReportWithInfo = async () => {
@@ -357,12 +342,7 @@ const Login = () => {
                             // populate contact info if provided by lookup
                             if (s.email) setEmail(s.email);
                             if (s.mobile) setMobile(s.mobile);
-                            if (s.photo) setPhoto(s.photo);
-                            if (s.originalObj) setExtraInfo(s.originalObj);
                             // `voted` state removed earlier; don't call undefined setter
-                            if (s.registeredAt) setRegisteredAtDetected(s.registeredAt);
-                            if (Array.isArray(s.originalArr)) setOriginalArrDetected(s.originalArr);
-                            if (Array.isArray(s.originalHeaders)) setOriginalHeadersDetected(s.originalHeaders);
                             setStudentData(s);
                             // Prompt user to confirm identity before sending OTP via WhatsApp
                             setMessage('Please confirm your identity to receive OTP via WhatsApp.');
@@ -450,10 +430,10 @@ const Login = () => {
                       <button
                         type="button"
                         onClick={() => { setIsMe(false); setShowReportModal(true); }}
-                        disabled={reportLoading}
+                        disabled={reportSubmitting}
                         className="text-sm text-red-600 hover:underline disabled:opacity-50"
                       >
-                        {reportLoading ? 'Reporting...' : 'Not me / Report'}
+                        {reportSubmitting ? 'Reporting...' : 'Not me / Report'}
                       </button>
                     </div>
                     {rollDetected && <p className="text-sm text-gray-600">Roll: <span className="font-medium">{rollDetected}</span></p>}
@@ -501,7 +481,7 @@ const Login = () => {
                             <div>
                               <div className="text-lg font-semibold mb-2">Student Details</div>
                               <div className="mb-2"><strong>Name:</strong> {studentData.name}</div>
-                              <div className="mb-2"><strong>Father's Name:</strong> {studentData.fatherName || '-'}</div>
+                              <div className="mb-2"><strong>Father&apos;s Name:</strong> {studentData.fatherName || '-'}</div>
                               <div className="mb-2"><strong>Blood Group:</strong> {studentData.bloodGroup || '-'}</div>
                               <div className="mb-2"><strong>Mobile:</strong> {studentData.mobile}</div>
                               <div className="mb-2"><strong>Program:</strong> {studentData.program || '-'}</div>

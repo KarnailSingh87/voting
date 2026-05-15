@@ -28,7 +28,7 @@
     "jszip": "^3.10.0",
     "mongoose": "^8.5.1",
     "multer": "^2.0.2",
-    "nodemailer": "^7.0.12",
+    "nodemailer": "^8.0.7",
     "pino": "^10.3.1",
     "qrcode": "^1.5.4",
     "socket.io": "^4.7.5",

@@ -1,5 +1,5 @@
 // WhatsApp OTP Service using Baileys
-import makeWASocket, { DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
+import makeWASocket, { DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } from '@whiskeysockets/baileys/lib/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
