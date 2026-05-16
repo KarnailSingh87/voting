@@ -166,20 +166,20 @@ const PublicElection = () => {
     <div className="max-w-5xl mx-auto px-4 py-6 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-xl sm:text-2xl font-bold break-words">{election.title}</h2>
-          <p className="text-sm text-gray-600">{election.description}</p>
-          <div className="mt-2 text-sm text-gray-700">Status: <strong>{election.status}</strong></div>
+          <h2 className="text-xl sm:text-2xl font-bold break-words text-gray-900 dark:text-white">{election.title}</h2>
+          <p className="text-sm text-gray-600 dark:text-white">{election.description}</p>
+          <div className="mt-2 text-sm text-gray-700 dark:text-white">Status: <strong>{election.status}</strong></div>
         </div>
         <div className="flex-shrink-0">
           <Link to="/public" className="px-3 py-2 bg-gray-100 rounded text-sm text-white dark:bg-gray-800 dark:text-white">Back to list</Link>
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg p-4 sm:p-6 mt-6">
+  <div className="bg-white dark:bg-slate-900 shadow rounded-lg p-4 sm:p-6 mt-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Candidate voters list</h3>
-            <p className="text-xs text-gray-500">Click a candidate below to view voters, hashes, and export the CSV list.</p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Candidate voters list</h3>
+            <p className="text-xs text-white">Click a candidate below to view voters, hashes, and export the CSV list.</p>
           </div>
           {selectedCandidate && votersCsvUrl ? (
             <a
@@ -193,11 +193,11 @@ const PublicElection = () => {
         </div>
 
         {!isCompleted ? (
-          <div className="text-sm text-gray-500">Voter lists are available after results are announced.</div>
+          <div className="text-sm text-white">Voter lists are available after results are announced.</div>
         ) : selectedCandidate ? (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div className="text-sm text-gray-700">
+              <div className="text-sm text-gray-700 dark:text-white">
                 Selected candidate: <strong>{selectedCandidate.name}</strong>
               </div>
               <button
@@ -208,57 +208,57 @@ const PublicElection = () => {
                   setVotersCsvUrl('');
                   setVotersError('');
                 }}
-                className="px-2 py-1 text-xs rounded border text-gray-600 hover:bg-gray-50"
+                className="px-2 py-1 text-xs rounded border text-gray-600 dark:text-white hover:bg-gray-50"
               >
                 Clear selection
               </button>
             </div>
 
             {votersLoading ? (
-              <div className="text-sm text-gray-500">Loading voters…</div>
+              <div className="text-sm text-gray-500 dark:text-white">Loading voters…</div>
             ) : votersError ? (
               <div className="text-sm text-red-600">{votersError}</div>
             ) : (
               <div className="space-y-4">
-                <div className="text-xs text-gray-500">Total voters: {candidateVoters.length}</div>
+                <div className="text-xs text-gray-500 dark:text-white">Total voters: {candidateVoters.length}</div>
 
                 <div className="border rounded-lg p-3">
-                  <div className="text-xs text-gray-500 mb-1">Voter List Hash (SHA-256)</div>
+                  <div className="text-xs text-gray-500 dark:text-white mb-1">Voter List Hash (SHA-256)</div>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div className="text-xs font-mono text-gray-700 break-all">
+                    <div className="text-xs font-mono text-gray-700 dark:text-white break-all">
                       {votersProof?.hash || '—'}
                     </div>
                     <button
                       onClick={() => handleCopy(votersProof?.hash)}
-                      className="px-2 py-1 text-xs rounded border text-gray-600 hover:bg-gray-50"
+                      className="px-2 py-1 text-xs rounded border text-gray-600 dark:text-white hover:bg-gray-50"
                     >
                       Copy hash
                     </button>
                   </div>
-                  <div className="mt-2 text-[11px] text-gray-400">Scope: {votersProof?.scope || 'candidate-voters-csv-v1'}</div>
+                  <div className="mt-2 text-[11px] text-gray-400 dark:text-white">Scope: {votersProof?.scope || 'candidate-voters-csv-v1'}</div>
                 </div>
 
                 <div className="border rounded-lg p-3">
-                  <div className="text-xs text-gray-500 mb-1">Voter List Signature (HMAC)</div>
+                  <div className="text-xs text-gray-500 dark:text-white mb-1">Voter List Signature (HMAC)</div>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div className="text-xs font-mono text-gray-700 break-all">
+                    <div className="text-xs font-mono text-gray-700 dark:text-white break-all">
                       {votersProof?.signature || '—'}
                     </div>
                     <button
                       onClick={() => handleCopy(votersProof?.signature)}
-                      className="px-2 py-1 text-xs rounded border text-gray-600 hover:bg-gray-50"
+                      className="px-2 py-1 text-xs rounded border text-gray-600 dark:text-white hover:bg-gray-50"
                     >
                       Copy signature
                     </button>
                   </div>
-                  <div className="mt-2 text-[11px] text-gray-400">Signed at: {votersProof?.signedAt ? new Date(votersProof.signedAt).toLocaleString() : '—'}</div>
+                  <div className="mt-2 text-[11px] text-gray-400 dark:text-white">Signed at: {votersProof?.signedAt ? new Date(votersProof.signedAt).toLocaleString() : '—'}</div>
                 </div>
 
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-600">Voters</div>
+                  <div className="bg-gray-50 dark:bg-slate-800 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-white">Voters</div>
                   <div className="max-h-72 overflow-auto">
                     <table className="min-w-full text-xs">
-                      <thead className="bg-gray-50 text-gray-500 sticky top-0">
+                      <thead className="bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-white sticky top-0">
                         <tr>
                           <th className="text-left px-4 py-2 font-medium">Name</th>
                           <th className="text-left px-4 py-2 font-medium">Roll</th>
@@ -270,19 +270,19 @@ const PublicElection = () => {
                       <tbody className="divide-y divide-gray-100">
                         {candidateVoters.length === 0 ? (
                           <tr>
-                            <td className="px-4 py-4 text-gray-500" colSpan="5">No voters recorded.</td>
+                            <td className="px-4 py-4 text-gray-500 dark:text-white" colSpan="5">No voters recorded.</td>
                           </tr>
                         ) : (
                           candidateVoters.map(voter => (
                             <tr key={voter.id}>
-                              <td className="px-4 py-2 text-gray-800">{voter.name}</td>
-                              <td className="px-4 py-2 text-gray-600">{voter.roll || '—'}</td>
-                              <td className="px-4 py-2 text-gray-600">
+                              <td className="px-4 py-2 text-gray-800 dark:text-white">{voter.name}</td>
+                              <td className="px-4 py-2 text-gray-600 dark:text-white">{voter.roll || '—'}</td>
+                              <td className="px-4 py-2 text-gray-600 dark:text-white">
                                 <div>{voter.email || '—'}</div>
                                 <div>{voter.mobile || '—'}</div>
                               </td>
-                              <td className="px-4 py-2 font-mono text-[11px] text-gray-600 break-all">{voter.voteHash || '—'}</td>
-                              <td className="px-4 py-2 text-gray-600">{voter.timestamp ? new Date(voter.timestamp).toLocaleString() : '—'}</td>
+                              <td className="px-4 py-2 font-mono text-[11px] text-gray-600 dark:text-white break-all">{voter.voteHash || '—'}</td>
+                              <td className="px-4 py-2 text-gray-600 dark:text-white">{voter.timestamp ? new Date(voter.timestamp).toLocaleString() : '—'}</td>
                             </tr>
                           ))
                         )}
@@ -294,20 +294,20 @@ const PublicElection = () => {
             )}
           </div>
         ) : (
-          <div className="text-sm text-gray-500">Select a candidate from the results below to view voters.</div>
+          <div className="text-sm text-gray-500 dark:text-white">Select a candidate from the results below to view voters.</div>
         )}
       </div>
 
-      <div className="bg-white shadow rounded-lg p-4 sm:p-6 mt-6">
+  <div className="bg-white dark:bg-slate-900 shadow rounded-lg p-4 sm:p-6 mt-6">
         <h3 className="font-medium mb-4">
           {election.status === 'ongoing' ? (
             <span className="flex items-center space-x-2">
               <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span>Live overview {socketConnected ? '(connected)' : '(connecting...)'}</span>
+              <span className="text-gray-900 dark:text-white">Live overview {socketConnected ? '(connected)' : '(connecting...)'}</span>
             </span>
           ) : isCompleted ? (
             <div className="flex items-center space-x-2">
-              <span className="text-lg font-bold text-gray-900"><span aria-hidden="true">🏆</span> Final Results</span>
+              <span className="text-lg font-bold text-gray-900 dark:text-white"><span aria-hidden="true">🏆</span> Final Results</span>
               <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Completed</span>
             </div>
           ) : (
@@ -315,13 +315,13 @@ const PublicElection = () => {
           )}
         </h3>
         {candidates.length === 0 ? (
-          <div className="text-sm text-gray-500">No candidates</div>
+          <div className="text-sm text-gray-500 dark:text-white">No candidates</div>
         ) : isCompleted ? (
           /* ─── COMPLETED ELECTION: Ranked list with podium design ─── */
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-4">
-              <div className="text-sm text-gray-600">{sorted.length} candidates</div>
-              <div className="text-sm font-semibold text-gray-700">Total votes cast: {totalVotes}</div>
+              <div className="text-sm text-gray-600 dark:text-white">{sorted.length} candidates</div>
+              <div className="text-sm font-semibold text-gray-700 dark:text-white">Total votes cast: {totalVotes}</div>
             </div>
 
             {/* Top 3 podium cards */}
@@ -389,7 +389,7 @@ const PublicElection = () => {
                           />
                         ) : null}
                         <div 
-                          className={`w-20 h-20 rounded-full bg-white ring-4 ${cfg.ring} flex items-center justify-center text-xl font-bold text-gray-500`}
+                          className={`w-20 h-20 rounded-full bg-white ring-4 ${cfg.ring} flex items-center justify-center text-xl font-bold text-gray-500 dark:text-white`}
                           style={c.photoUrl ? { display: 'none' } : {}}
                         >
                           {(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
@@ -397,12 +397,12 @@ const PublicElection = () => {
                       </div>
 
                       {/* Name & party */}
-                      <div className="font-bold text-base sm:text-lg text-gray-900 truncate w-full">{c.name}</div>
-                      {c.party && <div className="text-xs text-gray-500 truncate w-full">{c.party}</div>}
+                      <div className="font-bold text-base sm:text-lg text-gray-900 dark:text-white truncate w-full">{c.name}</div>
+                      {c.party && <div className="text-xs text-gray-500 dark:text-white truncate w-full">{c.party}</div>}
 
                       {/* Vote count */}
-                      <div className="mt-3 text-3xl font-extrabold text-gray-900">{count}</div>
-                      <div className="text-xs text-gray-500">votes ({pct}%)</div>
+                      <div className="mt-3 text-3xl font-extrabold text-gray-900 dark:text-white">{count}</div>
+                      <div className="text-xs text-gray-500 dark:text-white">votes ({pct}%)</div>
 
                       {/* Progress bar */}
                       <div className="w-full mt-3">
@@ -413,7 +413,7 @@ const PublicElection = () => {
 
                       <button
                         onClick={() => loadCandidateVoters(c)}
-                        className="mt-3 px-3 py-1 text-xs rounded-full border border-cyan-500 text-cyan-700 hover:bg-cyan-50"
+                        className="mt-3 px-3 py-1 text-xs rounded-full border border-cyan-500 text-cyan-700 dark:text-white hover:bg-cyan-50"
                       >
                         View voters
                       </button>
@@ -426,8 +426,8 @@ const PublicElection = () => {
             {/* Remaining candidates as a ranked list */}
             {sorted.length > 3 && (
               <div className="border rounded-lg overflow-hidden">
-                <div className="bg-gray-50 px-4 py-2 border-b">
-                  <h4 className="text-sm font-semibold text-gray-700">Other Candidates</h4>
+                <div className="bg-gray-50 dark:bg-slate-800 px-4 py-2 border-b">
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-white">Other Candidates</h4>
                 </div>
                 <ul className="divide-y divide-gray-100">
                   {sorted.slice(3).map((c, idx) => {
@@ -437,7 +437,7 @@ const PublicElection = () => {
                     return (
                       <li key={c.id} className="flex items-center px-4 py-3 hover:bg-gray-50 transition-colors">
                         {/* Rank number */}
-                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500 mr-3 flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500 dark:text-white mr-3 flex-shrink-0">
                           {rank}
                         </div>
 
@@ -456,7 +456,7 @@ const PublicElection = () => {
                           />
                         ) : null}
                         <div 
-                          className="w-10 h-10 rounded-full bg-gray-200 mr-3 flex-shrink-0 flex items-center justify-center text-sm text-gray-600"
+                          className="w-10 h-10 rounded-full bg-gray-200 mr-3 flex-shrink-0 flex items-center justify-center text-sm text-gray-600 dark:text-white"
                           style={c.photoUrl ? { display: 'none' } : {}}
                         >
                           {(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
@@ -464,8 +464,8 @@ const PublicElection = () => {
 
                         {/* Name & party */}
                         <div className="flex-1 min-w-0 mr-3">
-                          <div className="font-medium text-gray-900 truncate">{c.name}</div>
-                          {c.party && <div className="text-xs text-gray-500 truncate">{c.party}</div>}
+                          <div className="font-medium text-gray-900 dark:text-white truncate">{c.name}</div>
+                          {c.party && <div className="text-xs text-gray-500 dark:text-white truncate">{c.party}</div>}
                         </div>
 
                         {/* Vote bar + count */}
@@ -476,12 +476,12 @@ const PublicElection = () => {
                             </div>
                           </div>
                           <div className="text-right min-w-[60px]">
-                            <div className="font-bold text-gray-900">{count}</div>
-                            <div className="text-[10px] text-gray-500">{pct}%</div>
+                            <div className="font-bold text-gray-900 dark:text-white">{count}</div>
+                            <div className="text-[10px] text-gray-500 dark:text-white">{pct}%</div>
                           </div>
                           <button
                             onClick={() => loadCandidateVoters(c)}
-                            className="px-3 py-1 text-xs rounded-full border border-cyan-500 text-cyan-700 hover:bg-cyan-50"
+                            className="px-3 py-1 text-xs rounded-full border border-cyan-500 text-cyan-700 dark:text-white hover:bg-cyan-50"
                           >
                             View voters
                           </button>
@@ -498,8 +498,8 @@ const PublicElection = () => {
           <div className="space-y-4">
             {/* compact summary header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-              <div className="text-sm text-gray-600">Showing {paged.length} of {candidates.length} candidates</div>
-              <div className="text-sm font-semibold">Total votes: {totalVotes}</div>
+              <div className="text-sm text-gray-600 dark:text-white">Showing {paged.length} of {candidates.length} candidates</div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">Total votes: {totalVotes}</div>
             </div>
 
             {/* candidate list */}
@@ -509,7 +509,7 @@ const PublicElection = () => {
                 const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 1000) / 10 : 0;
                 const isWinner = c.id === winnerId;
                 return (
-                  <div key={c.id} className={`p-3 rounded border ${isWinner ? 'bg-green-50 border-green-300' : 'bg-white'}`}>
+                  <div key={c.id} className={`p-3 rounded border ${isWinner ? 'bg-green-50 border-green-300' : 'bg-white dark:bg-slate-900'}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center min-w-0">
                         {c.photoUrl ? (
@@ -526,17 +526,17 @@ const PublicElection = () => {
                           />
                         ) : null}
                         <div 
-                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 mr-3 flex-shrink-0 flex items-center justify-center text-sm text-gray-600"
+                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 mr-3 flex-shrink-0 flex items-center justify-center text-sm text-gray-600 dark:text-white"
                           style={c.photoUrl ? { display: 'none' } : {}}
                         >
                           {(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-medium text-base sm:text-lg truncate">{c.name} {isWinner && <span className="text-sm text-green-700 ml-2">(Leading)</span>}</div>
-                          <div className="text-xs text-gray-500 truncate">{c.party}</div>
+                          <div className="font-medium text-base sm:text-lg truncate text-gray-900 dark:text-white">{c.name} {isWinner && <span className="text-sm text-green-700 ml-2">(Leading)</span>}</div>
+                          <div className="text-xs text-gray-500 dark:text-white truncate">{c.party}</div>
                         </div>
                       </div>
-                      <div className="text-2xl font-bold">{count}</div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">{count}</div>
                     </div>
 
                     {/* simple spark / bar using inline SVG */}
@@ -545,7 +545,7 @@ const PublicElection = () => {
                         <rect x="0" y="0" width="100" height="10" fill="#f3f4f6" />
                         <rect x="0" y="0" width={`${pct}`} height="10" fill={isWinner ? '#10b981' : '#6366f1'} />
                       </svg>
-                      <div className="mt-1 text-xs text-gray-600">{pct}% of votes</div>
+                      <div className="mt-1 text-xs text-gray-600 dark:text-white">{pct}% of votes</div>
                     </div>
                   </div>
                 );
@@ -556,7 +556,7 @@ const PublicElection = () => {
             {totalPages > 1 && (
               <div className="flex items-center justify-center space-x-2 mt-4">
                 <button className="px-3 py-1 border rounded disabled:opacity-50" onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}>Prev</button>
-                <div className="text-sm">Page {page} of {totalPages}</div>
+                <div className="text-sm text-gray-900 dark:text-white">Page {page} of {totalPages}</div>
                 <button className="px-3 py-1 border rounded disabled:opacity-50" onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}>Next</button>
               </div>
             )}
