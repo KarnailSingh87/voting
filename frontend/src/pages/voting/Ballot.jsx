@@ -58,6 +58,8 @@ const Ballot = () => {
   const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
   const [blockchainData, setBlockchainData] = useState(null);
   const [voteHashResult, setVoteHashResult] = useState('');
+  const [hasVoted, setHasVoted] = useState(false);
+  const [votedCandidateName, setVotedCandidateName] = useState('');
 
   const { isConnected, castVoteOnChain, isCorrectChain, account } = useWeb3();
 
@@ -79,10 +81,33 @@ const Ballot = () => {
       }
     };
 
+    const fetchVotingHistory = async () => {
+      try {
+        const token = localStorage.getItem('voterToken');
+        if (!token) return;
+
+        const response = await axios.get('/api/voter/history', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.data.success && response.data.voteHistory) {
+          const existingVote = response.data.voteHistory.find(h => h.electionId === id);
+          if (existingVote) {
+            setHasVoted(true);
+            setVotedCandidateName(existingVote.candidateName || '');
+          }
+        }
+      } catch (err) {
+        console.log('Could not fetch voting history');
+      }
+    };
+
     fetchElection();
+    fetchVotingHistory();
   }, [id]);
 
   const handleVote = async () => {
+    if (hasVoted) return;
     setVoting(true);
     setError('');
 
@@ -137,6 +162,7 @@ const Ballot = () => {
   };
 
   const handleConfirmVote = () => {
+    if (hasVoted) return;
     setShowConfirmation(true);
   };
 
@@ -309,6 +335,20 @@ const Ballot = () => {
             <p className="mt-1 text-sm text-gray-500">
               Select a candidate and confirm your vote
             </p>
+            {hasVoted && (
+              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                <div className="flex items-start gap-2">
+                  <span className="text-lg" aria-hidden="true">✅</span>
+                  <div>
+                    <p className="font-semibold">You&apos;ve already voted in this election.</p>
+                    <p className="mt-1 text-green-700">
+                      {votedCandidateName ? `Your vote was recorded for ${votedCandidateName}. ` : ''}
+                      Voting is disabled to prevent multiple submissions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {showConfirmation ? (
@@ -381,7 +421,7 @@ const Ballot = () => {
                   <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                     <dt className="text-sm font-medium text-gray-500">Select Candidate</dt>
                     <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                      <div className="space-y-4">
+                      <div className={`space-y-4 ${hasVoted ? 'opacity-60 pointer-events-none' : ''}`}>
                         {election.candidates.map((candidate) => (
                           <div 
                             key={candidate.id} 
@@ -390,14 +430,15 @@ const Ballot = () => {
                                 ? 'border-cyan-500 bg-cyan-50' 
                                 : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                             }`}
-                            onClick={() => setSelectedCandidate(candidate.id)}
+                            onClick={() => !hasVoted && setSelectedCandidate(candidate.id)}
                           >
                             <input
                               id={`candidate-${candidate.id}`}
                               name="candidate"
                               type="radio"
                               checked={selectedCandidate === candidate.id}
-                              onChange={() => setSelectedCandidate(candidate.id)}
+                              onChange={() => !hasVoted && setSelectedCandidate(candidate.id)}
+                              disabled={hasVoted}
                               className="focus:ring-cyan-500 h-4 w-4 text-cyan-600 border-gray-300"
                             />
                             <div className="ml-3 flex items-center flex-1 min-w-0">
@@ -453,11 +494,14 @@ const Ballot = () => {
               <div className="px-4 py-4 bg-gray-50 sm:px-6">
                 <button
                   onClick={handleConfirmVote}
-                  disabled={!selectedCandidate || Voting}
+                  disabled={hasVoted || !selectedCandidate || Voting}
                   className="w-full sm:w-auto sm:float-right inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50"
                 >
-                  Review & Confirm Vote
+                  {hasVoted ? 'Voted' : 'Review & Confirm Vote'}
                 </button>
+                {hasVoted && (
+                  <p className="mt-2 text-sm text-green-700">Voting is locked because your vote is already recorded.</p>
+                )}
               </div>
             </div>
           )}
