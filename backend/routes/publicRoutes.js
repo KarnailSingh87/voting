@@ -60,17 +60,81 @@ const buildResultsCsv = (election, candidates, totalVotes) => {
   return [header.join(','), ...rows.map(row => row.map(csvEscape).join(','))].join('\n');
 };
 
-const buildResultProof = (csvData) => {
-  const hash = crypto.createHash('sha256').update(csvData).digest('hex');
+const buildSignedProof = (data, scope) => {
+  const hash = crypto.createHash('sha256').update(data).digest('hex');
   const signature = crypto.createHmac('sha256', RESULT_SIGNING_SECRET).update(hash).digest('hex');
   return {
     hash,
     signature,
     hashAlgorithm: 'sha256',
     signatureAlgorithm: 'hmac-sha256',
-    scope: 'results-csv-v1',
+    scope,
     signedAt: new Date().toISOString(),
   };
+};
+
+const buildResultProof = (csvData) => buildSignedProof(csvData, 'results-csv-v1');
+
+const buildCandidateVotersCsv = (election, candidate, voters) => {
+  const header = [
+    'election_id',
+    'election_title',
+    'candidate_id',
+    'candidate_name',
+    'voter_name',
+    'voter_roll',
+    'voter_email',
+    'voter_mobile',
+    'voter_aadhaar_hash',
+    'vote_hash',
+    'voted_at',
+  ];
+  const rows = voters.map(v => [
+    election._id.toString(),
+    election.title,
+    candidate._id.toString(),
+    candidate.name,
+    v.name || '',
+    v.roll || '',
+    v.email || '',
+    v.mobile || '',
+    v.aadhaarHash || '',
+    v.voteHash || '',
+    v.timestamp ? new Date(v.timestamp).toISOString() : '',
+  ]);
+  return [header.join(','), ...rows.map(row => row.map(csvEscape).join(','))].join('\n');
+};
+
+const getCandidateVoters = async (electionId, candidateId) => {
+  const election = await Election.findById(electionId);
+  if (!election) return { error: { status: 404, message: 'Election not found' } };
+  const candidate = await Candidate.findById(candidateId);
+  if (!candidate) return { error: { status: 404, message: 'Candidate not found' } };
+  if (candidate.election.toString() !== election._id.toString()) {
+    return { error: { status: 400, message: 'Candidate does not belong to this election' } };
+  }
+
+  const voterDocs = await Voter.find({
+    history: { $elemMatch: { electionId: election._id, candidateName: candidate.name } },
+  }).select('name email mobile identifierRaw aadhaarHash history').lean();
+
+  const voters = voterDocs.map(v => {
+    const record = (v.history || []).find(h =>
+      h.electionId?.toString() === election._id.toString() && h.candidateName === candidate.name
+    );
+    return {
+      id: v._id.toString(),
+      name: v.name,
+      roll: v.identifierRaw || '',
+      email: v.email || '',
+      mobile: v.mobile || '',
+      aadhaarHash: v.aadhaarHash || '',
+      voteHash: record?.voteHash || '',
+      timestamp: record?.timestamp || null,
+    };
+  }).sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+
+  return { election, candidate, voters };
 };
 
 // Load contract ABI for log decoding (optional)
@@ -404,6 +468,42 @@ router.get('/election/:id/results.:format?', async (req, res) => {
     res.status(200).send(csvData);
   } catch (e) {
     console.error('public election csv error', e);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Public: voters for a specific candidate (JSON or CSV)
+// GET /api/election/:id/candidate/:candidateId/voters
+// GET /api/election/:id/candidate/:candidateId/voters.csv
+router.get('/election/:id/candidate/:candidateId/voters.:format?', async (req, res) => {
+  try {
+    const { id, candidateId, format } = req.params;
+    if (!id || !candidateId) return res.status(400).json({ success: false, message: 'election id and candidate id required' });
+    const result = await getCandidateVoters(id, candidateId);
+    if (result.error) return res.status(result.error.status).json({ success: false, message: result.error.message });
+
+    const { election, candidate, voters } = result;
+    const csvData = buildCandidateVotersCsv(election, candidate, voters);
+    const proof = buildSignedProof(csvData, 'candidate-voters-csv-v1');
+    const wantsCsv = (format || '').toLowerCase() === 'csv';
+
+    if (wantsCsv) {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="election-${election._id}-candidate-${candidate._id}-voters.csv"`);
+      return res.status(200).send(csvData);
+    }
+
+    return res.json({
+      success: true,
+      election: { _id: election._id, title: election.title, status: election.status },
+      candidate: { _id: candidate._id, name: candidate.name, party: candidate.party || '' },
+      total: voters.length,
+      voters,
+      proof,
+      csvUrl: `/api/election/${election._id}/candidate/${candidate._id}/voters.csv`,
+    });
+  } catch (e) {
+    console.error('candidate voters error', e);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

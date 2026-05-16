@@ -56,9 +56,12 @@ const PublicElection = () => {
   const [page, setPage] = useState(1);
   const [socketConnected, setSocketConnected] = useState(false);
   const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
-  const [resultProof, setResultProof] = useState(null);
-  const [onChainStatus, setOnChainStatus] = useState(null);
-  const [csvUrl, setCsvUrl] = useState('');
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [candidateVoters, setCandidateVoters] = useState([]);
+  const [votersLoading, setVotersLoading] = useState(false);
+  const [votersError, setVotersError] = useState('');
+  const [votersProof, setVotersProof] = useState(null);
+  const [votersCsvUrl, setVotersCsvUrl] = useState('');
 
   useEffect(() => {
     const fetch = async () => {
@@ -69,9 +72,6 @@ const PublicElection = () => {
           setElection(res.data.election);
           setCandidates(res.data.candidates || []);
           setTotalVotes(res.data.totalVotes || (res.data.candidates||[]).reduce((s,c)=>s+(c.voteCount||0),0));
-          setResultProof(res.data.resultProof || null);
-          setOnChainStatus(res.data.onChainStatus || null);
-          setCsvUrl(res.data.csvUrl || '');
         } else {
           setError(res.data?.message || 'Failed to load election');
         }
@@ -92,13 +92,13 @@ const PublicElection = () => {
   // Check if election is completed/ended
   const isCompleted = election?.status === 'ended' || election?.status === 'completed';
 
-  const resolvedCsvUrl = (() => {
-    if (csvUrl) {
-      if (csvUrl.startsWith('http://') || csvUrl.startsWith('https://')) return csvUrl;
-      return `${backendUrl}${csvUrl}`;
+  const resolveBackendUrl = (url, fallbackPath = '') => {
+    if (url) {
+      if (url.startsWith('http://') || url.startsWith('https://')) return url;
+      return `${backendUrl}${url}`;
     }
-    return `${backendUrl}/api/election/${id}/results.csv`;
-  })();
+    return fallbackPath ? `${backendUrl}${fallbackPath}` : '';
+  };
 
   const handleCopy = async (value) => {
     if (!value) return;
@@ -106,6 +106,31 @@ const PublicElection = () => {
       await navigator.clipboard.writeText(value);
     } catch (e) {
       console.warn('Copy failed', e);
+    }
+  };
+
+  const loadCandidateVoters = async (candidate) => {
+    if (!candidate?.id) return;
+    setSelectedCandidate(candidate);
+    setCandidateVoters([]);
+    setVotersProof(null);
+    setVotersCsvUrl('');
+    setVotersError('');
+    setVotersLoading(true);
+    try {
+      const res = await axios.get(`/api/election/${id}/candidate/${candidate.id}/voters`);
+      if (res.data && res.data.success) {
+        setCandidateVoters(res.data.voters || []);
+        setVotersProof(res.data.proof || null);
+        setVotersCsvUrl(res.data.csvUrl || '');
+      } else {
+        setVotersError(res.data?.message || 'Failed to load voters');
+      }
+    } catch (e) {
+      console.error('Failed to fetch candidate voters', e);
+      setVotersError(e.response?.data?.message || 'Failed to load voters');
+    } finally {
+      setVotersLoading(false);
     }
   };
 
@@ -146,91 +171,131 @@ const PublicElection = () => {
           <div className="mt-2 text-sm text-gray-700">Status: <strong>{election.status}</strong></div>
         </div>
         <div className="flex-shrink-0">
-          <Link to="/public" className="px-3 py-2 bg-gray-100 rounded text-sm">Back to list</Link>
+          <Link to="/public" className="px-3 py-2 bg-gray-100 rounded text-sm text-white dark:bg-gray-800 dark:text-white">Back to list</Link>
         </div>
       </div>
 
       <div className="bg-white shadow rounded-lg p-4 sm:p-6 mt-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Result transparency</h3>
-            <p className="text-xs text-gray-500">Signed results hash, CSV download, and on-chain verification summary.</p>
+            <h3 className="text-lg font-semibold text-gray-900">Candidate voters list</h3>
+            <p className="text-xs text-gray-500">Click a candidate below to view voters, hashes, and export the CSV list.</p>
           </div>
-          <a
-            href={resolvedCsvUrl}
-            className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md bg-cyan-600 text-white hover:bg-cyan-700"
-            download
-          >
-            Download CSV
-          </a>
+          {selectedCandidate && votersCsvUrl ? (
+            <a
+              href={resolveBackendUrl(votersCsvUrl)}
+              className="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md bg-cyan-600 text-white hover:bg-cyan-700"
+              download
+            >
+              Download voters CSV
+            </a>
+          ) : null}
         </div>
 
-        <div className="space-y-4">
-          <div className="border rounded-lg p-3">
-            <div className="text-xs text-gray-500 mb-1">Result Hash (SHA-256)</div>
+        {!isCompleted ? (
+          <div className="text-sm text-gray-500">Voter lists are available after results are announced.</div>
+        ) : selectedCandidate ? (
+          <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div className="text-xs font-mono text-gray-700 break-all">
-                {resultProof?.hash || '—'}
+              <div className="text-sm text-gray-700">
+                Selected candidate: <strong>{selectedCandidate.name}</strong>
               </div>
               <button
-                onClick={() => handleCopy(resultProof?.hash)}
+                onClick={() => {
+                  setSelectedCandidate(null);
+                  setCandidateVoters([]);
+                  setVotersProof(null);
+                  setVotersCsvUrl('');
+                  setVotersError('');
+                }}
                 className="px-2 py-1 text-xs rounded border text-gray-600 hover:bg-gray-50"
               >
-                Copy hash
+                Clear selection
               </button>
             </div>
-            <div className="mt-2 text-[11px] text-gray-400">Scope: {resultProof?.scope || 'results-csv-v1'}</div>
-          </div>
 
-          <div className="border rounded-lg p-3">
-            <div className="text-xs text-gray-500 mb-1">Result Signature (HMAC)</div>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div className="text-xs font-mono text-gray-700 break-all">
-                {resultProof?.signature || '—'}
-              </div>
-              <button
-                onClick={() => handleCopy(resultProof?.signature)}
-                className="px-2 py-1 text-xs rounded border text-gray-600 hover:bg-gray-50"
-              >
-                Copy signature
-              </button>
-            </div>
-            <div className="mt-2 text-[11px] text-gray-400">Signed at: {resultProof?.signedAt ? new Date(resultProof.signedAt).toLocaleString() : '—'}</div>
-          </div>
-
-          <div className="border rounded-lg p-3">
-            <div className="text-xs text-gray-500 mb-2">On-chain verification status</div>
-            {onChainStatus?.available ? (
-              <div className="flex flex-col gap-2">
-                <div className={`text-sm font-semibold ${onChainStatus?.matched ? 'text-emerald-700' : 'text-amber-700'}`}>
-                  {onChainStatus?.matched ? 'Matched with on-chain results' : 'Mismatch detected'}
-                </div>
-                <div className="text-xs text-gray-500">
-                  Network: {onChainStatus?.network || 'unknown'} (Chain ID: {onChainStatus?.chainId ?? '—'})
-                </div>
-                <div className="text-xs text-gray-500">
-                  Total votes — Local: {onChainStatus?.totals?.local ?? totalVotes} / On-chain: {onChainStatus?.totals?.onChain ?? '—'}
-                </div>
-                {!onChainStatus?.matched && onChainStatus?.mismatches?.length ? (
-                  <div className="text-xs text-gray-600">
-                    {onChainStatus.mismatches.length} candidate(s) differ from on-chain results.
-                  </div>
-                ) : null}
-              </div>
+            {votersLoading ? (
+              <div className="text-sm text-gray-500">Loading voters…</div>
+            ) : votersError ? (
+              <div className="text-sm text-red-600">{votersError}</div>
             ) : (
-              <div className="text-xs text-gray-500">
-                <div>
-                  {onChainStatus?.reason || (onChainStatus?.connected ? 'On-chain verification unavailable' : 'Web3 not connected for verification.')}
-                </div>
-                {!!onChainStatus?.missing?.length && (
-                  <div className="mt-2 text-[11px] text-gray-400">
-                    Missing: {onChainStatus.missing.join(', ')}
+              <div className="space-y-4">
+                <div className="text-xs text-gray-500">Total voters: {candidateVoters.length}</div>
+
+                <div className="border rounded-lg p-3">
+                  <div className="text-xs text-gray-500 mb-1">Voter List Hash (SHA-256)</div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="text-xs font-mono text-gray-700 break-all">
+                      {votersProof?.hash || '—'}
+                    </div>
+                    <button
+                      onClick={() => handleCopy(votersProof?.hash)}
+                      className="px-2 py-1 text-xs rounded border text-gray-600 hover:bg-gray-50"
+                    >
+                      Copy hash
+                    </button>
                   </div>
-                )}
+                  <div className="mt-2 text-[11px] text-gray-400">Scope: {votersProof?.scope || 'candidate-voters-csv-v1'}</div>
+                </div>
+
+                <div className="border rounded-lg p-3">
+                  <div className="text-xs text-gray-500 mb-1">Voter List Signature (HMAC)</div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="text-xs font-mono text-gray-700 break-all">
+                      {votersProof?.signature || '—'}
+                    </div>
+                    <button
+                      onClick={() => handleCopy(votersProof?.signature)}
+                      className="px-2 py-1 text-xs rounded border text-gray-600 hover:bg-gray-50"
+                    >
+                      Copy signature
+                    </button>
+                  </div>
+                  <div className="mt-2 text-[11px] text-gray-400">Signed at: {votersProof?.signedAt ? new Date(votersProof.signedAt).toLocaleString() : '—'}</div>
+                </div>
+
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-600">Voters</div>
+                  <div className="max-h-72 overflow-auto">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-gray-50 text-gray-500 sticky top-0">
+                        <tr>
+                          <th className="text-left px-4 py-2 font-medium">Name</th>
+                          <th className="text-left px-4 py-2 font-medium">Roll</th>
+                          <th className="text-left px-4 py-2 font-medium">Contact</th>
+                          <th className="text-left px-4 py-2 font-medium">Vote Hash</th>
+                          <th className="text-left px-4 py-2 font-medium">Voted At</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {candidateVoters.length === 0 ? (
+                          <tr>
+                            <td className="px-4 py-4 text-gray-500" colSpan="5">No voters recorded.</td>
+                          </tr>
+                        ) : (
+                          candidateVoters.map(voter => (
+                            <tr key={voter.id}>
+                              <td className="px-4 py-2 text-gray-800">{voter.name}</td>
+                              <td className="px-4 py-2 text-gray-600">{voter.roll || '—'}</td>
+                              <td className="px-4 py-2 text-gray-600">
+                                <div>{voter.email || '—'}</div>
+                                <div>{voter.mobile || '—'}</div>
+                              </td>
+                              <td className="px-4 py-2 font-mono text-[11px] text-gray-600 break-all">{voter.voteHash || '—'}</td>
+                              <td className="px-4 py-2 text-gray-600">{voter.timestamp ? new Date(voter.timestamp).toLocaleString() : '—'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
           </div>
-        </div>
+        ) : (
+          <div className="text-sm text-gray-500">Select a candidate from the results below to view voters.</div>
+        )}
       </div>
 
       <div className="bg-white shadow rounded-lg p-4 sm:p-6 mt-6">
@@ -302,7 +367,7 @@ const PublicElection = () => {
                   const cfg = rankConfig[rank];
 
                   return (
-                    <div key={c.id} className={`relative rounded-xl border-2 ${cfg.border} ${cfg.bg} ${cfg.shadow} p-4 flex flex-col items-center text-center`}>
+                    <div key={c.id} className={`relative rounded-xl border-2 ${cfg.border} ${cfg.bg} ${cfg.shadow} p-4 flex flex-col items-center text-center ${selectedCandidate?.id === c.id ? 'ring-2 ring-cyan-500' : ''}`}>
                       {/* Rank badge */}
                       <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-xs font-bold ${cfg.badge}`}>
                         {cfg.icon} {cfg.label}
@@ -345,6 +410,13 @@ const PublicElection = () => {
                           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: cfg.barColor }} />
                         </div>
                       </div>
+
+                      <button
+                        onClick={() => loadCandidateVoters(c)}
+                        className="mt-3 px-3 py-1 text-xs rounded-full border border-cyan-500 text-cyan-700 hover:bg-cyan-50"
+                      >
+                        View voters
+                      </button>
                     </div>
                   );
                 })}
@@ -407,6 +479,12 @@ const PublicElection = () => {
                             <div className="font-bold text-gray-900">{count}</div>
                             <div className="text-[10px] text-gray-500">{pct}%</div>
                           </div>
+                          <button
+                            onClick={() => loadCandidateVoters(c)}
+                            className="px-3 py-1 text-xs rounded-full border border-cyan-500 text-cyan-700 hover:bg-cyan-50"
+                          >
+                            View voters
+                          </button>
                         </div>
                       </li>
                     );

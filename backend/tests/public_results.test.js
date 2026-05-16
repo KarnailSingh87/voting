@@ -4,10 +4,12 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { app } from '../server.js';
 import Election from '../models/Election.js';
 import Candidate from '../models/Candidate.js';
+import Voter from '../models/Voter.js';
 
 describe('Public results transparency', () => {
   let replset;
   let electionId;
+  let candidateOneId;
 
   beforeAll(async () => {
     replset = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
@@ -25,13 +27,44 @@ describe('Public results transparency', () => {
     });
     electionId = election._id.toString();
 
-    await Candidate.create([
+    const [candidateOne, candidateTwo] = await Candidate.create([
       { name: 'Candidate One', party: 'A', election: electionId, voteCount: 12 },
       { name: 'Candidate Two', party: 'B', election: electionId, voteCount: 8 },
+    ]);
+    candidateOneId = candidateOne._id.toString();
+
+    await Voter.create([
+      {
+        aadhaarHash: 'hash-1',
+        name: 'Voter One',
+        email: 'voter1@example.com',
+        mobile: '9990001111',
+        identifierRaw: 'ROLL001',
+        history: [{
+          electionId,
+          candidateName: 'Candidate One',
+          voteHash: 'votehash-1',
+          timestamp: new Date(),
+        }],
+      },
+      {
+        aadhaarHash: 'hash-2',
+        name: 'Voter Two',
+        email: 'voter2@example.com',
+        mobile: '9990002222',
+        identifierRaw: 'ROLL002',
+        history: [{
+          electionId,
+          candidateName: 'Candidate Two',
+          voteHash: 'votehash-2',
+          timestamp: new Date(),
+        }],
+      },
     ]);
   });
 
   afterAll(async () => {
+    await Voter.deleteMany({});
     await Candidate.deleteMany({ election: electionId });
     await Election.deleteMany({ _id: electionId });
     await mongoose.disconnect();
@@ -55,5 +88,20 @@ describe('Public results transparency', () => {
     expect(res.headers['content-type']).toContain('text/csv');
     expect(res.text).toContain('Candidate One');
     expect(res.text).toContain('Candidate Two');
+  });
+
+  it('returns candidate voters with CSV export', async () => {
+    const res = await request(app).get(`/api/election/${electionId}/candidate/${candidateOneId}/voters`);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.total).toBe(1);
+    expect(res.body.voters[0].voteHash).toBe('votehash-1');
+    expect(res.body.csvUrl).toContain(`/api/election/${electionId}/candidate/${candidateOneId}/voters.csv`);
+
+    const csvRes = await request(app).get(`/api/election/${electionId}/candidate/${candidateOneId}/voters.csv`);
+    expect(csvRes.status).toBe(200);
+    expect(csvRes.headers['content-type']).toContain('text/csv');
+    expect(csvRes.text).toContain('Candidate One');
+    expect(csvRes.text).toContain('votehash-1');
   });
 });
