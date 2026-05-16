@@ -581,8 +581,15 @@ const PublicDashboard = () => {
                           </div>
                         </div>
                         <div className="text-right flex flex-col items-end space-y-2">
-                          <div className="text-sm">{ev.candidates?.reduce((s,c)=>s+(c.voteCount||0),0)} votes</div>
-                          <button onClick={() => navigate(`/public/election/${ev._id}`)} className="text-xs px-2 py-1 bg-cyan-50 text-cyan-700 rounded hover:bg-cyan-100">View results</button>
+                          <div className="text-sm text-gray-700 dark:text-gray-200">
+                            {ev.candidates?.reduce((s,c)=>s+(c.voteCount||0),0)} votes
+                          </div>
+                          <button
+                            onClick={() => navigate(`/public/election/${ev._id}`)}
+                            className="text-xs px-2 py-1 bg-cyan-50 text-cyan-700 rounded hover:bg-cyan-100 dark:bg-cyan-900 dark:text-cyan-100 dark:hover:bg-cyan-800"
+                          >
+                            View results
+                          </button>
                         </div>
                       </div>
                     ))}
