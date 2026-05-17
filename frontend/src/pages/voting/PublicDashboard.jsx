@@ -384,8 +384,8 @@ const PublicDashboard = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{t('publicDashboard.title')}</h1>
-                <p className="mt-1 text-xs sm:text-sm text-white">{t('publicDashboard.subtitle')}</p>
-                <p className="mt-2 text-xs text-white">{t('publicDashboard.note')}</p>
+                <p className="mt-1 text-xs sm:text-sm text-gray-900 dark:text-white">{t('publicDashboard.subtitle')}</p>
+                <p className="mt-2 text-xs text-gray-900 dark:text-white">{t('publicDashboard.note')}</p>
               </div>
               <div className="text-left sm:text-right text-xs sm:text-sm text-gray-500 dark:text-white">
                 <div className="mb-2">
@@ -512,7 +512,7 @@ const PublicDashboard = () => {
                 <h3 className="text-lg font-medium mb-3 text-gray-900 dark:text-white">{t('nav.elections')}</h3>
                 <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex items-center space-x-2">
-                    <label className="text-sm text-white">Filter:</label>
+                    <label className="text-sm text-gray-900 dark:text-white">Filter:</label>
                     <select value={electionFilter} onChange={e => setElectionFilter(e.target.value)} className="border rounded px-2 py-1 text-sm dark:bg-slate-900 dark:text-white dark:border-slate-700">
                       <option value="all">All</option>
                       <option value="active">Active</option>
@@ -520,7 +520,7 @@ const PublicDashboard = () => {
                       <option value="completed">Completed</option>
                     </select>
                   </div>
-                  <div className="text-sm text-white">{elections.length} elections</div>
+                  <div className="text-sm text-gray-900 dark:text-white">{elections.length} elections</div>
                 </div>
 
                 {elections.filter(ev => {
@@ -546,21 +546,21 @@ const PublicDashboard = () => {
                             <div className="font-semibold text-gray-900 break-words dark:text-white">{ev.title}</div>
                             <div>
                               {ev.status === 'active' || ev.status === 'ongoing' ? (
-                                <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">Active</span>
+                                <span className="px-2 py-0.5 bg-green-100 text-green-800 dark:bg-green-900 dark:text-white rounded text-xs">Active</span>
                               ) : ev.status === 'draft' || ev.status === 'scheduled' ? (
-                                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs">Upcoming</span>
+                                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-white rounded text-xs">Upcoming</span>
                               ) : ev.status === 'completed' || ev.status === 'ended' ? (
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">Completed</span>
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-white rounded text-xs">Completed</span>
                               ) : null}
                             </div>
                           </div>
-                          <div className="text-sm text-white">{ev.description}</div>
-                          <div className="text-xs text-white mt-1">{formatLastUpdated(ev.startDate)} — {formatLastUpdated(ev.endDate)}</div>
+                          <div className="text-sm text-gray-900 dark:text-white">{ev.description}</div>
+                          <div className="text-xs text-gray-900 dark:text-white mt-1">{formatLastUpdated(ev.startDate)} — {formatLastUpdated(ev.endDate)}</div>
                           <div className="mt-2 text-sm">
                             {ev.candidates && ev.candidates.length > 0 ? (
                               <div className="flex flex-wrap items-center gap-2">
                                 {ev.candidates.map(c => (
-                                  <div key={c.id} className="flex items-center space-x-1 px-2 py-1 bg-gray-100 dark:bg-slate-800 rounded text-xs text-white">
+                                  <div key={c.id} className="flex items-center space-x-1 px-2 py-1 bg-gray-100 dark:bg-slate-800 rounded text-xs text-gray-900 dark:text-white">
                                     {c.photoUrl ? (
                                       <img 
                                         src={getImageUrl(c.photoUrl)} 
@@ -571,12 +571,12 @@ const PublicDashboard = () => {
                                       />
                                     ) : null}
                                     <div 
-                                      className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-[10px] text-white"
+                                      className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-[10px] text-gray-900 dark:text-white"
                                       style={c.photoUrl ? { display: 'none' } : {}}
                                     >
                                       {(c.name || '').split(' ').map(s => s[0]).slice(0,2).join('')}
                                     </div>
-                                    <span className="dark:text-white">{c.name}</span>
+                                    <span className="text-gray-900 dark:text-white">{c.name}</span>
                                   </div>
                                 ))}
                               </div>
@@ -584,12 +584,12 @@ const PublicDashboard = () => {
                           </div>
                         </div>
                         <div className="text-right flex flex-col items-end space-y-2">
-                          <div className="text-sm text-gray-700 dark:text-white">
+                          <div className="text-sm text-gray-900 dark:text-white">
                             {ev.candidates?.reduce((s,c)=>s+(c.voteCount||0),0)} votes
                           </div>
                           <button
                             onClick={() => navigate(`/public/election/${ev._id}`)}
-                            className="text-xs px-2 py-1 bg-cyan-50 text-cyan-700 rounded hover:bg-cyan-100 dark:bg-cyan-900 dark:text-cyan-100 dark:hover:bg-cyan-800"
+                            className="text-xs px-2 py-1 bg-cyan-50 text-cyan-700 rounded hover:bg-cyan-100 dark:bg-cyan-900 dark:text-white dark:hover:bg-cyan-800"
                           >
                             View results
                           </button>
@@ -608,31 +608,31 @@ const PublicDashboard = () => {
               <div className="bg-white dark:bg-slate-900 shadow overflow-hidden sm:rounded-lg">
                 <div className="px-4 py-5 sm:px-6">
                   <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">About This System</h3>
-                  <p className="mt-1 max-w-2xl text-sm text-white">Secure & Transparent Online Voting System</p>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-900 dark:text-white">Secure & Transparent Online Voting System</p>
                 </div>
                 <div className="border-t border-gray-200">
                   <dl>
                     <div className="bg-gray-50 dark:bg-slate-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-white">Security</dt>
-                      <dd className="mt-1 text-sm text-white sm:mt-0 sm:col-span-2">
+                      <dt className="text-sm font-medium text-gray-900 dark:text-white">Security</dt>
+                      <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
                         All votes are encrypted and cryptographically separated from voter identity. The system uses end-to-end encryption and maintains an immutable audit trail.
                       </dd>
                     </div>
                     <div className="bg-white dark:bg-slate-900 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-white">Transparency</dt>
-                      <dd className="mt-1 text-sm text-white sm:mt-0 sm:col-span-2">
+                      <dt className="text-sm font-medium text-gray-900 dark:text-white">Transparency</dt>
+                      <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
                         The public ledger shows anonymized vote hashes that can be independently verified. No personal information is exposed in the public ledger.
                       </dd>
                     </div>
                     <div className="bg-gray-50 dark:bg-slate-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-white">Verification</dt>
-                      <dd className="mt-1 text-sm text-white sm:mt-0 sm:col-span-2">
+                      <dt className="text-sm font-medium text-gray-900 dark:text-white">Verification</dt>
+                      <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
                         Voters receive a unique confirmation ID after casting their vote, which can be used to verify their vote was recorded correctly without revealing how they voted.
                       </dd>
                     </div>
                     <div className="bg-white dark:bg-slate-900 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-white">Privacy</dt>
-                      <dd className="mt-1 text-sm text-white sm:mt-0 sm:col-span-2">
+                      <dt className="text-sm font-medium text-gray-900 dark:text-white">Privacy</dt>
+                      <dd className="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
                         Your vote is anonymous. The system uses cryptographic techniques to ensure that no one can link your identity to your vote.
                       </dd>
                     </div>
