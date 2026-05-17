@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { isRouteErrorResponse, useRouteError, Link } from 'react-router-dom';
 
 export default function RouteErrorBoundary() {
@@ -10,6 +11,18 @@ export default function RouteErrorBoundary() {
   const message = isRouteErrorResponse(err)
     ? (err.data?.message || err.data || 'A routing error occurred.')
     : (err?.message || String(err || 'Unknown error'));
+
+  useEffect(() => {
+    const msg = message.toLowerCase();
+    if (msg.includes('module script failed') || msg.includes('dynamically imported module') || msg.includes('failed to fetch')) {
+      if (!sessionStorage.getItem('chunk_load_error')) {
+        sessionStorage.setItem('chunk_load_error', 'true');
+        window.location.reload(true);
+      } else {
+        sessionStorage.removeItem('chunk_load_error');
+      }
+    }
+  }, [message]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">

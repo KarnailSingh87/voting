@@ -11,10 +11,18 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // You can integrate logging services here (Sentry, LogRocket, etc.)
-    // For now, store the extra info in state so we can show it if needed.
-  this.setState({ errorInfo });
-  console.error('Uncaught error in component tree:', error, errorInfo);
+    this.setState({ errorInfo });
+    console.error('Uncaught error in component tree:', error, errorInfo);
+    
+    const msg = error?.message?.toLowerCase() || '';
+    if (msg.includes('module script failed') || msg.includes('dynamically imported module') || msg.includes('failed to fetch')) {
+      if (!sessionStorage.getItem('admin_chunk_load_error')) {
+        sessionStorage.setItem('admin_chunk_load_error', 'true');
+        window.location.reload(true);
+      } else {
+        sessionStorage.removeItem('admin_chunk_load_error');
+      }
+    }
   }
 
   handleRetry = () => {
