@@ -520,7 +520,7 @@ const PublicDashboard = () => {
                       <option value="completed">Completed</option>
                     </select>
                   </div>
-                  <div className="text-sm text-gray-900 dark:text-white">{elections.length} elections</div>
+                  <div className="text-sm text-gray-900 dark:text-white">{elections.length} {elections.length === 1 ? 'Election' : 'Elections'}</div>
                 </div>
 
                 {elections.filter(ev => {
