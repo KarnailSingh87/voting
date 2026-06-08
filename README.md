@@ -770,3 +770,5 @@ MIT License - See LICENSE file
 <!-- Last documentation review: 2026-05-17 -->
 
 <!-- Documentation milestone logged: 2026-05-18 -->
+
+<!-- Maintenance note: verified layout and documentation on 2026-06-08 -->
