@@ -65,7 +65,7 @@ export async function initWhatsApp() {
         logger,
         version,
         // Using a common desktop UA tends to be more stable than mobile-like values.
-        browser: Browsers.macOS('Desktop'),
+        browser: ['Ubuntu', 'Chrome', '20.0.04'],
         // Ensure we always get QR updates (but we don't print it in server logs)
         printQRInTerminal: false,
         connectTimeoutMs: 60000,
@@ -84,6 +84,7 @@ export async function initWhatsApp() {
           qrCode = qr;
           consecutiveQRs++;
           console.log('[WhatsApp] ✅ QR Code ready! Scan from admin panel');
+          resolve(true); // Resolve promise so it doesn't hang waiting for connection
 
           // If WhatsApp keeps issuing QRs but pairing fails repeatedly, auth state is often stale.
           // Auto-reset after a few consecutive QR refreshes.

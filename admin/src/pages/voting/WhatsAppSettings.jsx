@@ -77,7 +77,7 @@ const WhatsAppSettings = ({ token }) => {
     const handleReconnect = async () => {
       setActionLoading(true);
       try {
-        const res = await axios.post(`${backendUrl}/api/admin/whatsapp-reconnect`, {}, {
+        const res = await axios.post(`${backendUrl}/api/admin/whatsapp-reset`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.data.success) {
