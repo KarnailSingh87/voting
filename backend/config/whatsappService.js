@@ -64,12 +64,12 @@ export async function initWhatsApp() {
         auth: state,
         logger,
         version,
-        // Using a common desktop UA tends to be more stable than mobile-like values.
         browser: ['Ubuntu', 'Chrome', '20.0.04'],
-        // Ensure we always get QR updates (but we don't print it in server logs)
         printQRInTerminal: false,
         connectTimeoutMs: 60000,
-        defaultQueryTimeoutMs: 0,
+        syncFullHistory: false,
+        markOnlineOnConnect: false,
+        retryRequestDelayMs: 250,
       });
 
       sock.ev.on('creds.update', saveCreds);
@@ -83,24 +83,26 @@ export async function initWhatsApp() {
         if (qr) {
           qrCode = qr;
           consecutiveQRs++;
-          console.log('[WhatsApp] ✅ QR Code ready! Scan from admin panel');
-          resolve(true); // Resolve promise so it doesn't hang waiting for connection
+          console.log('[WhatsApp] ✅ QR Code ready! Scan from admin panel (attempt ' + consecutiveQRs + ')');
 
           // If WhatsApp keeps issuing QRs but pairing fails repeatedly, auth state is often stale.
           // Auto-reset after a few consecutive QR refreshes.
-          if (consecutiveQRs >= 5 && !isConnected) {
+          if (consecutiveQRs >= 8 && !isConnected) {
             console.log('[WhatsApp] ⚠️  Too many QR refreshes without pairing. Clearing auth & restarting...');
             consecutiveQRs = 0;
             try { sock?.end(); } catch (_) {}
             sock = null;
             clearAuthFolder();
             connectionPromise = null;
+            resolve(false);
             setTimeout(() => initWhatsApp(), 1000);
           }
+          // Do NOT resolve the promise here — let the socket stay alive for pairing
         }
 
         if (connection === 'close') {
           isConnected = false;
+          qrCode = null;
           consecutiveQRs = 0;
 
           // If this socket is still the active one, clear it.
@@ -116,21 +118,21 @@ export async function initWhatsApp() {
             console.log('[WhatsApp] Logged out from phone. Clearing auth and generating new QR...');
             retryCount = 0;
             clearAuthFolder();
-            setTimeout(() => initWhatsApp(), 2000);
             resolve(false);
+            setTimeout(() => initWhatsApp(), 2000);
           } else if (statusCode === DisconnectReason.badSession) {
             // Bad/stale session — reset auth to allow a clean pairing.
             console.log('[WhatsApp] Bad session detected. Clearing auth and generating new QR...');
             retryCount = 0;
             clearAuthFolder();
-            setTimeout(() => initWhatsApp(), 2000);
             resolve(false);
+            setTimeout(() => initWhatsApp(), 2000);
           } else if (retryCount < MAX_RETRIES) {
             // Temporary disconnect — reconnect with existing session
             retryCount++;
             console.log(`[WhatsApp] Reconnecting (${retryCount}/${MAX_RETRIES})...`);
-            setTimeout(() => initWhatsApp(), RETRY_DELAY_MS);
             resolve(false);
+            setTimeout(() => initWhatsApp(), RETRY_DELAY_MS);
           } else {
             // Max retries exhausted — wait for manual reconnect
             console.log('[WhatsApp] Max retries reached. Use admin panel to reconnect.');
