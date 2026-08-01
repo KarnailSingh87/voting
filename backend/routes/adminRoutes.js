@@ -91,6 +91,27 @@ const imageUpload = multer({
   }
 });
 
+// multer for student photos
+const studentPhotoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dest = path.join(__dirname, '..', 'public', 'uploads', 'voters');
+      try { fs.mkdirSync(dest, { recursive: true }); } catch (e) {}
+      cb(null, dest);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || '') || '';
+      const name = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
+      cb(null, name);
+    }
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype || !file.mimetype.startsWith('image/')) return cb(new Error('Invalid file type'), false);
+    cb(null, true);
+  }
+});
+
 // helper to normalise photo paths – return relative paths and let the frontend prepend the backend URL
 function absoluteUrl(_req, url) {
   if (!url) return null;
@@ -2469,6 +2490,30 @@ router.get('/students/:roll/photo', adminAuth, async (req, res) => {
     // fallback: return as JSON
     res.json({ success: true, photo: photoValue });
   } catch (e) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Admin: upload student photo
+router.post('/students/:roll/photo', adminAuth, studentPhotoUpload.single('photo'), async (req, res) => {
+  try {
+    const roll = req.params.roll;
+    if (!roll) return res.status(400).json({ success: false, message: 'Roll required' });
+    if (!req.file) return res.status(400).json({ success: false, message: 'Photo file required' });
+    const escaped = roll.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const student = await Student.findOne({ roll: { $regex: `^${escaped}$`, $options: 'i' } });
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+
+    student.photo = req.file.filename;
+    // Clear potentially conflicting photo URL fields so the local file takes precedence
+    if (student.photoUrl) student.photoUrl = undefined;
+    if (student.imageUrl) student.imageUrl = undefined;
+    
+    await student.save();
+    try { await AdminAction.create({ admin: req.admin?.aid, action: 'upload-student-photo', details: { roll, filename: req.file.filename }, ip: req.ip }); } catch(_){}
+    res.json({ success: true, photo: req.file.filename });
+  } catch (e) {
+    console.error('student photo upload error:', e);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
