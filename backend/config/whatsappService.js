@@ -1,5 +1,5 @@
 // WhatsApp OTP Service using Baileys
-import makeWASocket, { DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } from '@whiskeysockets/baileys/lib/index.js';
+import makeWASocket, { DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, Browsers } from '@whiskeysockets/baileys/lib/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -65,7 +65,7 @@ export async function initWhatsApp() {
         logger,
         version,
         // Using a common desktop UA tends to be more stable than mobile-like values.
-        browser: ['Voting System', 'Chrome', '1.0.0'],
+        browser: Browsers.macOS('Desktop'),
         // Ensure we always get QR updates (but we don't print it in server logs)
         printQRInTerminal: false,
         connectTimeoutMs: 60000,
