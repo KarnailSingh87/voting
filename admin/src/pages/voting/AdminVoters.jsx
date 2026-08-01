@@ -182,7 +182,7 @@ const AdminVoters = () => {
   };
 
   const openEdit = (student) => {
-    setEditing({ ...student });
+    setEditing({ ...student, _originalRoll: student.roll });
     setPhotoFile(null);
     setPhotoPreviewUrl(null);
     setRemotePhotoUrl(null);
@@ -223,6 +223,7 @@ const AdminVoters = () => {
     if (!editing) return;
     // client-side validation
     const errs = {};
+    if (!editing.roll || String(editing.roll).trim().length === 0) errs.roll = 'Roll No is required';
     if (!editing.name || editing.name.trim().length < 2) errs.name = 'Name is required';
     const email = (editing.email || '').trim();
     if (email) {
@@ -244,7 +245,8 @@ const AdminVoters = () => {
 
     try {
       // Save text fields
-      await axios.patch(`/api/admin/students/${encodeURIComponent(editing.roll)}`, { 
+      await axios.patch(`/api/admin/students/${encodeURIComponent(editing._originalRoll)}`, { 
+        roll: editing.roll,
         name: editing.name, 
         email: editing.email, 
         mobile: editing.mobile,
@@ -395,6 +397,11 @@ const AdminVoters = () => {
           <div className="bg-white p-6 rounded shadow-lg w-[600px] max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-medium mb-3">Edit Voter {editing.roll}</h3>
             <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Roll No *</label>
+                <input value={editing.roll || ''} onChange={e=>setEditing(s=>({...s, roll: e.target.value}))} className="w-full px-3 py-2 border rounded" />
+                {editing.__errs?.roll && <div className="text-xs text-red-600 mt-1">{editing.__errs.roll}</div>}
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Name *</label>
                 <input value={editing.name || ''} onChange={e=>setEditing(s=>({...s, name: e.target.value}))} className="w-full px-3 py-2 border rounded" />
