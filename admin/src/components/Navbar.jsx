@@ -9,15 +9,14 @@ const Navbar = ({ setToken }) => {
   const [theme, setTheme] = useState('light');
 
   useEffect(() => {
-    // Initialize theme from localStorage or system preference
+    // Initialize theme from localStorage (default to light mode)
     const stored = localStorage.getItem('adminTheme');
-    if (stored) {
-      setTheme(stored);
-      document.documentElement.classList.toggle('dark', stored === 'dark');
+    if (stored === 'dark') {
+      setTheme('dark');
+      document.documentElement.classList.add('dark');
     } else {
-      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setTheme(prefersDark ? 'dark' : 'light');
-      document.documentElement.classList.toggle('dark', prefersDark);
+      setTheme('light');
+      document.documentElement.classList.remove('dark');
     }
   }, []);
 

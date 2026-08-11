@@ -5,14 +5,14 @@ import './index.css'
 import './i18n'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 
-// Initialize theme globally so all pages/components honor it on first render
+// Initialize theme globally (default to light mode unless explicitly set to dark in localStorage)
 (() => {
   try {
     const stored = localStorage.getItem('adminTheme');
-    if (stored) {
-      document.documentElement.classList.toggle('dark', stored === 'dark');
-    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    if (stored === 'dark') {
       document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
   } catch (e) {
     // ignore

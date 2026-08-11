@@ -62,16 +62,15 @@ const PublicDashboard = () => {
   const [theme, setTheme] = useState('light');
   // retry UI states removed — retries now run silently in background
 
-  // Theme initialization
+  // Theme initialization (defaults to light mode across all devices unless explicitly set in localStorage)
   useEffect(() => {
     const stored = localStorage.getItem('voterTheme');
-    if (stored) {
-      setTheme(stored);
-      document.documentElement.classList.toggle('dark', stored === 'dark');
+    if (stored === 'dark') {
+      setTheme('dark');
+      document.documentElement.classList.add('dark');
     } else {
-      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setTheme(prefersDark ? 'dark' : 'light');
-      document.documentElement.classList.toggle('dark', prefersDark);
+      setTheme('light');
+      document.documentElement.classList.remove('dark');
     }
   }, []);
 

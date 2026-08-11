@@ -8,14 +8,14 @@ import 'react-toastify/dist/ReactToastify.css'
 import { Web3Provider } from './context/Web3Context'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 
-// Initialize theme globally so pages render with the correct theme instantly
+// Initialize theme globally (default to light mode unless explicitly set to dark in localStorage)
 (() => {
   try {
     const stored = localStorage.getItem('voterTheme');
-    if (stored) {
-      document.documentElement.classList.toggle('dark', stored === 'dark');
-    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    if (stored === 'dark') {
       document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
   } catch (e) {
     // ignore
