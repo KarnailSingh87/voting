@@ -1,6 +1,9 @@
-# 🗳️ Secure & Transparent Online Voting System
+# 🗳️ Block Ballot — Secure & Transparent University Voting System
 
-A comprehensive voting platform with OTP authentication, real-time updates, and blockchain integration support.
+> **⚠️ PROPRIETARY SOFTWARE — All Rights Reserved. See [LICENSE](./LICENSE) for terms.**
+
+A comprehensive full-stack voting platform for university-level elections, featuring OTP authentication (WhatsApp/email), real-time vote monitoring, admin election management, and optional Ethereum blockchain integration.
+
 
 ---
 
@@ -1156,3 +1159,24 @@ MIT License - See LICENSE file
 <!-- Maintenance note: verified layout and documentation on 2024-12-29 -->
 
 <!-- Maintenance note: verified layout and documentation on 2024-12-30 -->
+
+---
+
+## ⚠️ License & Copyright
+
+```
+Copyright (c) 2026 Karnail Singh. All Rights Reserved.
+```
+
+This project is **proprietary software**. Unauthorized copying, modification, distribution, or use of this codebase — in whole or in part — is strictly prohibited without prior written permission from the author.
+
+- ❌ Do NOT copy or reproduce this code
+- ❌ Do NOT submit this code as your own academic work
+- ❌ Do NOT use this commercially without permission
+- ✅ You MAY view the code for review/evaluation purposes only
+
+This project was submitted as a **B.Tech Capstone Project** at **Himachal Pradesh Technical University (HPTU)**. Academic plagiarism of this work may result in disciplinary and legal action.
+
+For licensing or collaboration inquiries, reach out via [GitHub](https://github.com/KarnailSingh87).
+
+> © 2026 Karnail Singh · Block Ballot · All Rights Reserved
