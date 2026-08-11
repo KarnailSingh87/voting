@@ -41,37 +41,30 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // CORS: allow origins from env, plus known frontends and any *.onrender.com for Render deployments
 const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : [];
-// Default known frontends (Render deployments)
-const defaultAllowedOrigins = [
-  'https://voteadmin.onrender.com',
-  'https://voting-xr9p.onrender.com'
-];
-if (process.env.NODE_ENV === 'production' && !allowedOrigins.length) {
-  console.warn('WARNING: No CORS_ORIGIN configured for production — this will allow requests from any origin. Set CORS_ORIGIN in env to a comma-separated allowlist.');
-}
+
 app.use(cors({
   origin: (origin, cb) => {
     // allow requests with no origin (curl, mobile apps, server-to-server)
     if (!origin) return cb(null, true);
-  // allow if in explicit list or defaults
-  if (allowedOrigins.length && allowedOrigins.includes(origin)) return cb(null, true);
-  if (!allowedOrigins.length && defaultAllowedOrigins.includes(origin)) return cb(null, true);
+    // allow if '*' specified in env
+    if (allowedOrigins.includes('*')) return cb(null, true);
+    // allow if in explicit list
+    if (allowedOrigins.length && allowedOrigins.includes(origin)) return cb(null, true);
     // allow any *.onrender.com origin (all Render static sites)
-    if (origin.endsWith('.onrender.com')) return cb(null, true);
+    if (origin.endsWith('.onrender.com') || origin.includes('render.com')) return cb(null, true);
     // allow localhost for development
     if (origin.match(/^https?:\/\/localhost(:\d+)?$/)) return cb(null, true);
-    // if no explicit list was provided, allow everything
+    // if no explicit list was provided, default to allowing all origins so public site opens without admin login
     if (!allowedOrigins.length) return cb(null, true);
     cb(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));
+
 // Security headers: use helmet with tuned options and add a few custom headers.
 app.use(helmet({
-  // Set a reasonable Cross-Origin-Resource-Policy for responses
-  crossOriginResourcePolicy: { policy: 'same-origin' },
-  // Keep COEP disabled by default to avoid breaking cross-origin resources;
-  // we'll still expose the header with a conservative value so scanners see it.
+  // Set Cross-Origin-Resource-Policy to cross-origin so public assets/APIs load without restriction
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
   crossOriginEmbedderPolicy: false,
   // We'll set a CSP below explicitly to avoid breaking the frontend while improving security.
   contentSecurityPolicy: false
