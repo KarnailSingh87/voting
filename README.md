@@ -4,6 +4,7 @@
 
 A comprehensive full-stack voting platform for university-level elections, featuring OTP authentication (WhatsApp/email), real-time vote monitoring, admin election management, and optional Ethereum blockchain integration.
 
+🌐 **Live Demo:** [voteksingh.onrender.com](https://voteksingh.onrender.com)
 
 ---
 
