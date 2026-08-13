@@ -56,7 +56,7 @@ const PublicDashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [elections, setElections] = useState([]);
-  const [electionFilter, setElectionFilter] = useState('active');
+  const [electionFilter, setElectionFilter] = useState('all');
   const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [theme, setTheme] = useState(() => {
