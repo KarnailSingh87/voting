@@ -1,7 +1,9 @@
 import { Routes, Route } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 
-// Lazy-loaded pages for code splitting and faster initial load
+import PublicDashboard from './pages/voting/PublicDashboard';
+
+// Lazy-loaded secondary pages for code splitting
 const Register = lazy(() => import('./pages/voting/Register'));
 const Login = lazy(() => import('./pages/voting/Login'));
 const Dashboard = lazy(() => import('./pages/voting/Dashboard'));
@@ -9,7 +11,6 @@ const Ballot = lazy(() => import('./pages/voting/Ballot'));
 const History = lazy(() => import('./pages/voting/History'));
 const Verify = lazy(() => import('./pages/voting/Verify'));
 const Profile = lazy(() => import('./pages/voting/Profile'));
-const PublicDashboard = lazy(() => import('./pages/voting/PublicDashboard'));
 const PublicElection = lazy(() => import('./pages/voting/PublicElection'));
 const PublicLedger = lazy(() => import('./pages/voting/PublicLedger'));
 const StudentDetail = lazy(() => import('./pages/voting/StudentDetail'));
