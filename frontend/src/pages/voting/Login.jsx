@@ -36,7 +36,10 @@ const Login = () => {
   // removed unused emailError state
 
   // Theme state for login page (no navbar here)
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('voterTheme') === 'dark' ? 'dark' : 'light'; }
+    catch { return 'light'; }
+  });
   useEffect(() => {
     const stored = localStorage.getItem('voterTheme');
     if (stored === 'dark') {
@@ -45,6 +48,7 @@ const Login = () => {
     } else {
       setTheme('light');
       document.documentElement.classList.remove('dark');
+      if (!stored) localStorage.setItem('voterTheme', 'light');
     }
   }, []);
   const toggleTheme = () => {

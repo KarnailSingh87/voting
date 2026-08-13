@@ -24,7 +24,10 @@ const VoterNavbar = () => {
   const location = useLocation();
   const [voter, setVoter] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('voterTheme') === 'dark' ? 'dark' : 'light'; }
+    catch { return 'light'; }
+  });
 
   // Initialize theme from localStorage (default to light mode)
   useEffect(() => {
@@ -35,6 +38,7 @@ const VoterNavbar = () => {
     } else {
       setTheme('light');
       document.documentElement.classList.remove('dark');
+      if (!stored) localStorage.setItem('voterTheme', 'light');
     }
   }, []);
 

@@ -59,10 +59,12 @@ const PublicDashboard = () => {
   const [electionFilter, setElectionFilter] = useState('active');
   const [photoModal, setPhotoModal] = useState({ show: false, url: null, name: '' });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [theme, setTheme] = useState('light');
-  // retry UI states removed — retries now run silently in background
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('voterTheme') === 'dark' ? 'dark' : 'light'; }
+    catch { return 'light'; }
+  });
 
-  // Theme initialization (defaults to light mode across all devices unless explicitly set in localStorage)
+  // Theme initialization (defaults to light mode across all devices unless explicitly set to dark in localStorage)
   useEffect(() => {
     const stored = localStorage.getItem('voterTheme');
     if (stored === 'dark') {
@@ -71,6 +73,7 @@ const PublicDashboard = () => {
     } else {
       setTheme('light');
       document.documentElement.classList.remove('dark');
+      if (!stored) localStorage.setItem('voterTheme', 'light');
     }
   }, []);
 

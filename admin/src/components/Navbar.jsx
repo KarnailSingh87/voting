@@ -6,7 +6,10 @@ import './Navbar.css';
 
 const Navbar = ({ setToken }) => {
   const { t } = useTranslation();
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('adminTheme') === 'dark' ? 'dark' : 'light'; }
+    catch { return 'light'; }
+  });
 
   useEffect(() => {
     // Initialize theme from localStorage (default to light mode)
@@ -17,6 +20,7 @@ const Navbar = ({ setToken }) => {
     } else {
       setTheme('light');
       document.documentElement.classList.remove('dark');
+      if (!stored) localStorage.setItem('adminTheme', 'light');
     }
   }, []);
 

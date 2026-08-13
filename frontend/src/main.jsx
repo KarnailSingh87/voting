@@ -16,6 +16,9 @@ import RouteErrorBoundary from './components/RouteErrorBoundary'
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
+      if (!stored) {
+        localStorage.setItem('voterTheme', 'light');
+      }
     }
   } catch (e) {
     // ignore

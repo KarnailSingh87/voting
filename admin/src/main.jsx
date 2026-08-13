@@ -13,6 +13,9 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
+      if (!stored) {
+        localStorage.setItem('adminTheme', 'light');
+      }
     }
   } catch (e) {
     // ignore

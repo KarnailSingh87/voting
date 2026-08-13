@@ -107,6 +107,10 @@ export function Web3Provider({ children }) {
     else setupProvider(accs[0]);
   }, [disconnect, setupProvider]);
 
+  const onChainChanged = useCallback(() => {
+    window.location.reload();
+  }, []);
+
   // ── Detect wallet on mount ───────────────────────────────
   useEffect(() => {
     const detect = async () => {
@@ -122,15 +126,15 @@ export function Web3Provider({ children }) {
 
     if (window.ethereum) {
       window.ethereum.on('accountsChanged', onAccountsChanged);
-      window.ethereum.on('chainChanged', () => window.location.reload());
+      window.ethereum.on('chainChanged', onChainChanged);
     }
     return () => {
       if (window.ethereum) {
         window.ethereum.removeListener('accountsChanged', onAccountsChanged);
-        window.ethereum.removeListener('chainChanged', () => {});
+        window.ethereum.removeListener('chainChanged', onChainChanged);
       }
     };
-  }, [onAccountsChanged, setupProvider]);
+  }, [onAccountsChanged, onChainChanged, setupProvider]);
 
   // ── Connect Wallet ────────────────────────────────────────
   const connectWallet = useCallback(async () => {
