@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/voting';
+const uri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/voting';
 
 const electionSchema = new mongoose.Schema({
   title: String,
