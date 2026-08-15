@@ -29,6 +29,47 @@ const Elections = () => {
   }, []);
 
 
+  const [demoEnabled, setDemoEnabled] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const fetchDemoStatus = async () => {
+    try {
+      const res = await axios.get('/api/admin/demo-elections-status');
+      if (res.data?.success) {
+        setDemoEnabled(res.data.enabled);
+      }
+    } catch (err) {
+      console.error('Failed to fetch demo elections status', err);
+    }
+  };
+
+  const handleToggleDemo = async () => {
+    setDemoLoading(true);
+    const nextState = !demoEnabled;
+    try {
+      const res = await axios.post('/api/admin/toggle-demo-elections', { enable: nextState });
+      if (res.data?.success) {
+        setDemoEnabled(nextState);
+        toast.success(nextState ? 'Demo elections enabled & seeded!' : 'Demo elections disabled & removed!');
+        // Refetch elections list
+        const token = localStorage.getItem('adminToken');
+        const response = await axios.get('/api/admin/election', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.data?.success) {
+          setElections(response.data.elections);
+        }
+      } else {
+        toast.error(res.data?.message || 'Failed to toggle demo elections');
+      }
+    } catch (err) {
+      console.error('Failed to toggle demo elections', err);
+      toast.error('Error toggling demo elections');
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+
   useEffect(() => {
     const fetchElections = async () => {
       try {
@@ -54,6 +95,7 @@ const Elections = () => {
     };
 
     fetchElections();
+    fetchDemoStatus();
   }, []);
 
   const handleLogout = () => {
@@ -292,19 +334,45 @@ const Elections = () => {
         <Navbar onLogout={handleLogout} />
         
         <main className="flex-1 overflow-y-auto p-6">
-          <div className="mb-6 flex justify-between items-center">
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Election Management</h1>
               <p className="mt-1 text-sm text-gray-500">
                 Create and manage elections
               </p>
             </div>
-            <button
-              onClick={() => setShowCreateForm(!showCreateForm)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-            >
-              {showCreateForm ? 'Cancel' : 'Create Election'}
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm">
+                <span className="text-xs font-semibold text-gray-700 mr-2 flex items-center gap-1">
+                  ⚡ Demo Elections:
+                </span>
+                <button
+                  type="button"
+                  onClick={handleToggleDemo}
+                  disabled={demoLoading}
+                  title="Turn demo sample elections on or off"
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    demoEnabled ? 'bg-cyan-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className="sr-only">Toggle Demo Elections</span>
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      demoEnabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+                <span className={`ml-2 text-xs font-bold ${demoEnabled ? 'text-cyan-600' : 'text-gray-400'}`}>
+                  {demoLoading ? '...' : (demoEnabled ? 'ON' : 'OFF')}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowCreateForm(!showCreateForm)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+              >
+                {showCreateForm ? 'Cancel' : 'Create Election'}
+              </button>
+            </div>
           </div>
 
           {error && (

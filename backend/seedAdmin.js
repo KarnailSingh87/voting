@@ -5,21 +5,17 @@ import Admin from './models/Admin.js';
 
 dotenv.config();
 
-async function seedAdmin() {
+export async function seedSuperAdmin() {
   try {
-    await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting');
-    
     const username = process.env.ADMIN_USERNAME || 'admin';
-    const email = process.env.ADMIN_EMAIL || 'admin@Voting.com';
+    const email = process.env.ADMIN_EMAIL || 'admin@voting.com';
     const password = process.env.ADMIN_PASSWORD || 'Admin@123456';
     
     // Check if super admin already exists
     const existing = await Admin.findOne({ role: 'super_admin' });
     if (existing) {
-      console.log('✓ Super admin already exists');
-      console.log('  Username:', existing.username);
-      console.log('  Email:', existing.email);
-      process.exit(0);
+      console.log('ℹ️ Super admin already exists');
+      return { seeded: false, username: existing.username, email: existing.email };
     }
     
     // Create new super admin
@@ -31,18 +27,22 @@ async function seedAdmin() {
       role: 'super_admin'
     });
     
-    console.log('✓ Super admin created successfully!');
-    console.log('  Username:', username);
-    console.log('  Email:', email);
-    console.log('  Password:', password);
-    console.log('  ID:', admin._id);
-    console.log('\nUse these credentials to login to admin panel.');
-    
-    process.exit(0);
+    console.log('✅ Super admin created successfully!');
+    return { seeded: true, username, email, password, id: admin._id };
   } catch (error) {
-    console.error('Error seeding admin:', error);
-    process.exit(1);
+    console.error('❌ Error seeding super admin:', error);
+    throw error;
   }
 }
 
-seedAdmin();
+if (process.argv[1] && process.argv[1].endsWith('seedAdmin.js')) {
+  (async () => {
+    try {
+      await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting');
+      await seedSuperAdmin();
+      process.exit(0);
+    } catch (err) {
+      process.exit(1);
+    }
+  })();
+}

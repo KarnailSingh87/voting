@@ -25,6 +25,7 @@ import { createElectionOnChain, addCandidateOnChain, finalizeElectionOnChain } f
 
 import Query from '../models/Query.js';
 import { sendWhatsAppMessage, resetWhatsAppAuth } from '../config/whatsappService.js';
+import { seedDemoElections, removeDemoElections, getDemoElectionsStatus } from '../seed_demo_elections.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -145,6 +146,47 @@ router.post('/seed-super', async (req, res) => {
   } catch(e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Seed demo elections (convenience endpoint for dev / initial deployment setup)
+router.post('/seed-demo-elections', async (req, res) => {
+  try {
+    const result = await seedDemoElections({ force: req.body?.force === true });
+    res.json(result);
+  } catch (e) {
+    console.error('Error seeding demo elections:', e);
+    res.status(500).json({ message: 'Server error seeding demo elections', error: e.message });
+  }
+});
+
+// Check status of demo elections
+router.get('/demo-elections-status', async (req, res) => {
+  try {
+    const status = await getDemoElectionsStatus();
+    res.json({ success: true, ...status });
+  } catch (e) {
+    console.error('Error fetching demo elections status:', e);
+    res.status(500).json({ success: false, message: 'Server error checking demo elections status' });
+  }
+});
+
+// Toggle demo elections ON / OFF
+router.post('/toggle-demo-elections', async (req, res) => {
+  try {
+    const shouldEnable = req.body?.enable !== undefined ? req.body.enable : req.body?.enabled;
+    if (shouldEnable === true) {
+      const result = await seedDemoElections({ force: true });
+      return res.json({ success: true, enabled: true, ...result });
+    } else if (shouldEnable === false) {
+      const result = await removeDemoElections();
+      return res.json({ success: true, enabled: false, ...result });
+    } else {
+      return res.status(400).json({ success: false, message: 'Missing "enable" boolean parameter' });
+    }
+  } catch (e) {
+    console.error('Error toggling demo elections:', e);
+    res.status(500).json({ success: false, message: 'Server error toggling demo elections' });
   }
 });
 

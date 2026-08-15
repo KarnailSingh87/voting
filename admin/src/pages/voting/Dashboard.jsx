@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
+import { toast } from 'react-toastify';
 import axios from '../../utils/axios';
 
 const AdminDashboard = () => {
@@ -9,6 +10,8 @@ const AdminDashboard = () => {
   const [chainStats, setChainStats] = useState(null);
   const [chainValidation, setChainValidation] = useState(null);
   const [validatingChain, setValidatingChain] = useState(false);
+  const [demoEnabled, setDemoEnabled] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -60,8 +63,20 @@ const AdminDashboard = () => {
       }
     };
 
+    const fetchDemoStatus = async () => {
+      try {
+        const res = await axios.get('/api/admin/demo-elections-status');
+        if (res.data?.success) {
+          setDemoEnabled(res.data.enabled);
+        }
+      } catch (err) {
+        console.error('Failed to fetch demo status', err);
+      }
+    };
+
     fetchDashboardData();
     fetchChainStats();
+    fetchDemoStatus();
     const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5005');
     socket.on('vote_cast', (_payload) => {
       // Could trigger a refetch or update a local tally widget in future
@@ -72,9 +87,34 @@ const AdminDashboard = () => {
       // Refetch to update stats
       fetchDashboardData();
       fetchChainStats();
+      fetchDemoStatus();
     });
     return () => socket.disconnect();
   }, []);
+
+  const handleToggleDemo = async () => {
+    setDemoLoading(true);
+    const nextState = !demoEnabled;
+    try {
+      const res = await axios.post('/api/admin/toggle-demo-elections', { enable: nextState });
+      if (res.data?.success) {
+        setDemoEnabled(nextState);
+        toast.success(nextState ? 'Demo elections enabled & seeded!' : 'Demo elections disabled & removed!');
+        // Refetch dashboard data
+        const response = await axios.get('/api/admin/dashboard');
+        if (response.data.success) {
+          setDashboardData(response.data.dashboard);
+        }
+      } else {
+        toast.error(res.data?.message || 'Failed to toggle demo elections');
+      }
+    } catch (err) {
+      console.error('Failed to toggle demo elections', err);
+      toast.error('Error toggling demo elections');
+    } finally {
+      setDemoLoading(false);
+    }
+  };
 
   const handleValidateChain = async () => {
     setValidatingChain(true);
@@ -389,6 +429,29 @@ const AdminDashboard = () => {
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             Operational
                           </span>
+                        </dd>
+                      </div>
+                      <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 items-center">
+                        <dt className="text-sm font-medium text-gray-500">Demo Elections</dt>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 flex items-center justify-between">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${demoEnabled ? 'bg-cyan-100 text-cyan-800' : 'bg-gray-100 text-gray-600'}`}>
+                            {demoEnabled ? 'Active (2 Sample Elections)' : 'Disabled'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleToggleDemo}
+                            disabled={demoLoading}
+                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              demoEnabled ? 'bg-cyan-600' : 'bg-gray-300'
+                            }`}
+                          >
+                            <span className="sr-only">Toggle Demo Elections</span>
+                            <span
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                demoEnabled ? 'translate-x-5' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
                         </dd>
                       </div>
                     </dl>

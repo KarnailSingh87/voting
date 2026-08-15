@@ -19,6 +19,8 @@ import debugRoutes from './routes/debugRoutes.js';
 import { initOTPService } from './config/otpService.js';
 import { createGenesisBlock } from './services/blockchainService.js';
 import { initWeb3 } from './services/web3Service.js';
+import { seedSuperAdmin } from './seedAdmin.js';
+import { seedDemoElections } from './seed_demo_elections.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -276,6 +278,19 @@ const PORT = Number(process.env.PORT) || 5005;
 
 async function startServer() {
   await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/aadhaar_Voting');
+
+  // Auto-seed default super admin and demo elections if database is empty (unless disabled via env)
+  try {
+    await seedSuperAdmin();
+    const enableDemo = process.env.ENABLE_DEMO_ELECTIONS !== 'false' && process.env.SEED_DEMO_ELECTIONS !== 'false';
+    if (enableDemo) {
+      await seedDemoElections();
+    } else {
+      console.log('ℹ️ Demo elections seeding skipped (ENABLE_DEMO_ELECTIONS=false)');
+    }
+  } catch (err) {
+    console.warn('Auto-seed check failed (non-fatal):', err && err.message ? err.message : err);
+  }
 
   // initialize OTP/email transporter so requestOTP can actually send emails (Ethereal or SMTP)
   // Initialize blockchain (create genesis block if needed)
